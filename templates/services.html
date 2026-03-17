@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% macro icon_path(type) %}
+    {% if type == 'star' %}M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z{% elif type == 'zap' %}M13 2L3 14h9l-1 8 10-12h-9l1-8z{% elif type == 'heart' %}M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z{% elif type == 'globe' %}M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z{% elif type == 'award' %}M12 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM8.21 13.89L7 23l5-3 5 3-1.21-9.12{% else %}M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z{% endif %}
+{% endmacro %}
+
+<style>
+    .services-landing { background: var(--bg-alt); padding: 160px 80px 100px; }
+    .services-header { 
+        max-width: 1240px; margin: 0 auto 80px; 
+        display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: end; 
+    }
+    .services-header-right { 
+        color: var(--text-muted); font-size: 1.2rem; line-height: 1.8; 
+        max-width: 500px; font-weight: 400;
+    }
+
+    .services-grid { 
+        max-width: 1240px; margin: 0 auto; 
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 40px; 
+    }
+    .service-card { 
+        background: var(--bg); border-radius: 32px; padding: 60px 50px; 
+        position: relative; overflow: hidden; 
+        transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        border: 1px solid rgba(0,0,0,0.04);
+        display: flex; flex-direction: column; height: 100%;
+    }
+    .service-card:hover { transform: translateY(-12px); box-shadow: 0 40px 90px rgba(0,0,0,0.08); border-color: var(--primary-light); }
+
+    .service-num { 
+        position: absolute; top: 30px; right: 40px; 
+        font-family: var(--font-heading); font-size: 5rem; font-weight: 900; 
+        color: var(--primary); opacity: 0.04; line-height: 1; pointer-events: none; 
+    }
+    .service-icon { 
+        width: 64px; height: 64px; background: var(--bg-alt); 
+        border: 1px solid rgba(0,0,0,0.04); border-radius: 20px; 
+        display: flex; align-items: center; justify-content: center; 
+        margin-bottom: 40px; transition: all 0.4s;
+    }
+    .service-card:hover .service-icon { background: var(--primary); border-color: var(--primary); transform: rotate(-5deg) scale(1.1); }
+    .service-card:hover .service-icon svg { stroke: #fff; }
+    .service-icon svg { stroke: var(--text-main); transition: stroke 0.3s; }
+
+    .service-card h3 { 
+        font-family: var(--font-heading); font-size: 1.8rem; font-weight: 800; 
+        letter-spacing: -0.03em; color: var(--text-main); margin-bottom: 16px; 
+    }
+    .service-card p { color: var(--text-muted); font-size: 1rem; line-height: 1.8; margin-bottom: 40px; flex: 1; }
+    
+    .service-link { 
+        display: inline-flex; align-items: center; gap: 8px; 
+        color: var(--primary); font-size: 0.85rem; font-weight: 800; 
+        text-decoration: none; text-transform: uppercase; letter-spacing: 0.1em;
+        transition: all 0.3s;
+    }
+    .service-link svg { transition: transform 0.3s; }
+    .service-link:hover { color: var(--primary-dark); }
+    .service-link:hover svg { transform: translateX(6px); }
+
+    @media (max-width: 1024px) {
+        .services-landing { padding: 120px 40px 80px; }
+        .services-header { grid-template-columns: 1fr; gap: 24px; text-align: left; }
+    }
+</style>
+
+<section class="services-landing">
+    <div class="services-header reveal">
+        <div>
+            <span class="section-label">Capabilities</span>
+            <h2 class="section-title">Our Expertise</h2>
+        </div>
+        <p class="services-header-right">
+            We deliver high-impact digital solutions tailored to the unique goals of every partner. 
+            Quality is not an option; it's our standard.
+        </p>
+    </div>
+
+    <div class="services-grid">
+        {% for s in services %}
+        <div class="service-card reveal reveal-delay-{{ loop.index }}">
+            <div class="service-num">{{ '%02d' % loop.index }}</div>
+            <div class="service-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="{{ icon_path(s.get('icon_type', 'shield')) | trim }}"/>
+                </svg>
+            </div>
+            <h3 contenteditable="true">{{ s.title }}</h3>
+            <p contenteditable="true">{{ s.description }}</p>
+            <a href="contact.html" class="service-link">
+                Inquire now
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+{% endblock %}

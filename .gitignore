@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
+# Uploads and generated files
+static/uploads/*
+!static/uploads/.gitkeep
+static/generated/*
+!static/generated/.gitkeep

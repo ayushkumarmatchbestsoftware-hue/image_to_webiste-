@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .portfolio-landing { background: var(--bg); padding: 160px 80px 100px; }
+    .portfolio-header { 
+        max-width: 1240px; margin: 0 auto 80px; text-align: left; 
+    }
+    .portfolio-header p { 
+        color: var(--text-muted); max-width: 600px; font-size: 1.2rem; line-height: 1.8; 
+    }
+
+    /* Editorial Grid (Staggered) */
+    .portfolio-grid { 
+        max-width: 1240px; margin: 0 auto; 
+        display: grid; grid-template-columns: repeat(12, 1fr); gap: 40px;
+    }
+    .portfolio-card { 
+        grid-column: span 6; position: relative; border-radius: 32px; overflow: hidden; 
+        background: var(--bg-alt); transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        border: 1px solid rgba(0,0,0,0.04);
+    }
+    .portfolio-card:nth-child(3n+1) { grid-column: span 8; }
+    .portfolio-card:nth-child(3n+2) { grid-column: span 4; }
+    .portfolio-card:nth-child(3n+3) { grid-column: span 12; }
+
+    .portfolio-card:hover { transform: translateY(-12px); box-shadow: 0 40px 100px rgba(0,0,0,0.1); }
+
+    .portfolio-img-wrap { overflow: hidden; position: relative; height: 480px; }
+    .portfolio-card:nth-child(3n+2) .portfolio-img-wrap { height: 480px; }
+    .portfolio-card:nth-child(3n+3) .portfolio-img-wrap { height: 560px; }
+
+    .portfolio-img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 1s cubic-bezier(.16,1,.3,1); }
+    .portfolio-card:hover .portfolio-img-wrap img { transform: scale(1.05); }
+
+    .portfolio-img-wrap.no-img { background: var(--primary-light); display: flex; align-items: center; justify-content: center; }
+    .portfolio-img-wrap.no-img::after { content: 'Project'; font-family: var(--font-heading); font-size: 1.5rem; font-weight: 800; color: var(--primary); opacity: 0.15; }
+
+
+    .portfolio-info { 
+        padding: 40px; display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; 
+    }
+
+    .portfolio-info h3 { 
+        font-family: var(--font-heading); font-size: 2rem; font-weight: 800; 
+        letter-spacing: -0.03em; color: var(--text-main); margin-bottom: 12px; 
+    }
+    .portfolio-info p { color: var(--text-muted); font-size: 1rem; line-height: 1.7; max-width: 480px; }
+    
+    .portfolio-arrow { 
+        flex-shrink: 0; width: 56px; height: 56px; background: var(--bg-alt); 
+        border: 1px solid rgba(0,0,0,0.04); border-radius: 50%; 
+        display: flex; align-items: center; justify-content: center; 
+        transition: all 0.4s; margin-top: 8px;
+    }
+    .portfolio-card:hover .portfolio-arrow { background: var(--primary); border-color: var(--primary); transform: translate(4px, -4px); }
+    .portfolio-card:hover .portfolio-arrow svg { stroke: #fff; }
+    .portfolio-arrow svg { stroke: var(--text-main); transition: stroke 0.3s; }
+
+    @media (max-width: 1024px) {
+        .portfolio-landing { padding: 120px 40px 80px; }
+        .portfolio-card { grid-column: span 12 !important; }
+        .portfolio-img-wrap { height: 380px !important; }
+    }
+</style>
+
+<section class="portfolio-landing">
+    <div class="portfolio-header reveal">
+        <span class="section-label">Case Studies</span>
+        <h2 class="section-title">Selected Works</h2>
+        <p>A curated gaze into our most significant collaborations. We don't just build; we craft legacies through precision and bold digital architecture.</p>
+    </div>
+
+    <div class="portfolio-grid">
+        {% for p in portfolio %}
+        <div class="portfolio-card reveal reveal-delay-{{ loop.index }}">
+
+            {% set img_index = loop.index0 + 2 %}
+            {% set has_img = images and images|length > img_index %}
+            <div class="portfolio-img-wrap {{ 'no-img' if not has_img }}">
+                {% if has_img %}
+                <img src="{{ images[img_index] }}" alt="{{ p.title }}">
+                {% endif %}
+            </div>
+
+            <div class="portfolio-info">
+                <div>
+                    <div class="badge-item">{{ p.get('tag', 'Strategic Project') }}</div>
+                    <h3 contenteditable="true">{{ p.title }}</h3>
+                    <p contenteditable="true">{{ p.description }}</p>
+                </div>
+                <div class="portfolio-arrow">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="7" y1="17" x2="17" y2="7"/>
+                        <polyline points="7 7 17 7 17 17"/>
+                    </svg>
+                </div>
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+{% endblock %}
