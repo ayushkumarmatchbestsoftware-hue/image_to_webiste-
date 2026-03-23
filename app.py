@@ -19,46 +19,43 @@ MAX_IMAGES = app.config["MAX_IMAGES"]
 # NICHE → DESIGN TOKENS
 # ---------------------------------------------------------------------------
 NICHE_DESIGN = {
-    "restaurant":   {"font_heading": "Cormorant Garamond", "font_body": "Lato",            "primary": "#c0392b", "primary_dark": "#2c1810", "bg": "#fdf6ec", "bg_alt": "#f5ede0", "text_main": "#1a0f0a", "text_muted": "#7a5c4e", "accent": "#e67e22", "mood": "warm intimate dining"},
-    "cafe":         {"font_heading": "Playfair Display",   "font_body": "Source Sans Pro",  "primary": "#3d1f0d", "primary_dark": "#1a0a04", "bg": "#fef9f0", "bg_alt": "#f5ede0", "text_main": "#1a0f0a", "text_muted": "#7a5c4e", "accent": "#8a9a5b", "mood": "artisanal cozy"},
-    "bakery":       {"font_heading": "Fraunces",           "font_body": "Nunito",           "primary": "#c9806b", "primary_dark": "#3d1f0d", "bg": "#fffbf5", "bg_alt": "#f9f0e6", "text_main": "#2d1810", "text_muted": "#8a6858", "accent": "#e8a598", "mood": "artisan patisserie"},
-    "bar":          {"font_heading": "Bebas Neue",         "font_body": "Raleway",          "primary": "#d4a017", "primary_dark": "#0d1b2a", "bg": "#0d1b2a", "bg_alt": "#12243a", "text_main": "#f5f0e8", "text_muted": "#94a3b8", "accent": "#d4a017", "mood": "moody sophisticated"},
-    "hotel":        {"font_heading": "Cormorant Garamond", "font_body": "Jost",             "primary": "#8b7355", "primary_dark": "#1a1a1a", "bg": "#faf5eb", "bg_alt": "#f0e8d8", "text_main": "#1a1a1a", "text_muted": "#6b5a45", "accent": "#c9a84c", "mood": "luxury hospitality"},
-    "spa":          {"font_heading": "Cormorant Garamond", "font_body": "Josefin Sans",     "primary": "#7c8c7a", "primary_dark": "#3d4a3b", "bg": "#fdfaf7", "bg_alt": "#f0ebe4", "text_main": "#2a2a2a", "text_muted": "#7a7a6a", "accent": "#a89a7c", "mood": "serene minimal"},
-    "yoga":         {"font_heading": "Cormorant Garamond", "font_body": "Karla",            "primary": "#7c9a6e", "primary_dark": "#2d4a28", "bg": "#f5efe0", "bg_alt": "#ece4d0", "text_main": "#1a2a18", "text_muted": "#6a7a5e", "accent": "#c97b4b", "mood": "organic calm"},
-    "fitness":      {"font_heading": "Barlow Condensed",   "font_body": "Barlow",           "primary": "#ef233c", "primary_dark": "#0a0a0a", "bg": "#f8f8f8", "bg_alt": "#efefef", "text_main": "#0a0a0a", "text_muted": "#555555", "accent": "#ef233c", "mood": "athletic power"},
-    "gym":          {"font_heading": "Bebas Neue",         "font_body": "Oswald",           "primary": "#ff4500", "primary_dark": "#0a0a0a", "bg": "#f5f5f5", "bg_alt": "#ebebeb", "text_main": "#111111", "text_muted": "#555555", "accent": "#ff4500", "mood": "raw intensity"},
-    "wellness":     {"font_heading": "Fraunces",           "font_body": "Karla",            "primary": "#2d6a4f", "primary_dark": "#1a3d2e", "bg": "#faf0e6", "bg_alt": "#f0e4d4", "text_main": "#1a2a1a", "text_muted": "#5a7a5a", "accent": "#d4a853", "mood": "natural holistic"},
-    "medical":      {"font_heading": "Nunito",             "font_body": "Source Sans Pro",  "primary": "#0d9488", "primary_dark": "#1e3a5f", "bg": "#f8fafc", "bg_alt": "#eef2f7", "text_main": "#0f172a", "text_muted": "#475569", "accent": "#0ea5e9", "mood": "trustworthy clinical"},
-    "dental":       {"font_heading": "Nunito",             "font_body": "Lato",             "primary": "#0ea5e9", "primary_dark": "#0369a1", "bg": "#f0f9ff", "bg_alt": "#e0f2fe", "text_main": "#0c1a2e", "text_muted": "#475569", "accent": "#06b6d4", "mood": "fresh friendly"},
-    "law":          {"font_heading": "Cormorant Garamond", "font_body": "Lato",             "primary": "#c9a84c", "primary_dark": "#0c1b33", "bg": "#faf8f2", "bg_alt": "#f0ece0", "text_main": "#0c1b33", "text_muted": "#5a5a4a", "accent": "#c9a84c", "mood": "authoritative formal"},
-    "finance":      {"font_heading": "Libre Baskerville",  "font_body": "Source Sans Pro",  "primary": "#059669", "primary_dark": "#0f1f3d", "bg": "#f8fafc", "bg_alt": "#eef2f7", "text_main": "#0f172a", "text_muted": "#475569", "accent": "#10b981", "mood": "stable trustworthy"},
-    "consulting":   {"font_heading": "Montserrat",         "font_body": "Open Sans",        "primary": "#d97706", "primary_dark": "#1c1c1c", "bg": "#fafafa", "bg_alt": "#f0f0f0", "text_main": "#1a1a1a", "text_muted": "#555555", "accent": "#f59e0b", "mood": "professional results"},
-    "real estate":  {"font_heading": "Cormorant Garamond", "font_body": "Jost",             "primary": "#64748b", "primary_dark": "#1e293b", "bg": "#faf8f5", "bg_alt": "#f0ece6", "text_main": "#1e293b", "text_muted": "#64748b", "accent": "#94a3b8", "mood": "premium aspirational"},
-    "photography":  {"font_heading": "Cormorant Garamond", "font_body": "Lato",             "primary": "#c9a84c", "primary_dark": "#111111", "bg": "#f8f8f5", "bg_alt": "#efefeb", "text_main": "#111111", "text_muted": "#555555", "accent": "#c9a84c", "mood": "editorial cinematic"},
-    "fashion":      {"font_heading": "Bodoni Moda",        "font_body": "Raleway",          "primary": "#111111", "primary_dark": "#000000", "bg": "#fafaf8", "bg_alt": "#f0f0ee", "text_main": "#0a0a0a", "text_muted": "#555555", "accent": "#8a7a6a", "mood": "high fashion editorial"},
-    "interior":     {"font_heading": "Cormorant Garamond", "font_body": "Jost",             "primary": "#8a6a4a", "primary_dark": "#2a1a0a", "bg": "#f8f4ee", "bg_alt": "#eee8e0", "text_main": "#1a1210", "text_muted": "#7a6a5a", "accent": "#c9a87c", "mood": "luxury residential"},
-    "architecture": {"font_heading": "Montserrat",         "font_body": "Libre Franklin",   "primary": "#555555", "primary_dark": "#111111", "bg": "#f8f8f8", "bg_alt": "#eeeeee", "text_main": "#111111", "text_muted": "#666666", "accent": "#333333", "mood": "brutalist structural"},
-    "design":       {"font_heading": "Syne",               "font_body": "DM Sans",          "primary": "#111111", "primary_dark": "#000000", "bg": "#f7f6f3", "bg_alt": "#eeede8", "text_main": "#0a0a0a", "text_muted": "#555555", "accent": "#ffe600", "mood": "meta experimental"},
-    "saas":         {"font_heading": "Syne",               "font_body": "DM Sans",          "primary": "#06b6d4", "primary_dark": "#0f172a", "bg": "#f8fafc", "bg_alt": "#eef2f7", "text_main": "#0f172a", "text_muted": "#475569", "accent": "#0ea5e9", "mood": "technical credibility"},
-    "software":     {"font_heading": "Space Grotesk",      "font_body": "IBM Plex Sans",    "primary": "#00c896", "primary_dark": "#050a0f", "bg": "#f0f4f8", "bg_alt": "#e4eaf0", "text_main": "#050a0f", "text_muted": "#4a5568", "accent": "#00ff88", "mood": "engineering precision"},
-    "startup":      {"font_heading": "Syne",               "font_body": "Plus Jakarta Sans","primary": "#ff6b35", "primary_dark": "#111827", "bg": "#f9fafb", "bg_alt": "#f0f1f3", "text_main": "#111827", "text_muted": "#4b5563", "accent": "#ff8c5a", "mood": "disruptive ambitious"},
-    "ai":           {"font_heading": "Syne",               "font_body": "IBM Plex Sans",    "primary": "#3b82f6", "primary_dark": "#050810", "bg": "#f0f4ff", "bg_alt": "#e4ebff", "text_main": "#050810", "text_muted": "#4a5568", "accent": "#60a5fa", "mood": "futuristic intelligent"},
-    "tech":         {"font_heading": "Exo 2",              "font_body": "Manrope",          "primary": "#6366f1", "primary_dark": "#0f172a", "bg": "#f8fafc", "bg_alt": "#eef2f7", "text_main": "#0f172a", "text_muted": "#475569", "accent": "#818cf8", "mood": "modern geometric"},
-    "app":          {"font_heading": "Syne",               "font_body": "DM Sans",          "primary": "#7c3aed", "primary_dark": "#1e0a3c", "bg": "#faf8ff", "bg_alt": "#f0ebff", "text_main": "#1e0a3c", "text_muted": "#6b5b9a", "accent": "#a78bfa", "mood": "product-led bold"},
-    "portfolio":    {"font_heading": "Cormorant Garamond", "font_body": "DM Sans",          "primary": "#111111", "primary_dark": "#000000", "bg": "#fafafa", "bg_alt": "#f0f0f0", "text_main": "#111111", "text_muted": "#555555", "accent": "#333333", "mood": "minimal work-forward"},
-    "agency":       {"font_heading": "Syne",               "font_body": "DM Sans",          "primary": "#111111", "primary_dark": "#000000", "bg": "#f8f8f8", "bg_alt": "#eeeeee", "text_main": "#0a0a0a", "text_muted": "#555555", "accent": "#a3e635", "mood": "bold creative"},
-    "school":       {"font_heading": "Nunito",             "font_body": "Lato",             "primary": "#1e40af", "primary_dark": "#1e3a8a", "bg": "#f0f4ff", "bg_alt": "#e4ebff", "text_main": "#0f172a", "text_muted": "#475569", "accent": "#fbbf24", "mood": "welcoming community"},
-    "coaching":     {"font_heading": "Fraunces",           "font_body": "Karla",            "primary": "#92400e", "primary_dark": "#451a03", "bg": "#fef9f0", "bg_alt": "#f5ede0", "text_main": "#1c0a00", "text_muted": "#7a5030", "accent": "#d97706", "mood": "personal transformative"},
-    "nonprofit":    {"font_heading": "Fraunces",           "font_body": "Source Sans Pro",  "primary": "#166534", "primary_dark": "#052e16", "bg": "#f0fdf4", "bg_alt": "#dcfce7", "text_main": "#052e16", "text_muted": "#4a7a5a", "accent": "#f59e0b", "mood": "mission driven"},
-    "wedding":      {"font_heading": "Cormorant Garamond", "font_body": "Lato",             "primary": "#c9a87c", "primary_dark": "#3d1f0d", "bg": "#fffbf5", "bg_alt": "#f9f0e6", "text_main": "#2d1810", "text_muted": "#8a6858", "accent": "#e8c5a0", "mood": "romantic elegant"},
-    "event":        {"font_heading": "Bebas Neue",         "font_body": "Raleway",          "primary": "#facc15", "primary_dark": "#0a0a0a", "bg": "#0a0a0a", "bg_alt": "#141414", "text_main": "#fafafa", "text_muted": "#aaaaaa", "accent": "#fde047", "mood": "bold excitement"},
-    "music":        {"font_heading": "Syne",               "font_body": "DM Sans",          "primary": "#7c3aed", "primary_dark": "#0a0a0a", "bg": "#0a0a0a", "bg_alt": "#141414", "text_main": "#fafafa", "text_muted": "#aaaaaa", "accent": "#a78bfa", "mood": "dark atmospheric"},
-    "jewelry":      {"font_heading": "Cormorant Garamond", "font_body": "Raleway",          "primary": "#c9a84c", "primary_dark": "#111111", "bg": "#fafaf8", "bg_alt": "#f2f0eb", "text_main": "#111111", "text_muted": "#666655", "accent": "#e8c87a", "mood": "luxury desire"},
-    "clothing":     {"font_heading": "Bodoni Moda",        "font_body": "Raleway",          "primary": "#111111", "primary_dark": "#000000", "bg": "#fafaf8", "bg_alt": "#f2f0ee", "text_main": "#0a0a0a", "text_muted": "#555555", "accent": "#888888", "mood": "fashion editorial"},
-    "ecommerce":    {"font_heading": "Syne",               "font_body": "DM Sans",          "primary": "#111827", "primary_dark": "#030712", "bg": "#ffffff", "bg_alt": "#f9fafb", "text_main": "#111827", "text_muted": "#6b7280", "accent": "#3b82f6", "mood": "product conversion"},
-    "shop":         {"font_heading": "Nunito",             "font_body": "Lato",             "primary": "#2563eb", "primary_dark": "#1d4ed8", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#0f172a", "text_muted": "#475569", "accent": "#3b82f6", "mood": "clean retail"},
-    "food":         {"font_heading": "Fraunces",           "font_body": "DM Sans",          "primary": "#e63946", "primary_dark": "#9b1b24", "bg": "#fff8f0", "bg_alt": "#ffeedd", "text_main": "#1a0a04", "text_muted": "#7a4a3a", "accent": "#f4a261", "mood": "vibrant appetite"},
+    "restaurant":   {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#4338ca", "primary_dark": "#312e81", "bg": "#fffcf9", "bg_alt": "#f6f3f0", "text_main": "#1e1b4b", "text_muted": "#4338ca", "accent": "#f59e0b", "mood": "boutique dining"},
+    "cafe":         {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#7c2d12", "primary_dark": "#431407", "bg": "#fdfaf7", "bg_alt": "#f5f0eb", "text_main": "#431407", "text_muted": "#9a3412", "accent": "#10b981", "mood": "artisanal coffee"},
+    "bakery":       {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#92400e", "primary_dark": "#78350f", "bg": "#fffcf9", "bg_alt": "#f7f3f0", "text_main": "#451a03", "text_muted": "#b45309", "accent": "#f59e0b", "mood": "handcrafted patisserie"},
+    "bar":          {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#4f46e5", "primary_dark": "#3730a3", "bg": "#0a0a0a", "bg_alt": "#141414", "text_main": "#fafafa", "text_muted": "#818cf8", "accent": "#f59e0b", "mood": "speakeasy sophisticated"},
+    "hotel":        {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#0f172a", "primary_dark": "#022c22", "bg": "#faf9f6", "bg_alt": "#f2f0eb", "text_main": "#0f172a", "text_muted": "#334155", "accent": "#f59e0b", "mood": "curated hospitality"},
+    "spa":          {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#065f46", "primary_dark": "#064e3b", "bg": "#fcfaf8", "bg_alt": "#f4f0ec", "text_main": "#064e3b", "text_muted": "#059669", "accent": "#f59e0b", "mood": "editorial wellness"},
+    "yoga":         {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#166534", "primary_dark": "#14532d", "bg": "#f9f7f2", "bg_alt": "#f1eee6", "text_main": "#14532d", "text_muted": "#15803d", "accent": "#ea580c", "mood": "organic minimal"},
+    "fitness":      {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#dc2626", "primary_dark": "#991b1b", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#111827", "text_muted": "#4b5563", "accent": "#000000", "mood": "architectural performance"},
+    "gym":          {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#dc2626", "primary_dark": "#991b1b", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#111827", "text_muted": "#4b5563", "accent": "#000000", "mood": "raw architectural"},
+    "wellness":     {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#1e3a2f", "primary_dark": "#0c1a14", "bg": "#fdfbf7", "bg_alt": "#f5f2ed", "text_main": "#1e3a2f", "text_muted": "#4a5d52", "accent": "#f59e0b", "mood": "natural boutique"},
+    "medical":      {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#2563eb", "primary_dark": "#1e40af", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#0f172a", "text_muted": "#3b82f6", "accent": "#f59e0b", "mood": "premium clinical"},
+    "dental":       {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#2563eb", "primary_dark": "#1e40af", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#0f172a", "text_muted": "#0ea5e9", "accent": "#f59e0b", "mood": "clean professional"},
+    "law":          {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#1e293b", "primary_dark": "#0f172a", "bg": "#fcfcfc", "bg_alt": "#f1f1f1", "text_main": "#0f172a", "text_muted": "#475569", "accent": "#94a3b8", "mood": "authoritative minimalist"},
+    "finance":      {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#064e3b", "primary_dark": "#022c22", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#064e3b", "text_muted": "#059669", "accent": "#f59e0b", "mood": "premium stability"},
+    "consulting":   {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#1e1b4b", "primary_dark": "#0c0a09", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#1e1b4b", "text_muted": "#4338ca", "accent": "#f59e0b", "mood": "strategic minimalist"},
+    "real estate":  {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#334155", "primary_dark": "#1e293b", "bg": "#fdfcfa", "bg_alt": "#f4f2ef", "text_main": "#1e293b", "text_muted": "#475569", "accent": "#f59e0b", "mood": "editorial residential"},
+    "photography":  {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#000000", "primary_dark": "#000000", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#111827", "text_muted": "#4b5563", "accent": "#2563eb", "mood": "cinematic editorial"},
+    "fashion":      {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#db2777", "primary_dark": "#9d174d", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#111827", "text_muted": "#be185d", "accent": "#000000", "mood": "fashion editorial"},
+    "interior":     {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#4338ca", "primary_dark": "#312e81", "bg": "#fffcf9", "bg_alt": "#f6f3f0", "text_main": "#1e1b4b", "text_muted": "#4338ca", "accent": "#f59e0b", "mood": "architectural luxury"},
+    "architecture": {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#1e1b4b", "primary_dark": "#0c0a09", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#09090b", "text_muted": "#4b5563", "accent": "#2563eb", "mood": "structural architectural"},
+    "design":       {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#1e1b4b", "primary_dark": "#0c0a09", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#09090b", "text_muted": "#4b5563", "accent": "#2563eb", "mood": "modern experimental"},
+    "saas":         {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#4338ca", "primary_dark": "#312e81", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#1e1b4b", "text_muted": "#4338ca", "accent": "#f59e0b", "mood": "technical premium"},
+    "software":     {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#4338ca", "primary_dark": "#312e81", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#1e1b4b", "text_muted": "#4338ca", "accent": "#10b981", "mood": "precise engineering"},
+    "startup":      {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#4338ca", "primary_dark": "#312e81", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#1e1b4b", "text_muted": "#4338ca", "accent": "#f59e0b", "mood": "disruptive ambitious"},
+    "ai":           {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#4338ca", "primary_dark": "#312e81", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#1e1b4b", "text_muted": "#4338ca", "accent": "#4f46e5", "mood": "premium intelligent"},
+    "tech":         {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#4338ca", "primary_dark": "#312e81", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#111827", "text_muted": "#4338ca", "accent": "#1a1a1a", "mood": "structural engineering"},
+    "agency":       {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#4338ca", "primary_dark": "#312e81", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#111827", "text_muted": "#4338ca", "accent": "#1a1a1a", "mood": "premium minimalist"},
+    "school":       {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#1e40af", "primary_dark": "#1e3a8a", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#1e293b", "text_muted": "#3b82f6", "accent": "#f59e0b", "mood": "modern academic"},
+    "coaching":     {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#1e1b4b", "primary_dark": "#0c0a09", "bg": "#fafafa", "bg_alt": "#f4f4f5", "text_main": "#18181b", "text_muted": "#4338ca", "accent": "#4f46e5", "mood": "visionary leadership"},
+    "nonprofit":    {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#064e3b", "primary_dark": "#022c22", "bg": "#ffffff", "bg_alt": "#f0fdf4", "text_main": "#064e3b", "text_muted": "#10b981", "accent": "#f59e0b", "mood": "impactful boutique"},
+    "wedding":      {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#7c2d12", "primary_dark": "#431407", "bg": "#fffdfa", "bg_alt": "#fdf5e6", "text_main": "#431407", "text_muted": "#9a3412", "accent": "#f59e0b", "mood": "cinematic romantic"},
+    "event":        {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#dc2626", "primary_dark": "#991b1b", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#111827", "text_muted": "#4b5563", "accent": "#000000", "mood": "bold impact"},
+    "jewelry":      {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#1c1917", "primary_dark": "#000000", "bg": "#ffffff", "bg_alt": "#fafaf9", "text_main": "#1c1917", "text_muted": "#78716c", "accent": "#f59e0b", "mood": "quiet luxury"},
+    "clothing":     {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#000000", "primary_dark": "#000000", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#111827", "text_muted": "#4b5563", "accent": "#2563eb", "mood": "editorial fashion"},
+    "ecommerce":    {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#1e1b4b", "primary_dark": "#0c0a09", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#111827", "text_muted": "#4b5563", "accent": "#2563eb", "mood": "premium retail"},
+    "shop":         {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#1e1b4b", "primary_dark": "#0c0a09", "bg": "#ffffff", "bg_alt": "#f4f4f5", "text_main": "#111827", "text_muted": "#4b5563", "accent": "#2563eb", "mood": "modern retail"},
+    "food":         {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#991b1b", "primary_dark": "#7f1d1d", "bg": "#fffcf9", "bg_alt": "#fef2f2", "text_main": "#7f1d1d", "text_muted": "#dc2626", "accent": "#f59e0b", "mood": "artisanal quality"},
 }
 
 LAYOUT_BLUEPRINTS = {
@@ -98,11 +95,11 @@ def get_niche_key(prompt: str) -> str:
 def get_fallback_tokens(prompt: str) -> dict:
     key = get_niche_key(prompt)
     return NICHE_DESIGN.get(key, {
-        "font_heading": "Syne", "font_body": "DM Sans",
-        "primary": "#111827", "primary_dark": "#030712",
-        "bg": "#ffffff", "bg_alt": "#f9fafb",
-        "text_main": "#111827", "text_muted": "#6b7280",
-        "accent": "#3b82f6", "mood": "professional modern"
+        "font_heading": "Roboto", "font_body": "Roboto",
+        "primary": "#4f46e5", "primary_dark": "#312e81",
+        "bg": "#ffffff", "bg_alt": "#f8fafc",
+        "text_main": "#0f172a", "text_muted": "#475569",
+        "accent": "#f59e0b", "mood": "strategic minimalist"
     })
 
 def get_layout_blueprint(prompt: str) -> list:
@@ -221,15 +218,20 @@ def validate_and_fix_theme(theme: dict, fallback: dict, has_image: bool = False)
     #    - fullbleed: ONLY when user has uploaded an image (looks great with real photo)
     #    - dark bg niches (gym, bar, music etc): bold-center (text on dark bg, no empty right panel)
     #    - light bg niches: split-left (text left, visual/card right)
+    # 7. hero_style logic
+    #    - fullbleed: ONLY when user has uploaded an image (looks great with real photo)
+    #    - dark bg niches (gym, bar, music etc): bold-center (text on dark bg, no empty right panel)
+    #    - light bg niches: split-left (text left, visual/card right)
     if fixed.get("hero_style") not in ["split-left", "fullbleed", "bold-center"]:
         fixed["hero_style"] = "split-left"
-    if fixed["hero_style"] == "fullbleed" and not has_image:
-        # Without a real photo, fullbleed just looks like a color wash
-        # Dark bg → bold-center, light bg → split-left
-        fixed["hero_style"] = "bold-center" if bg_lum < 0.15 else "split-left"
-    if bg_lum < 0.15 and not has_image:
-        # Very dark bg (gym black, bar navy) → bold-center looks premium
+    
+    if not has_image:
+        # If no image, we want to avoid the "blank right side" look.
+        # bold-center is the safest/most professional looking layout without imagery.
         fixed["hero_style"] = "bold-center"
+    elif fixed["hero_style"] == "fullbleed":
+        # fullbleed is fine if we have an image
+        pass
 
     # 8. card_style
     if fixed.get("card_style") not in ["flat", "outlined", "elevated"]:
@@ -237,14 +239,15 @@ def validate_and_fix_theme(theme: dict, fallback: dict, has_image: bool = False)
 
     # 9. divider_style
     if fixed.get("divider_style") not in ["diagonal", "wave", "none"]:
-        fixed["divider_style"] = "diagonal"
+        fixed["divider_style"] = "none"
 
-    # 10. Font guards
-    bad_heading_fonts = ["Inter", "Roboto", "Arial", "system-ui", "sans-serif", ""]
-    if not fixed.get("font_heading") or fixed["font_heading"] in bad_heading_fonts:
-        fixed["font_heading"] = fallback.get("font_heading", "Syne")
-    if not fixed.get("font_body") or fixed["font_body"] in ["Arial", "system-ui", "sans-serif", ""]:
-        fixed["font_body"] = fallback.get("font_body", "DM Sans")
+    # 10. Font guards — DEFAULT IS ROBOTO
+    # Only allow other fonts if they are top-tier and explicitly in theme
+    top_tier = ["Roboto", "Plus Jakarta Sans", "Outfit", "Fraunces", "Playfair Display"]
+    if not fixed.get("font_heading") or fixed["font_heading"] not in top_tier:
+        fixed["font_heading"] = fallback.get("font_heading", "Roboto")
+    if not fixed.get("font_body") or fixed["font_body"] not in top_tier:
+        fixed["font_body"] = fallback.get("font_body", "Roboto")
 
     return fixed
 
@@ -252,11 +255,14 @@ def validate_and_fix_theme(theme: dict, fallback: dict, has_image: bool = False)
 # SYSTEM PROMPT
 # ---------------------------------------------------------------------------
 system_prompt = """
-You are a professional website copywriter and brand strategist.
-Write CONTENT for a website — real headlines, real copy, real descriptions.
+You are a Distinguished Creative Director and Brand Architect for an elite global agency.
+Your task is to materialize a website that feels meticulously handcrafted, professional, and entirely human.
 
-You will receive DEVELOPER DESIGN TOKENS. These set the visual style.
-NEVER put design token values (color names, font names, palette words) into any copy field.
+CRITICAL: ZERO AI LOOK.
+1. ABSOLUTELY NO generic marketing phrases ("Your partner in...", "One-stop shop", "Industry leader").
+2. USE SPECIALIZED JARGON. If it's a tech company, use terms like "Orchestration Layer", "State Management", "Concurrency". If it's a law firm, use "Transactional Integrity", "Litigation Strategy".
+3. COLOR IS MANDATORY. Every design must be vibrant and professional, using rich premium colors (Indigo, Slate, Crimson, Forest, etc.) paired with the Roboto typography system.
+4. COPY MUST BE DECISIVE. No "Welcome to". No "Discover". Start with facts and powerful industry statements.
 
 CRITICAL COPY RULES:
 - BAD title: "Delicate Patisserie in Blush Pinks and Warm Whites"  ← mentions colors
@@ -267,9 +273,9 @@ CRITICAL COPY RULES:
 Return ONLY valid JSON. No markdown fences. No text outside JSON.
 
 {
-  "theme": {
-    "font_heading": "EXACT_GOOGLE_FONT_FROM_TOKENS",
-    "font_body": "EXACT_GOOGLE_FONT_FROM_TOKENS",
+    "theme": {
+    "font_heading": "Roboto",
+    "font_body": "Roboto",
     "primary": "#hex",
     "primary_dark": "#hex",
     "primary_light": "rgba(r,g,b,0.12)",
@@ -279,9 +285,9 @@ Return ONLY valid JSON. No markdown fences. No text outside JSON.
     "text_main": "#hex dark enough for 4.5:1 contrast on bg",
     "text_muted": "#hex",
     "nav_bg": "rgba(r,g,b,0.92)",
-    "hero_style": "split-left",
-    "card_style": "elevated",
-    "divider_style": "diagonal"
+    "divider_style": "diagonal",
+    "hero_bg_id": "Unsplash ID that best fits the niche (Minimal/Modern Architectural style)",
+    "about_bg_id": "Unsplash ID that best fits the niche (different from hero_bg_id)"
   },
   "site_info": {
     "display_name": "2 word business name max",
@@ -307,12 +313,13 @@ Return ONLY valid JSON. No markdown fences. No text outside JSON.
   "services": [
     {"title": "Real service name", "description": "2 specific sentences.", "icon_type": "shield"},
     {"title": "Real service name", "description": "2 sentences.", "icon_type": "star"},
-    {"title": "Real service name", "description": "2 sentences.", "icon_type": "zap"}
+    {"title": "Real service name", "description": "2 sentences.", "icon_type": "zap"},
+    {"title": "Real service name", "description": "2 sentences.", "icon_type": "globe"}
   ],
   "portfolio": [
-    {"title": "Real project name", "description": "One result sentence.", "tag": "Category"},
-    {"title": "Real project name", "description": "One result sentence.", "tag": "Category"},
-    {"title": "Real project name", "description": "One result sentence.", "tag": "Category"}
+    {"title": "Bespoke Strategy", "description": "Architectural solution for a high-traffic system.", "tag": "Industrial Design", "client": "Global Logistics Corp", "outcome": "30% increase in regional distribution efficiency."},
+    {"title": "Bespoke Strategy", "description": "Architectural solution for a high-traffic system.", "tag": "Industrial Design", "client": "Global Logistics Corp", "outcome": "30% increase in regional distribution efficiency."},
+    {"title": "Bespoke Strategy", "description": "Architectural solution for a high-traffic system.", "tag": "Industrial Design", "client": "Global Logistics Corp", "outcome": "30% increase in regional distribution efficiency."}
   ],
   "testimonials": [
     {"name": "Full Name", "role": "Title, Company", "text": "Specific 2-sentence review with real details.", "rating": 5},
@@ -347,21 +354,20 @@ Return ONLY valid JSON. No markdown fences. No text outside JSON.
   "footer": {"tagline": "Memorable sign-off"}
 }
 
-ABSOLUTE RULES:
 1. Return ONLY JSON. No markdown. No text outside.
-2. hero_style: ONLY "split-left", "fullbleed", or "bold-center"
-3. card_style: ONLY "flat", "outlined", or "elevated"
-4. divider_style: ONLY "diagonal", "wave", or "none"
-5. Fonts MUST be real Google Fonts. NEVER Inter, Roboto, Arial as font_heading.
-6. primary_light MUST be rgba of primary at 0.10-0.15 opacity.
-7. bg and bg_alt MUST be different shades.
-8. text_main MUST have 4.5:1 contrast ratio against bg.
-9. ALL copy specific to THIS business — zero generic filler.
-10. ZERO color/font/design words in any copy field.
-11. layout only includes sections making sense for this business.
-12. pricing ONLY for SaaS/subscription businesses.
-13. testimonials sound like real people with specific real details.
-14. stats realistic for this exact business type.
+2. Fonts MUST be 'Roboto' for both heading and body by DEFAULT.
+3. Use RICH, VIBRANT colors in the theme. Avoid "clinical" black/white.
+4. ALL copy must be niche-perfect. Use the specific vocabulary of a high-end professional in that field.
+5. PORTFOLIO: Each item MUST have: 'tag' (niche expertise), 'title', 'description' (the HOW), 'client' (industry name), and 'outcome' (the RESULTS).
+   - NEVER use "Project", "Case Study", or "Service" as tags.
+6. NO AI-ISMS: Ban "Unlock", "Empower", "Comprehensive", "Seamless", "Journey", "Elevate".
+7. Content length must be varied (some punchy, some detailed) to look realistic.
+8. Use realistic, invented dummy content instead of [Placeholders].
+9. hero_style: "split-left", "fullbleed", or "bold-center"
+10. card_style: "flat", "outlined", or "elevated"
+11. divider_style: "diagonal", "wave", or "none"
+12. SERVICES: ALWAYS generate EXACTLY 4 services to ensure a balanced 2x2 or 4-column grid.
+13. BACKGROUNDS: If no images are provided, select professional Unsplash IDs for 'hero_bg_id' and 'about_bg_id'. Choose high-end architectural, nature, or abstract textures that complement the business niche. NO generic stock photos.
 """
 
 model = genai.GenerativeModel(
@@ -382,13 +388,21 @@ def generate_website_content(prompt, image_paths=None, image_count=0):
         fallback = get_fallback_tokens(prompt)
         layout   = get_layout_blueprint(prompt)
 
-        full_prompt = f"""Business: {prompt}
+        # Explicitly tell the AI how many portfolio entries to make to match the images
+        expected_port_count = min(3, max(0, image_count - 2))
+        image_summary = ""
+        if image_count > 0:
+            image_summary = f"\nIMAGE ALLOCATION (MUST MATCH):\n- Image 1: Hero\n- Image 2: About"
+            if image_count >= 3:
+                image_summary += f"\n- Images 3 to {min(5, image_count)}: Portfolio Case Studies (You MUST generate exactly {expected_port_count} items in the 'portfolio' list)."
 
-DEVELOPER DESIGN TOKENS (for theme JSON only — do NOT use these words in copy):
-- font_heading: {fallback['font_heading']}
-- font_body: {fallback['font_body']}
+        full_prompt = f"""Business: {prompt}
+{image_summary}
+
+DEVELOPER DESIGN TOKENS (pair these with Roboto for a premium look):
+- font_heading: Roboto
+- font_body: Roboto
 - primary color: {fallback['primary']}
-- primary_dark: {fallback['primary_dark']}
 - bg: {fallback['bg']}
 - bg_alt: {fallback['bg_alt']}
 - text_main: {fallback['text_main']}
@@ -400,20 +414,28 @@ SUGGESTED LAYOUT: {layout}
 IMAGES UPLOADED: {image_count}
 {"Analyze uploaded images for color and mood." if image_count > 0 else "No images — generate theme from business type only."}
 
-Write copy like a real human copywriter for THIS specific business. Zero generic phrases."""
+Write copy like a senior creative director for a high-end boutique agency. Roleplay as a human.
+CRITICAL RULES for Copy:
+1. NO AI-ISMS: Ban "Unlock", "Empower", "Comprehensive", "Seamless", "Journey", "Elevate".
+2. PORTFOLIO MATCHING: You must generate EXACTLY {expected_port_count} portfolio items in the 'portfolio' list to match images 3, 4, and 5.
+3. Content must be 100% realistic. If it's a law firm, sound like a top attorney. If it's a software agency, use specialized technical terms.
+4. NO "Welcome to", "Experience the", "Discover the", "Our journey"."""
 
         content_parts = [full_prompt]
         if image_paths:
-            for path in image_paths:
+            for i, path in enumerate(image_paths):
                 try:
                     img = Image.open(path)
+                    # Label the image for the Vision model
+                    label = "Hero Image" if i == 0 else "About Background" if i == 1 else f"Portfolio Project Image {i-1}"
+                    content_parts.append(f"--- ATTACHED IMAGE {i+1} ({label}) ---")
                     content_parts.append(img)
                 except Exception as e:
                     print(f"Skipping image {path}: {e}")
 
         response = model.generate_content(
             content_parts,
-            generation_config={"temperature": 0.75, "max_output_tokens": 4000}
+            generation_config={"temperature": 0.85, "max_output_tokens": 4000}
         )
 
         text = response.text.strip()
@@ -436,18 +458,18 @@ Write copy like a real human copywriter for THIS specific business. Zero generic
 
 
 def build_image_map(image_context: list, layout: list) -> dict:
-    total   = len(image_context)
-    mapping = {}
-    if total == 0:
-        return mapping
-    mapping["hero"] = image_context[0]
-    if total == 1:
-        mapping["about"] = image_context[0]
-        return mapping
-    if total >= 2:
-        mapping["about"] = image_context[1]
-    if total > 2:
-        mapping["portfolio"] = image_context[2:]
+    total = len(image_context)
+    mapping = {"hero": None, "about": None, "portfolio": []}
+    
+    # 1st Image -> Hero
+    if total >= 1: mapping["hero"] = image_context[0]
+    
+    # 2nd Image -> About
+    if total >= 2: mapping["about"] = image_context[1]
+    
+    # 3rd, 4th, 5th -> Portfolio Grid
+    if total >= 3: mapping["portfolio"] = image_context[2:5]
+        
     return mapping
 
 
@@ -460,9 +482,10 @@ def index():
 def generate_website():
     try:
         prompt = request.form.get('prompt', '')
+        logo_file = request.files.get('logo')
 
-        if "upload image" in prompt.lower() or "add images yourself" in prompt.lower():
-            return jsonify({"warning": "Please upload images manually."}), 400
+        if any(kw in prompt.lower() for kw in ["upload image", "add images yourself", "generate image", "create image"]):
+            return jsonify({"warning": "Please upload images manually. This AI generates branding and content, not the images themselves."}), 400
 
         files = request.files.getlist('images')
 
@@ -471,6 +494,14 @@ def generate_website():
 
         if len(files) > MAX_IMAGES:
             return jsonify({"error": f"Max {MAX_IMAGES} images allowed."}), 400
+
+        logo_web_path = None
+        if logo_file and logo_file.filename and allowed_file(logo_file.filename):
+            logo_filename = secure_filename(logo_file.filename)
+            unique_logo_name = f"logo_{uuid.uuid4()}_{logo_filename}"
+            logo_filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_logo_name)
+            logo_file.save(logo_filepath)
+            logo_web_path = "/" + logo_filepath.replace("\\", "/")
 
         image_context = []
         image_paths   = []
@@ -486,6 +517,7 @@ def generate_website():
                 image_paths.append(filepath)
 
         data = generate_website_content(prompt, image_paths, len(image_paths))
+        # ... and later pass logo=logo_web_path to base_ctx
 
         if not data:
             return jsonify({"error": "AI failed to generate content. Please try again."}), 500
@@ -506,7 +538,9 @@ def generate_website():
             site_name=site_name, site_title=site_title,
             tagline=tagline, theme=theme, footer=footer,
             layout=layout, image_map=image_map,
-            image_count=len(image_context)
+            image_count=len(image_context),
+            has_images=(len(image_context) > 0),
+            logo=logo_web_path
         )
 
         home_html = render_template(
@@ -526,7 +560,7 @@ def generate_website():
             f.write(home_html)
 
         page_templates = {
-            "about.html":     ("about.html",     dict(**base_ctx, about=data.get("about",{}), images=image_context)),
+            "about.html":     ("about.html",     dict(**base_ctx, about=data.get("about",{}), services=data.get("services",[]), images=image_context)),
             "services.html":  ("services.html",  dict(**base_ctx, services=data.get("services",[]), images=image_context)),
             "portfolio.html": ("portfolio.html", dict(**base_ctx, portfolio=data.get("portfolio",[]), images=image_context)),
             "contact.html":   ("contact.html",   dict(**base_ctx, contact=data.get("contact",{}), images=image_context)),
@@ -583,6 +617,18 @@ def list_websites():
             "download_url": f"/download/{folder}"
         })
     return jsonify(websites)
+ 
+@app.route('/save-and-build', methods=['POST'])
+def save_and_build():
+    from flask import request
+    data = request.json
+    wid = data.get('website_id')
+    pg  = os.path.basename(data.get('page_name', 'home.html'))
+    fld = os.path.join(app.config['GENERATED_FOLDER'], wid)
+    if os.path.exists(fld):
+        with open(os.path.join(fld, pg), "w", encoding="utf-8") as f:
+            f.write(data.get('html'))
+    return jsonify({"success": True})
 
 
 if __name__ == "__main__":

@@ -6,39 +6,44 @@
     <title>{{ site_name }} — {{ site_title }}</title>
 
     {% set hf = theme.get('font_heading', 'Outfit') if theme else 'Outfit' %}
-    {% set bf = theme.get('font_body', 'Inter') if theme else 'Inter' %}
+    {% set bf = theme.get('font_body', 'Plus Jakarta Sans') if theme else 'Plus Jakarta Sans' %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family={{ hf | replace(' ', '+') }}:wght@400;700;900&family={{ bf | replace(' ', '+') }}:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300..900&family=Roboto:ital,wght@0,300..900;1,300..900&family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
     <style>
         :root {
-            --primary:       {{ theme.get('primary',       '#1a1a2e') if theme else '#1a1a2e' }};
-            --primary-dark:  {{ theme.get('primary_dark',  '#0f0f1a') if theme else '#0f0f1a' }};
-            --primary-light: {{ theme.get('primary_light', 'rgba(26,26,46,0.1)') if theme else 'rgba(26,26,46,0.1)' }};
-            --accent:        {{ theme.get('accent',        '#e94560') if theme else '#e94560' }};
+            --primary:       {{ theme.get('primary',       '#6366f1') if theme else '#6366f1' }};
+            --primary-dark:  {{ theme.get('primary_dark',  '#4338ca') if theme else '#4338ca' }};
+            --primary-light: {{ theme.get('primary_light', 'rgba(99,102,241,0.1)') if theme else 'rgba(99,102,241,0.1)' }};
+            --accent:        {{ theme.get('accent',        '#f59e0b') if theme else '#f59e0b' }};
             --bg:            {{ theme.get('bg',            '#ffffff') if theme else '#ffffff' }};
-            --bg-alt:        {{ theme.get('bg_alt',        '#f8f8f6') if theme else '#f8f8f6' }};
-            --text-main:     {{ theme.get('text_main',     '#0f0f0f') if theme else '#0f0f0f' }};
-            --text-muted:    {{ theme.get('text_muted',    '#6b7280') if theme else '#6b7280' }};
-            --nav-bg:        {{ theme.get('nav_bg',        'rgba(255,255,255,0.88)') if theme else 'rgba(255,255,255,0.88)' }};
-            --font-heading:  '{{ hf }}', system-ui, sans-serif;
-            --font-body:     '{{ bf }}', system-ui, sans-serif;
-            --card-shadow:   0 4px 24px rgba(0,0,0,0.07);
-            --card-hover:    0 16px 48px rgba(0,0,0,0.13);
-            --radius-card:   20px;
-            --radius-btn:    12px;
+            --bg-alt:        {{ theme.get('bg_alt',        '#f9fafb') if theme else '#f9fafb' }};
+            --text-main:     {{ theme.get('text_main',     '#111827') if theme else '#111827' }};
+            --text-muted:    {{ theme.get('text_muted',    '#4b5563') if theme else '#4b5563' }};
+            --nav-bg:        {{ theme.get('nav_bg',        'rgba(255,255,255,0.7)') if theme else 'rgba(255,255,255,0.7)' }};
+            --font-heading:  '{{ theme.get('font_heading', 'Roboto') }}', sans-serif;
+            --font-body:     '{{ theme.get('font_body', 'Roboto') }}', sans-serif;
+            --gutter:        max(60px, 8%);
+            --card-shadow:   0 20px 50px rgba(0,0,0,0.05);
+            --card-hover:    0 30px 70px rgba(0,0,0,0.08);
+            --radius-card:   0px; /* Force sharp architectural corners */
+            --radius-btn:    0px; 
+            --glass:         rgba(255, 255, 255, 0.03);
+            --glass-border:  rgba(255, 255, 255, 0.08);
         }
 
-        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
         html { scroll-behavior: smooth; }
         body {
             font-family: var(--font-body);
             background: var(--bg);
             color: var(--text-main);
-            line-height: 1.7;
+            line-height: 1.65;
             overflow-x: hidden;
-            padding-top: 80px;
+            letter-spacing: -0.01em;
+            padding-top: 0; /* Changed to 0 for full-bleed sections */
             -webkit-font-smoothing: antialiased;
         }
 
@@ -47,49 +52,71 @@
             content: "";
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url("https://grainy-gradients.vercel.app/noise.svg");
-            opacity: 0.04;
+            opacity: 0.05;
             pointer-events: none;
             z-index: 99999;
-            filter: contrast(150%) brightness(100%);
+            filter: contrast(170%) brightness(100%);
         }
 
-        /* ── NAV ── */
-        nav {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-            height: 84px; /* Slightly taller */
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 80px; /* Increased side padding */
-            background: var(--nav-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        body::after {
+            content: "";
+            position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: 
+                radial-gradient(circle at 80% 20%, var(--primary-light) 0%, transparent 20%),
+                radial-gradient(circle at 20% 80%, rgba(245, 158, 11, 0.05) 0%, transparent 20%);
+            z-index: -1;
+            pointer-events: none;
+            animation: bgMove 30s infinite alternate ease-in-out;
         }
-        nav.scrolled { 
-            height: 64px;
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(24px) saturate(180%);
-            -webkit-backdrop-filter: blur(24px) saturate(180%);
-            border-bottom: 1px solid rgba(0,0,0,0.06);
-            box-shadow: 0 4px 30px rgba(0,0,0,0.03);
+
+        @keyframes bgMove {
+            from { transform: translate(0,0) rotate(0deg); }
+            to { transform: translate(5%, 5%) rotate(5deg); }
+        }
+
+        /* ── NAV (Elite Minimalist) ── */
+        nav {
+            position: absolute; top: 0; left: 0; width: 100%; z-index: 1000;
+            padding: 20px 0; background: var(--nav-bg); backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0,0,0,0.05); transition: all 0.4s ease;
+        }
+        .nav-inner {
+            max-width: 1440px; margin: 0 auto; padding: 0 var(--gutter);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        nav.scrolled {
+            position: fixed;
+            padding: 20px 0;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
         }
         .nav-logo {
-            font-family: var(--font-heading);
-            font-size: 1.8rem; font-weight: 900;
-            letter-spacing: -0.05em; /* Tighter logo feel */
-            color: var(--primary); text-decoration: none;
-            transition: transform 0.3s;
+            font-family: var(--font-heading); font-size: 1.6rem; font-weight: 950;
+            letter-spacing: -0.05em; color: var(--text-main); text-decoration: none;
+            display: flex; align-items: center; gap: 12px;
+            transition: transform 0.3s ease;
         }
-        .nav-logo:hover { transform: scale(1.02); }
-        .nav-links { display: flex; align-items: center; gap: 48px; } /* Wider gap */
+        .nav-logo.text-logo {
+            background: linear-gradient(135deg, var(--text-main) 0%, var(--primary) 100%);
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .logo:hover, .nav-logo:hover { transform: scale(1.03); }
+        .nav-logo img {
+            height: 38px; width: auto; max-width: 200px;
+            object-fit: contain; display: block;
+            margin: 0;
+        }
+
+        .nav-links { display: flex; gap: 48px; }
         .nav-links a {
-            font-size: 0.95rem; font-weight: 600;
-            color: var(--text-main); text-decoration: none;
-            position: relative; transition: color 0.3s;
-            opacity: 0.8;
+            font-family: var(--font-body); font-size: 0.85rem; font-weight: 800;
+            color: var(--text-main); text-decoration: none; text-transform: uppercase;
+            letter-spacing: 0.15em; transition: all 0.3s ease; opacity: 0.6;
         }
-        .nav-links a:hover { color: var(--primary); opacity: 1; }
-        
+        .nav-links a:hover { opacity: 1; color: var(--primary); transform: translateY(-1px); }
+        .nav-links a.active { opacity: 1; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 4px; }
+
         /* ── EDITORIAL CORE ── */
         .reveal { opacity: 0; transform: translateY(40px); transition: all 1s cubic-bezier(0.16, 1, 0.3, 1); }
         .reveal.visible { opacity: 1; transform: translateY(0); }
@@ -97,55 +124,68 @@
         .reveal-delay-2 { transition-delay: 0.2s; }
         .reveal-delay-3 { transition-delay: 0.3s; }
 
-        @keyframes heroUp { 
-            from { opacity: 0; transform: translateY(60px); } 
-            to { opacity: 1; transform: translateY(0); } 
+        @keyframes heroUp {
+            from { opacity: 0; transform: translateY(60px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .section-title {
-            font-family: var(--font-heading); font-size: clamp(2.5rem, 5vw, 4.2rem); 
-            font-weight: 900; line-height: 1.1; letter-spacing: -0.04em; 
-            color: var(--text-main); margin-bottom: 32px;
+            font-family: var(--font-heading); font-size: clamp(2.5rem, 5vw, 4.2rem);
+            font-weight: 800; line-height: 1.1; letter-spacing: -0.04em;
+            color: var(--text-main); margin-bottom: 24px;
         }
 
         .section-label {
-            display: inline-block; font-family: var(--font-heading); font-size: 0.8rem; font-weight: 800; 
-            text-transform: uppercase; letter-spacing: 0.15em; color: var(--primary); 
-            margin-bottom: 24px; padding: 10px 22px; background: var(--bg-alt); border-radius: 100px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            display: inline-flex; align-items: center; gap: 8px;
+            font-family: var(--font-heading); font-size: 0.58rem; font-weight: 900;
+            text-transform: uppercase; letter-spacing: 0.35em; color: var(--text-muted);
+            margin-bottom: 16px; padding: 0; position: relative;
         }
+        .section-label::before { content: ''; width: 16px; height: 1.5px; background: var(--primary); }
 
         .badge-item {
-            display: inline-block; padding: 6px 14px; background: var(--bg-alt); 
-            color: var(--primary); border: 1px solid rgba(0,0,0,0.06); 
-            border-radius: 100px; font-size: 0.72rem; font-weight: 800; 
-            letter-spacing: 0.1em; text-transform: uppercase;
+            display: inline-block; padding: 0; margin-bottom: 12px;
+            color: var(--primary); font-size: 0.65rem; font-weight: 900;
+            letter-spacing: 0.2em; text-transform: uppercase;
+            border: none; background: none;
         }
-        
+
         /* ── BUTTONS ── */
         .btn {
-            display: inline-flex; align-items: center; gap: 10px;
-            padding: 16px 36px; background: var(--primary); color: #fff;
-            font-family: var(--font-body); font-size: 1rem; font-weight: 700;
-            text-decoration: none; border-radius: 100px; /* Pill shape is more modern */
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 18px 48px; background: var(--primary); color: #fff;
+            font-family: var(--font-body); font-size: 0.85rem; font-weight: 700;
+            text-decoration: none; border-radius: var(--radius-btn);
             border: none; cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 10px 25px var(--primary-light);
+            transition: all 0.3s ease;
+            text-transform: uppercase; letter-spacing: 0.15em;
+            position: relative;
         }
-        .btn:hover { background: var(--primary-dark); transform: translateY(-4px); box-shadow: 0 15px 35px var(--primary-light); }
-        
+        .btn::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(rgba(255,255,255,0.2), transparent);
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .btn:hover { background: var(--primary-dark); transform: translateY(-3px) scale(1.02); box-shadow: 0 20px 35px -8px var(--primary-light); }
+        .btn:hover::after { opacity: 1; }
+
+        .btn-secondary {
+            background: var(--bg); color: var(--text-main);
+            border: 1px solid rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .btn-secondary:hover { background: var(--bg-alt); border-color: var(--primary); box-shadow: 0 10px 20px rgba(0,0,0,0.08); }
+
         /* ── THE "BOTTOM RIGHT" SAVE BAR (Floating Control) ── */
 #save-bar {
     position: fixed; bottom: 32px; right: 32px; z-index: 9998;
     display: flex; gap: 8px;
-    background: rgba(255, 255, 255, 0.85); /* Premium White */
+    background: rgba(17, 17, 17, 0.95); /* Deep Ink */
     backdrop-filter: blur(28px) saturate(180%);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
     padding: 8px; border-radius: 100px;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 
-        0 30px 60px rgba(0,0,0,0.1), 
-        inset 0 1px 1px rgba(255,255,255,1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 40px 100px rgba(0,0,0,0.5);
     animation: heroUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .save-btn {
@@ -156,18 +196,18 @@
     border: 1px solid transparent;
     text-transform: uppercase; letter-spacing: 0.1em;
 }
-#btn-undo { 
-    background: transparent; color: rgba(0,0,0,0.4); 
+#btn-undo {
+    background: transparent; color: rgba(255,255,255,0.4);
 }
-#btn-undo:hover { 
-    background: rgba(0,0,0,0.05); color: #000; 
+#btn-undo:hover {
+    background: rgba(255,255,255,0.05); color: #fff;
 }
-#btn-save-download { 
-    background: #ffffff; color: #000;
-    border: 1px solid rgba(0,0,0,0.08);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+#btn-save-download {
+    background: var(--primary); color: #fff;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
-#btn-save-download:hover { 
+#btn-save-download:hover {
     transform: translateY(-2px);
     background: #111; color: #fff;
 }
@@ -177,58 +217,63 @@
 
 
         /* ── EDIT HIGHLIGHT ── */
-        [contenteditable="true"]:hover { outline: 1.5px dashed rgba(91,79,255,0.35); outline-offset: 3px; border-radius: 4px; }
-        [contenteditable="true"]:focus { outline: 2px solid #5b4fff; outline-offset: 3px; border-radius: 4px; }
+        [contenteditable="true"]:hover { outline: 1px dashed rgba(var(--primary), 0.2); outline-offset: 4px; border-radius: 4px; }
+        [contenteditable="true"]:focus { outline: 1px solid var(--primary); outline-offset: 4px; border-radius: 4px; }
 
-        /* ── FOOTER (Editorial & Bold) ── */
-        footer {
-            background: #0a0a0f; /* Deep Ink */
-            padding: 140px 80px 60px;
-            position: relative;
-            color: rgba(255,255,255,0.6);
-            overflow: hidden;
+        /* ── FOOTER (Refined Amazon Style) ── */
+        .back-to-top {
+            background: #37475a; color: #fff; padding: 15px 0; text-align: center; 
+            font-size: 0.8rem; font-weight: 500; text-decoration: none; display: block;
+            transition: background 0.2s;
         }
-        footer::before {
-            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        .back-to-top:hover { background: #485769; }
+
+        footer {
+            background: #232f3e; padding: 40px 0 0 0; color: #fff;
+            font-family: var(--font-body);
         }
         .footer-grid {
-            max-width: 1240px; margin: 0 auto;
-            display: grid; grid-template-columns: 2.5fr 1fr 1fr 1fr; gap: 80px;
-            padding-bottom: 80px;
+            max-width: 1000px; margin: 0 auto;
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px;
+            padding: 40px var(--gutter);
         }
-        .footer-logo { 
-            font-family: var(--font-heading); font-size: 2.8rem; font-weight: 900; 
-            color: #fff; margin-bottom: 24px; letter-spacing: -0.05em;
-            display: inline-block;
+        .footer-head {
+            color: #fff; font-weight: 700; font-size: 1rem;
+            margin-bottom: 15px; text-transform: none; letter-spacing: normal; opacity: 1;
         }
-        .footer-tagline { 
-            color: rgba(255,255,255,0.4); font-size: 1.1rem; line-height: 1.7; 
-            max-width: 360px; font-weight: 400;
-        }
-        .footer-head { 
-            color: #fff; font-weight: 800; font-size: 0.8rem; 
-            text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 32px; 
-            opacity: 0.9;
-        }
-        .footer-links { display: flex; flex-direction: column; gap: 16px; }
+        .footer-links { display: flex; flex-direction: column; gap: 10px; }
         .footer-links a { 
-            color: rgba(255,255,255,0.35); text-decoration: none; 
-            font-size: 0.95rem; font-weight: 500; transition: all 0.4s; 
-            width: fit-content;
+            color: #DDD; text-decoration: none; 
+            font-size: 0.85rem; font-weight: 400; transition: all 0.2s; 
         }
-        .footer-links a:hover { color: #fff; transform: translateX(8px); }
+        .footer-links a:hover { color: #fff; text-decoration: underline; transform: none; }
         
-        .footer-bottom { 
-            max-width: 1240px; margin: 60px auto 0;
-            padding-top: 40px;
-            border-top: 1px solid rgba(255,255,255,0.05);
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 0.85rem; color: rgba(255,255,255,0.25);
+        .footer-bottom-bar {
+            background: #131a22; padding: 40px 0;
+            border-top: 1px solid #3a4553; margin-top: 40px;
         }
-        .social-row { display: flex; gap: 24px; }
-        .social-row a { color: rgba(255,255,255,0.3); transition: color 0.3s; }
-        .social-row a:hover { color: #fff; }
+        .footer-bottom-inner {
+            max-width: 1000px; margin: 0 auto;
+            display: flex; align-items: center; justify-content: center;
+            gap: 20px; flex-wrap: wrap;
+        }
+        .footer-logo-bottom {
+            display: flex; align-items: center; gap: 10px; margin-right: 20px;
+        }
+        .footer-logo-bottom img { height: 24px; width: auto; object-fit: contain; }
+        .footer-logo-bottom span { font-size: 1.1rem; font-weight: 950; letter-spacing: -0.05em; color: #fff; }
+
+        .footer-selectors { display: flex; gap: 10px; }
+        .footer-selector {
+            border: 1px solid #848688; border-radius: 3px; padding: 6px 12px;
+            font-size: 0.75rem; color: #CCC; display: flex; align-items: center; gap: 8px;
+            text-decoration: none; transition: border-color 0.2s;
+        }
+        .footer-selector:hover { border-color: #fff; color: #fff; }
+        .footer-copyright {
+            text-align: center; padding: 20px 0; font-size: 0.75rem; color: #999;
+            background: #131a22;
+        }
 
         /* ── EDIT TOOLBAR (Sleek Dark Mode) ── */
         #edit-toolbar {
@@ -265,6 +310,44 @@
             border: 2px solid rgba(255,255,255,0.2);
             cursor: pointer; padding: 0; overflow: hidden; background: none;
         }
+
+        .edit-img-indicator {
+            position: absolute; top: 20px; right: 20px; 
+            width: 36px; height: 36px; background: #fff;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15); opacity: 0; transform: scale(0.8);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 25; color: var(--primary);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        .image-drop-zone:hover .edit-img-indicator {
+            opacity: 1; transform: scale(1);
+        }
+        .edit-img-indicator svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.5; }
+
+        /* ── IMAGE DROP ZONE ── */
+        .image-drop-zone {
+            position: relative; cursor: pointer; display: block; overflow: hidden;
+            transition: all 0.3s ease;
+            height: 100%; width: 100%;
+        }
+        .image-drop-zone.drag-hover::after {
+            content: "Drop image here";
+            position: absolute; inset: 0;
+            background: rgba(99,102,241,0.8);
+            color: #fff; font-size: 0.9rem; font-weight: 800;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 100; backdrop-filter: blur(4px);
+            text-transform: uppercase; letter-spacing: 0.1em;
+        }
+        .image-drop-zone:hover::before {
+            content: "Replace Image";
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8); color: #fff; font-size: 0.8rem; font-weight: 700;
+            padding: 8px 16px; border-radius: 100px; pointer-events: none; z-index: 10;
+            backdrop-filter: blur(8px); opacity: 0; transition: all 0.3s;
+        }
+        .image-drop-zone:hover::before { opacity: 1; margin-top: 40px; }
 
         /* ── RESPONSIVE ── */
         @media (max-width: 1024px) { 
@@ -314,14 +397,22 @@
 </div>
 
 <nav id="main-nav">
-    <a href="home.html" class="nav-logo">{{ site_name }}</a>
-    <div class="nav-toggle" onclick="toggleNav()"><span></span><span></span><span></span></div>
-    <div class="nav-links" id="nav-links">
-        <a href="home.html">Home</a>
-        <a href="about.html">About</a>
-        <a href="services.html">Services</a>
-        <a href="portfolio.html">Portfolio</a>
-        <a href="contact.html">Contact</a>
+    <div class="nav-inner">
+        <a href="home.html" class="nav-logo {{ 'text-logo' if not logo else '' }}">
+            {% if logo %}
+                <img src="{{ logo }}" alt="{{ site_name }}">
+            {% else %}
+                {{ site_name }}
+            {% endif %}
+        </a>
+        <div class="nav-toggle" onclick="toggleNav()"><span></span><span></span><span></span></div>
+        <div class="nav-links" id="nav-links">
+            <a href="home.html">Home</a>
+            <a href="about.html">About</a>
+            <a href="services.html">Services</a>
+            <a href="portfolio.html">Portfolio</a>
+            <a href="contact.html">Contact</a>
+        </div>
     </div>
 </nav>
 
@@ -329,59 +420,87 @@
 
 {% set divider = theme.get('divider_style', 'diagonal') if theme else 'diagonal' %}
 {% if divider == 'diagonal' %}
-<div class="section-divider" style="background:var(--bg);">
-    <svg viewBox="0 0 1440 48" preserveAspectRatio="none" height="48">
-        <polygon points="0,48 1440,0 1440,48" fill="{{ theme.get('primary_dark','#0f0f1a') if theme else '#0f0f1a' }}"/>
+<div class="section-divider" style="background:var(--bg); margin-top: -1px; overflow: hidden; line-height: 0;">
+    <svg viewBox="0 0 1440 120" preserveAspectRatio="none" style="width: 100%; height: 120px; display: block;">
+        <path d="M0,120 L1440,0 L1440,120 L0,120 Z" fill="{{ theme.get('primary_dark','#0f0f1a') if theme else '#0f0f1a' }}"/>
     </svg>
 </div>
 {% elif divider == 'wave' %}
-<div class="section-divider" style="background:var(--bg);">
-    <svg viewBox="0 0 1440 60" preserveAspectRatio="none" height="60">
-        <path d="M0,30 C360,60 1080,0 1440,30 L1440,60 L0,60 Z" fill="{{ theme.get('primary_dark','#0f0f1a') if theme else '#0f0f1a' }}"/>
+<div class="section-divider" style="background:var(--bg); margin-top: -1px; overflow: hidden; line-height: 0;">
+    <svg viewBox="0 0 1440 120" preserveAspectRatio="none" style="width: 100%; height: 120px; display: block;">
+        <path d="M0,60 C320,120 420,0 720,60 C1020,120 1120,0 1440,60 L1440,120 L0,120 Z" fill="{{ theme.get('primary_dark','#0f0f1a') if theme else '#0f0f1a' }}"/>
     </svg>
 </div>
 {% endif %}
 
+<a href="#" class="back-to-top">Back to top</a>
 <footer>
     <div class="footer-grid">
         <div>
-            <div class="footer-logo">{{ site_name }}</div>
-            <p class="footer-tagline">{{ footer.tagline if footer else 'Bespoke digital architecture designed for high-impact results and timeless brand presence.' }}</p>
-        </div>
-        <div>
-            <div class="footer-head">Explore</div>
+            <div class="footer-head">Get to Know Us</div>
             <div class="footer-links">
-                <a href="home.html">Home</a>
-                <a href="about.html">About</a>
-                <a href="services.html">Services</a>
+                <a href="about.html">About {{ site_name }}</a>
+                <a href="services.html">Our Services</a>
                 <a href="portfolio.html">Portfolio</a>
+                <a href="contact.html">Contact Us</a>
             </div>
         </div>
         <div>
-            <div class="footer-head">Legal</div>
+            <div class="footer-head">Make Money with Us</div>
             <div class="footer-links">
-                <a href="#">Privacy Policy</a>
-                <a href="#">Terms of Service</a>
-                <a href="#">Cookie Strategy</a>
+                <a href="#">Sell on {{ site_name }}</a>
+                <a href="#">Become an Affiliate</a>
+                <a href="#">Advertise Your Products</a>
+                <a href="#">Self-Publish with Us</a>
             </div>
         </div>
         <div>
-            <div class="footer-head">Connect</div>
+            <div class="footer-head">{{ site_name }} Payment</div>
             <div class="footer-links">
-                <a href="#">Instagram</a>
-                <a href="#">LinkedIn</a>
-                <a href="#">Dribbble</a>
-                <a href="#">X (Twitter)</a>
+                <a href="#">Business Card</a>
+                <a href="#">Shop with Points</a>
+                <a href="#">Reload Your Balance</a>
+                <a href="#">Currency Converter</a>
+            </div>
+        </div>
+        <div>
+            <div class="footer-head">Let Us Help You</div>
+            <div class="footer-links">
+                <a href="#">Your Account</a>
+                <a href="#">Your Orders</a>
+                <a href="#">Shipping Rates</a>
+                <a href="#">Policies</a>
+                <a href="contact.html">Help</a>
             </div>
         </div>
     </div>
-    <div class="footer-bottom">
-        <div>&copy; {{ current_year or '2026' }} {{ site_name }}. All rights reserved.</div>
-        <div class="social-row">
-            <a href="#" aria-label="Twitter"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg></a>
-            <a href="#" aria-label="LinkedIn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a>
-            <a href="#" aria-label="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></a>
+    
+    <div class="footer-bottom-bar">
+        <div class="footer-bottom-inner">
+            <a href="home.html" class="footer-logo-bottom">
+                {% if logo %}
+                    <img src="{{ logo }}" alt="{{ site_name }}">
+                {% else %}
+                    <span>{{ site_name }}</span>
+                {% endif %}
+            </a>
+            <div class="footer-selectors">
+                <a href="#" class="footer-selector">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    English
+                </a>
+                <a href="#" class="footer-selector">
+                    INR - Indian Rupee
+                </a>
+                <a href="#" class="footer-selector">
+                    United States
+                </a>
+            </div>
         </div>
+    </div>
+
+    <div class="footer-copyright">
+        &copy; {{ current_year or '2026' }}, {{ site_name }}, Inc. or its affiliates
     </div>
 </footer>
 
@@ -492,31 +611,202 @@ function hideSaveIndicator() {
 // ── ACTIVE LINKS ──
 document.querySelectorAll('.nav-links a').forEach(link => {
     if (window.location.pathname.endsWith(link.getAttribute('href'))) {
-        link.style.color = 'var(--primary)';
-        link.style.opacity = '1';
-        link.style.fontWeight = '800';
+        link.classList.add('active');
     }
 });
 
 // ── SAVE & DOWNLOAD ──
-function savePage() {
+async function savePage() {
+    const btn = document.getElementById('btn-save-download');
+    const oldHtml = btn.innerHTML;
+    btn.innerHTML = 'Saving...';
+    
+    // Process Sortable states before cloning
+    document.querySelectorAll('.eb-sortable').forEach(grid => {
+        // Sortable naturally moves the DOM, so we just capture it
+    });
+
     const clone = document.documentElement.cloneNode(true);
-    clone.querySelectorAll('#edit-toolbar, #save-bar').forEach(el => el.remove());
+    // Remove editor UI before saving to disk
+    clone.querySelectorAll('#edit-toolbar, #save-bar, .sortable-fallback').forEach(el => el.remove());
     clone.querySelectorAll('[contenteditable]').forEach(el => {
         el.removeAttribute('contenteditable');
         el.removeAttribute('data-edit-id');
         el.removeAttribute('data-dirty');
         el.style.outline = '';
     });
+
     const html = '<!DOCTYPE html>\n' + clone.outerHTML;
-    const blob = new Blob([html], { type: 'text/html' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = '{{ site_name | lower | replace(" ", "-") }}-website.html';
-    a.click();
-    URL.revokeObjectURL(a.href);
-    hideSaveIndicator();
+    const website_id = window.location.pathname.split('/')[2];
+    const page_name = window.location.pathname.split('/').pop();
+
+    try {
+        const response = await fetch('/save-and-build', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ website_id, page_name, html })
+        });
+        
+        if (response.ok) {
+            const blob = new Blob([html], { type: 'text/html' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = page_name;
+            a.click();
+            hideSaveIndicator();
+        }
+    } catch (e) { console.error(e); }
+    btn.innerHTML = oldHtml;
 }
+
+// ── IMAGE DRAG & DROP + SWAP ──
+let draggedSource = null;
+
+function getImgSrc(el) {
+    if (el.tagName === 'IMG') return el.src;
+    const style = window.getComputedStyle(el).backgroundImage;
+    if (style && style !== 'none') {
+        const match = style.match(/url\(["']?(.*?)["']?\)/);
+        return match ? match[1] : null;
+    }
+    return null;
+}
+
+function setImgSrc(el, src) {
+    if (el.tagName === 'IMG') {
+        el.src = src;
+    } else {
+        const currentStyle = el.style.backgroundImage;
+        if (currentStyle.includes('linear-gradient')) {
+            const gradient = currentStyle.split('url(')[0];
+            el.style.backgroundImage = `${gradient}url("${src}")`;
+        } else {
+            el.style.backgroundImage = `url("${src}")`;
+        }
+    }
+    showSaveIndicator();
+}
+
+function initImageDropZones() {
+    if (!document.querySelectorAll('[contenteditable="true"]').length) return;
+
+    // 1. Wrap <img> tags and handle them
+    document.querySelectorAll('img').forEach(img => {
+        if (img.closest('nav') || img.closest('footer')) return;
+
+        let wrap = img.parentElement;
+        if (!wrap.classList.contains('image-drop-zone')) {
+            wrap = document.createElement('div');
+            wrap.className = 'image-drop-zone';
+            img.parentNode.insertBefore(wrap, img);
+            wrap.appendChild(img);
+        }
+        
+        img.draggable = true;
+        setupDropEvents(wrap, img);
+    });
+
+    // 2. Handle sections with background images
+    document.querySelectorAll('section[style*="background-image"]').forEach(sec => {
+        if (sec.closest('nav') || sec.closest('footer')) return;
+        sec.classList.add('image-drop-zone');
+        sec.draggable = true;
+        setupDropEvents(sec, sec);
+    });
+}
+
+function addEditIndicator(zone) {
+    if (zone.querySelector('.edit-img-indicator')) return;
+    const div = document.createElement('div');
+    div.className = 'edit-img-indicator';
+    div.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+    zone.appendChild(div);
+}
+
+function setupDropEvents(zone, target) {
+    addEditIndicator(zone);
+    zone.addEventListener('dragstart', e => {
+        const src = getImgSrc(target);
+        if (!src) { e.preventDefault(); return; }
+        draggedSource = { el: target, src: src };
+        e.dataTransfer.setData('text/plain', src);
+        target.style.opacity = '0.5';
+    });
+
+    zone.addEventListener('dragend', () => {
+        target.style.opacity = '1';
+        document.querySelectorAll('.image-drop-zone').forEach(z => z.classList.remove('drag-hover'));
+    });
+
+    zone.addEventListener('dragover', e => {
+        e.preventDefault();
+        zone.classList.add('drag-hover');
+    });
+
+    zone.addEventListener('dragleave', () => {
+        zone.classList.remove('drag-hover');
+    });
+
+    zone.addEventListener('drop', async e => {
+        e.preventDefault();
+        zone.classList.remove('drag-hover');
+
+        if (e.dataTransfer.files.length) {
+            const file = e.dataTransfer.files[0];
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (re) => setImgSrc(target, re.target.result);
+                reader.readAsDataURL(file);
+            }
+            return;
+        }
+
+        if (draggedSource && draggedSource.el !== target) {
+            const sourceSrc = draggedSource.src;
+            const targetSrc = getImgSrc(target);
+            if (sourceSrc && targetSrc) {
+                setImgSrc(target, sourceSrc);
+                setImgSrc(draggedSource.el, targetSrc);
+            } else if (sourceSrc) {
+                setImgSrc(target, sourceSrc);
+            }
+            draggedSource = null;
+            return;
+        }
+
+        const link = e.dataTransfer.getData('text/plain');
+        if (link && link.startsWith('http')) {
+            setImgSrc(target, link);
+        }
+    });
+
+    zone.addEventListener('click', (e) => {
+        if (e.target !== zone && e.target !== target && !e.target.closest('.edit-img-indicator')) return;
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (ev) => {
+            const file = ev.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (re) => setImgSrc(target, re.target.result);
+                reader.readAsDataURL(file);
+            }
+        };
+        input.click();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initImageDropZones();
+    document.querySelectorAll('.eb-sortable').forEach(el => {
+        new Sortable(el, {
+            animation: 350,
+            ghostClass: 'eb-sortable-ghost',
+            onEnd: () => showSaveIndicator()
+        });
+    });
+});
 </script>
 
 {% block extra_scripts %}{% endblock %}

@@ -1,108 +1,66 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% set about_img = image_map.get('about') if image_map else None %}
 <style>
-    .about-landing { background: var(--bg); padding: 140px 80px; }
+    .about-landing { 
+        background-color: var(--bg-alt);
+        background-image: var(--about-bg); 
+        background-size: cover; background-position: center; background-attachment: fixed;
+        background-blend-mode: normal;
+        padding: 120px var(--gutter) 100px; color: var(--text-main); min-height: 60vh; display: flex; align-items: center;
+    }
     .about-grid { 
-        max-width: 1240px; margin: 0 auto; 
-        display: grid; 
-        grid-template-columns: 1.1fr 1fr; 
-        gap: 100px; align-items: center; 
+        max-width: 1440px; margin: 0 auto; 
+        display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 120px; align-items: center; 
     }
-    .about-text { max-width: none; margin: 0; text-align: left; }
-    
-
-    .about-title {
-        font-family: var(--font-heading); font-size: clamp(3rem, 6vw, 5.2rem); 
-        font-weight: 900; line-height: 1; letter-spacing: -0.05em; 
-        color: var(--text-main); margin-bottom: 40px;
+    .about-header-side { border-left: 5px solid var(--primary); padding-left: 40px; }
+    .about-landing h1 { 
+        font-family: var(--font-heading); font-size: clamp(3rem, 7vw, 5rem); 
+        font-weight: 950; line-height: 1; letter-spacing: -0.05em; 
+        margin-bottom: 32px; text-transform: uppercase; color: var(--text-main);
     }
-    .about-description {
-        font-size: 1.2rem; color: var(--text-muted); line-height: 1.8; 
-        margin-bottom: 48px; max-width: 580px; font-weight: 400;
+    .about-landing p { 
+        font-size: 1.25rem; line-height: 1.8; color: var(--text-muted); 
+        max-width: 600px; margin-bottom: 48px; 
     }
-
-    /* Modern Stats Strip */
-    .about-stats {
-        display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px;
-        margin-top: 64px; padding-top: 48px; border-top: 1px solid rgba(0,0,0,0.06);
-    }
-    .about-stat-number {
-        font-family: var(--font-heading); font-size: 2.8rem; font-weight: 800;
-        color: var(--primary); letter-spacing: -0.04em; line-height: 1; margin-bottom: 8px;
-    }
-    .about-stat-label {
-        font-size: 0.72rem; font-weight: 800; color: var(--text-muted);
-        text-transform: uppercase; letter-spacing: 0.1em;
-    }
-
-    /* Conditionals */
-    .about-grid-single { grid-template-columns: 1fr !important; }
-    .about-text-center { max-width: 800px !important; margin: 0 auto !important; text-align: center !important; }
-    .about-desc-center { margin: 0 auto 48px auto !important; }
-    .about-stats-center { justify-items: center !important; }
-
-    /* Editorial Visuals */
-    .about-visual { position: relative; }
-    .about-img-main {
-        width: 100%; border-radius: 40px; display: block; position: relative; z-index: 2;
-        box-shadow: 0 50px 120px rgba(0,0,0,0.15); aspect-ratio: 4/5; object-fit: cover;
-        transition: transform 0.8s cubic-bezier(.16,1,.3,1);
-    }
-    .about-visual:hover .about-img-main { transform: scale(1.02); }
-
-
-    .about-badge {
-        position: absolute; bottom: -30px; right: -30px; z-index: 5;
-        background: var(--accent); color: #fff; border-radius: 24px;
-        padding: 32px; text-align: center;
-        box-shadow: 0 20px 50px rgba(0,0,0,0.25);
-        animation: heroUp 1.2s 0.6s cubic-bezier(.16,1,.3,1) both;
-    }
+    .about-services-side { display: flex; flex-direction: column; gap: 40px; }
+    .about-services-side h3 { font-family: var(--font-heading); font-size: 1.8rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; }
+    .about-s-item { display: flex; gap: 24px; align-items: flex-start; }
+    .about-s-icon { width: 44px; height: 44px; color: var(--primary); flex-shrink: 0; }
+    .about-s-info h4 { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .about-s-info p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
 
     @media (max-width: 1024px) {
-        .about-landing { padding: 120px 40px 80px; }
+        .about-landing { padding: 120px 24px 80px; }
         .about-grid { grid-template-columns: 1fr; gap: 80px; }
-        .about-visual { max-width: 600px; margin: 0 auto; }
-        .about-badge { bottom: 20px; right: 20px; padding: 24px; }
     }
 </style>
 
-<section class="about-landing">
-    <div class="about-grid {% if not (images and images|length > 1) %}about-grid-single{% endif %}">
-
-        <div class="about-content reveal {% if not (images and images|length > 1) %}about-text-center{% endif %}">
-            <span class="section-label" contenteditable="true">{{ about.get('label', 'Our Story') }}</span>
-            <h2 class="about-title" contenteditable="true">{{ about.heading }}</h2>
-            <p class="about-description {% if not (images and images|length > 1) %}about-desc-center{% endif %}" contenteditable="true">{{ about.description }}</p>
-            <a href="contact.html" class="btn">Get in Touch</a>
-
-            <div class="about-stats {% if not (images and images|length > 1) %}about-stats-center{% endif %}">
-                <div class="about-stat">
-                    <div class="about-stat-number" contenteditable="true">{{ about.get('stat1_number', '10+') }}</div>
-                    <div class="about-stat-label" contenteditable="true">Years experience</div>
-                </div>
-                <div class="about-stat">
-                    <div class="about-stat-number" contenteditable="true">{{ about.get('stat2_number', '500+') }}</div>
-                    <div class="about-stat-label" contenteditable="true">Global Clients</div>
-                </div>
-                <div class="about-stat">
-                    <div class="about-stat-number" contenteditable="true">{{ about.get('stat3_number', '98%') }}</div>
-                    <div class="about-stat-label" contenteditable="true">Success Rate</div>
-                </div>
-            </div>
+<section class="about-landing" style="background-image: {{ "linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.92)), url('" ~ (about_img or hero_img) ~ "')" if (about_img or hero_img) else "none" }}; border-bottom: 1px solid rgba(0,0,0,0.05);">
+    <div class="about-grid reveal">
+        <div class="about-header-side">
+            <h1 contenteditable="true">{{ about.heading }}</h1>
+            <p contenteditable="true">{{ about.description }}</p>
+            <a href="services.html" class="btn" style="background:var(--primary); color:#fff; font-weight:900;">View Our Expertise</a>
         </div>
 
-        {% if images and images|length > 1 %}
-        <div class="about-visual reveal">
-            <img class="about-img-main" src="{{ images[1] }}" alt="About {{ site_name }}">
-            <div class="about-badge">
-                <div class="about-stat-number" style="color:#fff; font-size:2.2rem;">{{ about.get('stat2_number', '500+') }}</div>
-                <div class="about-stat-label" style="color:rgba(255,255,255,0.7); font-size:0.65rem;">Trusted Partners</div>
+        <div class="about-services-side">
+            <h3 contenteditable="true">Global Capabilities</h3>
+            {% for s in services[:3] %}
+            <div class="about-s-item reveal-delay-{{ loop.index }}">
+              <div class="about-s-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </div>
+              <div class="about-s-info">
+                <h4 contenteditable="true">{{ s.title }}</h4>
+                <p contenteditable="true">{{ s.description }}</p>
+              </div>
             </div>
+            {% endfor %}
         </div>
-        {% endif %}
-
     </div>
 </section>
 

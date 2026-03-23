@@ -11,137 +11,421 @@
 {% set accent   = theme.get('accent', '#e94560') if theme else '#e94560' %}
 
 <style>
+:root {
+    --about-bg-url: {{ "url('" ~ about_img ~ "')" if about_img else "none" }};
+}
 /* ── Global Typography & Layout Overrides ── */
-.hero-text h1 {
-    font-size: clamp(3rem, 7.5vw, 6rem);
-    font-weight: 900;
-    color: var(--text-main);
-    letter-spacing: -0.04em;
-    line-height: 1.05;
+/* ── HERO (Editorial Refined) ── */
+.hero { 
+    padding: 140px var(--gutter) 80px; background: var(--bg); position: relative; overflow: hidden; 
 }
-.hero-text p, .hero-cta-row, .hero-trust { margin-left: auto; margin-right: auto; }
+.hero-container { max-width: 1440px; margin: 0 auto; position: relative; z-index: 10; }
 
-/* ── Hero Scenarios ── */
-.hero-no-img-center { justify-content: center; text-align: center; height: auto; min-height: 80vh; }
-.hero-text-center { max-width: 900px; flex: none; margin: 0 auto; }
-
-/* ── About Scenarios ── */
-.about-grid-center { grid-template-columns: 1fr !important; }
-.about-text-center { max-width: 800px; margin: 0 auto; text-align: center; }
-.about-stats-center { justify-items: center !important; }
-
-/* Remove grid background from hero */
-.hero-center-bg::before {
-    background: none;
+.hero-top-row { margin-bottom: 48px; }
+.hero-top-row h1 { 
+    font-family: var(--font-heading); font-size: clamp(2.8rem, 4.5vw, 4.2rem); 
+    font-weight: 950; line-height: 1.0; letter-spacing: -0.04em; 
+    text-transform: uppercase; color: var(--text-main); margin: 0;
+    max-width: 85%;
 }
+
+/* ── WITH IMAGES: two-column split grid ── */
+.hero-bottom-grid { 
+    display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start; 
+}
+.hero-content { display: flex; flex-direction: column; gap: 40px; }
+.hero-content p { 
+    font-size: 1.15rem; color: var(--text-muted); line-height: 1.6; max-width: 550px; margin: 0; opacity: 1;
+}
+.hero-visual { position: relative; }
+.hero-visual { 
+    width: 100%; aspect-ratio: 16/10; background: var(--bg-alt); border-radius: 40px; 
+    box-shadow: 0 60px 120px -20px rgba(0,0,0,0.18); border: 1.5px solid rgba(0,0,0,0.03); 
+    overflow: hidden; 
+}
+.hero-visual img { 
+    width: 100%; height: 100%; object-fit: contain; border-radius: 40px;
+}
+
+/* ── NO IMAGES: Light minimal premium editorial hero ── */
+.hero-ni {
+    background: var(--bg);
+    padding: 0 var(--gutter);
+    position: relative;
+    overflow: hidden;
+    min-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Subtle dot-grid texture */
+.hero-ni::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.6;
+}
+
+/* Top metadata bar */
+.hero-ni-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 28px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    position: relative; z-index: 2;
+}
+.hero-ni-topbar-label {
+    font-size: 0.62rem; font-weight: 900; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--text-muted); opacity: 0.6;
+}
+.hero-ni-topbar-tag {
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--text-muted); opacity: 0.45;
+    display: flex; align-items: center; gap: 10px;
+}
+.hero-ni-topbar-tag::before {
+    content: '';
+    display: inline-block; width: 5px; height: 5px;
+    border-radius: 50%; background: var(--primary); opacity: 1;
+}
+
+/* Main content block */
+.hero-ni-body {
+    display: grid;
+    grid-template-columns: 1.3fr 0.7fr;
+    gap: 100px;
+    align-items: center;
+    padding: 100px 0 80px;
+    position: relative; z-index: 2;
+    flex: 1;
+}
+.hero-ni-headline h1 {
+    font-family: var(--font-heading);
+    font-size: clamp(2.8rem, 4.5vw, 5rem);
+    font-weight: 950; line-height: 1.0; letter-spacing: -0.04em;
+    text-transform: uppercase; color: var(--text-main);
+    margin: 0; max-width: 100%;
+}
+.hero-ni-eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    margin-bottom: 28px;
+}
+.hero-ni-eyebrow-line {
+    display: inline-block; width: 40px; height: 2px; background: var(--primary);
+}
+.hero-ni-eyebrow-text {
+    font-size: 0.65rem; font-weight: 900; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--primary);
+}
+
+.hero-ni-right {
+    display: flex; flex-direction: column;
+    gap: 32px;
+    padding-top: 8px;
+    border-left: 1px solid rgba(0,0,0,0.07);
+    padding-left: 60px;
+}
+.hero-ni-right p {
+    font-size: 1.1rem; line-height: 1.8;
+    color: var(--text-muted); margin: 0; max-width: 420px;
+}
+.hero-ni-ctas { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.hero-ni-ctas .btn {
+    background: var(--primary); color: #fff;
+    border: none; font-weight: 800; font-size: 0.8rem;
+    padding: 14px 28px;
+}
+.hero-ni-ctas .btn:hover { opacity: 0.88; }
+.hero-ni-ctas .btn-secondary {
+    background: transparent;
+    border: 1.5px solid rgba(0,0,0,0.15);
+    color: var(--text-main); font-weight: 700;
+    font-size: 0.8rem; padding: 14px 28px;
+}
+.hero-ni-ctas .btn-secondary:hover {
+    border-color: var(--primary); color: var(--primary);
+    background: transparent;
+}
+
+/* Bottom 3-column proof strip */
+.hero-ni-proof {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid rgba(0,0,0,0.06);
+    background: var(--bg-alt);
+    position: relative; z-index: 2;
+    margin: 0 calc(-1 * var(--gutter));
+    padding: 0 var(--gutter);
+}
+.hero-ni-proof-item {
+    padding: 40px 48px 48px 0;
+    border-right: 1px solid rgba(0,0,0,0.06);
+}
+.hero-ni-proof-item:first-child { padding-left: 0; }
+.hero-ni-proof-item:not(:first-child) { padding-left: 48px; }
+.hero-ni-proof-item:last-child { border-right: none; }
+.ni-proof-num {
+    font-family: var(--font-heading); font-size: 2.2rem; font-weight: 900;
+    color: var(--primary); letter-spacing: -0.04em; line-height: 1;
+    margin-bottom: 6px; display: block;
+}
+.ni-proof-label {
+    font-size: 0.58rem; font-weight: 900; text-transform: uppercase;
+    letter-spacing: 0.18em; color: var(--text-muted); opacity: 0.45;
+    margin-bottom: 10px; display: block;
+}
+.ni-proof-desc {
+    font-size: 0.88rem; color: var(--text-muted); line-height: 1.65; opacity: 0.75;
+}
+
+/* Decorative soft glow */
+.hero-ni-glow {
+    position: absolute; top: -150px; right: -150px;
+    width: 500px; height: 500px; border-radius: 50%;
+    background: radial-gradient(circle, var(--primary) 0%, transparent 65%);
+    filter: blur(120px); opacity: 0.06; pointer-events: none; z-index: 1;
+}
+
+@media (max-width: 1024px) {
+    .hero-ni-body { grid-template-columns: 1fr; gap: 48px; padding: 60px 0 48px; }
+    .hero-ni-right { border-left: none; padding-left: 0; border-top: 1px solid rgba(0,0,0,0.07); padding-top: 40px; }
+    .hero-ni-proof { grid-template-columns: 1fr; margin: 0; padding: 0; }
+    .hero-ni-proof-item { border-right: none; border-bottom: 1px solid rgba(0,0,0,0.06); padding: 32px 0; }
+    .hero-ni-proof-item:last-child { border-bottom: none; }
+}
+
+/* ── SHARED PILLAR (used in image mode) ── */
+.v-pillars-grid { display: flex; flex-direction: column; gap: 48px; margin-top: 16px; }
+.v-pillar { border-left: 4px solid var(--primary); padding-left: 24px; }
+.v-pillar-title { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; color: var(--text-main); }
+.v-pillar-desc { font-size: 0.95rem; color: var(--text-muted); line-height: 1.6; opacity: 0.7; }
+
+.about-text-center { max-width: 920px !important; margin: 0 auto !important; text-align: center; }
+.about-text-center .about-desc { margin-left: auto; margin-right: auto; max-width: 720px; }
+.about-stats-center { justify-content: center !important; margin-top: 40px; }
+.about-grid-no-img { grid-template-columns: 1fr !important; gap: 60px !important; text-align: center; }
+.about-grid-no-img .v-pillars-grid { flex-direction: row; justify-content: center; margin-top: 40px; text-align: left; }
+.about-grid-no-img .v-pillar { border-left: none; border-top: 2.5px solid var(--primary); padding-top: 24px; max-width: 320px; }
+.about-deco-blob {
+    position: absolute; top: 0; left: 0; width: 300px; height: 300px;
+    background: radial-gradient(circle, var(--primary-light) 0%, transparent 70%);
+    filter: blur(80px); opacity: 0.4; pointer-events: none;
+}
+
+/* ── NO-IMAGE PORTFOLIO: Bold Case Study List ── */
+.portfolio-caselist { max-width: 1400px; margin: 0 auto; }
+.portfolio-caserow {
+    display: grid; grid-template-columns: 100px 1fr auto;
+    gap: 60px; align-items: start;
+    padding: 60px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    transition: all 0.4s ease;
+    position: relative;
+}
+.portfolio-caserow:first-child { border-top: 1px solid rgba(0,0,0,0.07); }
+.portfolio-caserow:hover { background: var(--bg-alt); padding-left: 24px; padding-right: 24px; margin: 0 -24px; border-color: transparent; }
+.portfolio-caserow:hover .case-arrow { background: var(--primary); border-color: var(--primary); }
+.portfolio-caserow:hover .case-arrow svg { stroke: #fff; }
+.case-num {
+    font-family: var(--font-heading); font-size: 5rem; font-weight: 900;
+    line-height: 1; color: var(--text-main); opacity: 0.07;
+    letter-spacing: -0.05em; padding-top: 8px;
+}
+.case-body { }
+.case-tag { 
+    font-size: 0.65rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--primary); margin-bottom: 12px; display: block;
+}
+.case-title {
+    font-family: var(--font-heading); font-size: clamp(1.6rem, 3vw, 2.4rem);
+    font-weight: 900; color: var(--text-main); letter-spacing: -0.04em;
+    text-transform: uppercase; margin-bottom: 16px; line-height: 1.1;
+}
+.case-desc { font-size: 1rem; color: var(--text-muted); line-height: 1.7; max-width: 640px; margin-bottom: 24px; }
+.case-meta { display: flex; gap: 40px; }
+.case-meta-item { }
+.case-meta-label { font-size: 0.62rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); opacity: 0.5; margin-bottom: 4px; }
+.case-meta-value { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
+.case-arrow { 
+    width: 56px; height: 56px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.1);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: all 0.4s; margin-top: 8px;
+    background: var(--bg);
+}
+.case-arrow svg { stroke: var(--text-main); width: 20px; height: 20px; transition: stroke 0.4s; }
+
 /* ── ANIMATIONS ── */
 @keyframes heroUp {
-    from { opacity: 0; transform: translateY(28px); }
-    to   { opacity: 1; transform: none; }
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 
 /* ══════════════════════ STATS STRIP ══════════════════════ */
 .stats-strip {
-    background: var(--primary); padding: 44px 60px;
+    background: var(--primary); padding: 32px 60px;
     display: flex; justify-content: center; gap: 80px; flex-wrap: wrap;
 }
 .stat-item { text-align: center; }
 .stat-num  { font-family: var(--font-heading); font-size: 2.8rem; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.03em; margin-bottom: 4px; }
 .stat-lbl  { font-size: 0.78rem; color: rgba(255,255,255,0.6); font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; }
 
-/* ── ABOUT (Editorial Layout) ── */
-.about-section { background: var(--bg-alt); padding: 140px 60px; position: relative; overflow: hidden; }
-.about-section::before {
-    content: ''; position: absolute; top: -10%; right: -10%; width: 40%; height: 40%;
-    background: radial-gradient(circle, var(--primary-light) 0%, transparent 70%);
-    opacity: 0.15; pointer-events: none;
+/* ── ABOUT (Architectural Hybrid) ── */
+.about-section { 
+    background-color: var(--bg-alt);
+    background-image: var(--about-bg-url);
+    background-size: cover; background-position: center; background-attachment: fixed;
+    background-blend-mode: normal;
+    padding: 80px var(--gutter); position: relative; color: var(--text-main);
 }
-.about-grid { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 120px; align-items: center; }
+.about-grid { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 120px; align-items: center; }
 
-.about-title { font-family: var(--font-heading); font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 900; color: var(--text-main); line-height: 1.05; letter-spacing: -0.04em; margin-bottom: 32px; }
-.about-desc { font-size: 1.15rem; color: var(--text-muted); line-height: 1.8; margin-bottom: 48px; }
-.about-stats { 
-    display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; 
-    background: rgba(0,0,0,0.06); border-radius: 24px; overflow: hidden; 
-    border: 1px solid rgba(0,0,0,0.04);
+.about-header-side { border-left: 5px solid var(--primary); padding-left: 40px; }
+.about-title { 
+    font-family: var(--font-heading); font-size: clamp(2.5rem, 5vw, 4rem); 
+    font-weight: 900; color: var(--text-main); line-height: 1.1; 
+    letter-spacing: -0.04em; margin-bottom: 32px; text-transform: uppercase;
 }
-.about-stat { padding: 32px 20px; text-align: center; background: var(--bg); transition: all 0.4s; }
-.about-stat:hover { background: var(--bg-alt); }
-.about-stat-num { font-family: var(--font-heading); font-size: 2.2rem; font-weight: 800; color: var(--primary); letter-spacing: -0.04em; line-height: 1; margin-bottom: 8px; }
-.about-stat-lbl { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
-.about-visual { position: relative; }
-.about-img { width: 100%; border-radius: 32px; display: block; position: relative; z-index: 2; box-shadow: 0 40px 100px rgba(0,0,0,0.15); aspect-ratio: 4/5; object-fit: cover; }
+.about-desc { font-size: 1.15rem; color: var(--text-muted); line-height: 1.8; margin-bottom: 48px; max-width: 600px; }
+
+.about-services-side { display: flex; flex-direction: column; gap: 40px; }
+.about-services-side h3 { font-family: var(--font-heading); font-size: 1.8rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; }
+.about-s-item { display: flex; gap: 24px; align-items: flex-start; }
+.about-s-icon { width: 44px; height: 44px; color: var(--primary); flex-shrink: 0; }
+.about-s-info h4 { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.about-s-info p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
 
 /* ══════════════════════ SERVICES ══════════════════════ */
-.services-section { background: var(--bg); padding: 100px 60px; }
-.services-header { max-width: 1240px; margin: 0 auto 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: end; }
-.services-desc { color: var(--text-muted); font-size: 1.05rem; line-height: 1.75; }
-.services-grid { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 24px; }
-.service-card {
-    border-radius: 28px; padding: 52px 40px; position: relative; overflow: hidden;
-    transition: all 0.5s cubic-bezier(.19,1,.22,1);
-    background: var(--bg-alt);
+.services-section { background: var(--bg); padding: 80px 60px; }
+.services-header { 
+    max-width: 1240px; margin: 0 auto 80px; 
+    display: grid; grid-template-columns: 1fr 1fr; gap: 100px; align-items: end; 
 }
-.service-card.cs-elevated { box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-.service-card.cs-outlined { background: var(--bg); border: 2px solid rgba(0,0,0,0.06); }
-.service-card.cs-flat { background: var(--bg-alt); border: none; }
-.service-card:hover { transform: translateY(-8px); box-shadow: 0 20px 56px rgba(0,0,0,0.11); }
-.service-num { position: absolute; top: -10px; right: 20px; font-family: var(--font-heading); font-size: 6.5rem; font-weight: 900; color: var(--primary); opacity: 0.05; line-height: 1; pointer-events: none; user-select: none; }
-.service-icon { width: 50px; height: 50px; background: var(--primary-light); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; transition: background 0.3s; }
-.service-card:hover .service-icon { background: var(--primary); }
-.service-card:hover .service-icon svg { stroke: #fff; }
-.service-icon svg { stroke: var(--primary); transition: stroke 0.3s; }
-.service-card h3 { font-family: var(--font-heading); font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text-main); margin-bottom: 12px; }
-.service-card p { color: var(--text-muted); font-size: 0.96rem; line-height: 1.75; margin-bottom: 22px; }
-.service-link { display: inline-flex; align-items: center; gap: 6px; color: var(--primary); font-size: 0.85rem; font-weight: 700; text-decoration: none; transition: gap 0.2s; }
-.service-link:hover { gap: 10px; }
+.services-header .section-label { 
+    background: none; border: none; padding: 0; color: var(--text-muted); 
+    margin-bottom: 12px; font-weight: 500; opacity: 0.8;
+}
+.section-title { 
+    font-family: var(--font-heading); font-size: clamp(2.5rem, 5vw, 4.2rem); 
+    font-weight: 800; color: var(--text-main); line-height: 1; 
+    letter-spacing: -0.06em; margin-top: 12px; 
+}
+.services-desc { color: var(--text-muted); font-size: 1.15rem; line-height: 1.7; max-width: 500px; padding-bottom: 8px; }
+
+.services-grid { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(350px,1fr)); gap: 32px; }
+.service-card {
+    padding: 60px 40px; position: relative;
+    background: var(--bg);
+    border: 1px solid rgba(0,0,0,0.06);
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex; flex-direction: column; height: 100%;
+}
+.service-card:hover { transform: translateY(-10px); box-shadow: var(--card-hover); border-color: var(--primary); }
+
+/* Large background numbers (01, 02, 03, 04) */
+.service-num { 
+    position: absolute; top: 32px; right: 40px; 
+    font-family: var(--font-heading); font-size: 7.5rem; font-weight: 950; 
+    color: var(--text-main); opacity: 0.03; line-height: 1; 
+    pointer-events: none; user-select: none; z-index: 1;
+    transition: all 0.6s ease;
+}
+.service-card:hover .service-num { opacity: 0.07; transform: translateY(-10px); }
+
+.service-icon { 
+    width: 48px; height: 48px; background: none; 
+    display: flex; align-items: center; justify-content: flex-start; 
+    margin-bottom: 24px; transition: all 0.3s; position: relative; z-index: 2;
+}
+.service-card:hover .service-icon { transform: scale(1.1) translateX(4px); }
+.service-icon svg { stroke: var(--primary); stroke-width: 1.5px; transition: stroke 0.3s; }
+
+.service-card h3 { 
+    font-family: var(--font-heading); font-size: 1.4rem; font-weight: 900; 
+    color: var(--text-main); margin-bottom: 16px; text-transform: uppercase; letter-spacing: -0.01em;
+}
+.service-card p { 
+    color: var(--text-muted); font-size: 0.95rem; line-height: 1.65; margin-bottom: 0;
+    font-weight: 400; opacity: 0.7;
+}
 
 /* ══════════════════════ PORTFOLIO ══════════════════════ */
-/* ── PORTFOLIO (Editorial Grid) ── */
-.portfolio-section { background: var(--bg-alt); padding: 140px 60px; }
-.portfolio-header { max-width: 1240px; margin: 0 auto 80px; text-align: left; }
-.portfolio-header p { color: var(--text-muted); max-width: 600px; font-size: 1.15rem; line-height: 1.75; margin-top: 24px; }
-.portfolio-grid { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: repeat(12,1fr); gap: 40px; }
-.p-card { 
-    position: relative; border-radius: 32px; overflow: hidden; background: var(--bg); 
-    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); cursor: pointer; 
+.portfolio-section { background: var(--bg-alt); padding: 80px var(--gutter); position: relative; }
+.portfolio-header { 
+    max-width: 1400px; margin: 0 auto 80px; 
+    display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 100px; align-items: end;
 }
-.p-card:hover { transform: translateY(-12px); box-shadow: 0 40px 100px rgba(0,0,0,0.12); }
-.p-card:nth-child(1) { grid-column: span 8; }
-.p-card:nth-child(2) { grid-column: span 4; }
-.p-card:nth-child(3) { grid-column: span 4; }
-.p-card:nth-child(4) { grid-column: span 8; }
+.portfolio-header p { color: var(--text-muted); font-size: 1.1rem; line-height: 1.7; opacity: 0.8; margin-top: 0; }
 
-.p-img { overflow: hidden; position: relative; }
-.p-card:nth-child(odd) .p-img { aspect-ratio: 16/10; }
-.p-card:nth-child(even) .p-img { aspect-ratio: 4/5; }
-.p-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s cubic-bezier(.16,1,.3,1); }
+.portfolio-grid { 
+    max-width: 1400px; margin: 0 auto; 
+    display: grid; gap: 40px; 
+}
+.portfolio-grid.cols-1 { grid-template-columns: 1fr; max-width: 1100px; gap: 0; }
+.portfolio-grid.cols-1 .p-card { flex-direction: row; gap: 100px; align-items: center; border: none; padding-bottom: 0; }
+.portfolio-grid.cols-1 .p-img { width: 58%; aspect-ratio: 16/10; margin-bottom: 0; border-radius: 20px; box-shadow: 0 40px 100px rgba(0,0,0,0.12); }
+.portfolio-grid.cols-1 .p-info { width: 42%; padding: 0; flex-direction: column; }
+.portfolio-grid.cols-1 .p-info h3 { font-size: 2.2rem; margin-bottom: 20px; }
+.portfolio-grid.cols-1 .p-info p { -webkit-line-clamp: 6; line-clamp: 6; font-size: 1.05rem; }
+.portfolio-grid.cols-1 .p-meta { border-top: none; padding-top: 0; margin-top: 32px; }
+
+.portfolio-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.portfolio-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+@media (max-width: 1024px) {
+    .portfolio-grid.cols-1, .portfolio-grid.cols-2, .portfolio-grid.cols-3 { grid-template-columns: 1fr; }
+    .portfolio-grid.cols-1 .p-card { flex-direction: column; gap: 40px; }
+    .portfolio-grid.cols-1 .p-img, .portfolio-grid.cols-1 .p-info { width: 100%; }
+}
+
+.p-card { 
+    position: relative; background: var(--bg); 
+    display: flex; flex-direction: column; height: 100%;
+    border-bottom: 2px solid rgba(0,0,0,0.06); padding-bottom: 32px;
+}
+.p-card:hover { transform: translateY(-4px); }
+
+.p-img { overflow: hidden; position: relative; margin-bottom: 24px; aspect-ratio: 16/10; border-radius: 12px; background: var(--bg-alt); }
+.p-img img { width: 100%; height: 100%; object-fit: contain; transition: transform 0.8s ease; }
 .p-card:hover .p-img img { transform: scale(1.05); }
-.p-img.no-img { background: var(--primary-light); display: flex; align-items: center; justify-content: center; }
-.p-img.no-img::after { content: 'Project'; font-family: var(--font-heading); font-size: 1.2rem; font-weight: 800; color: var(--primary); opacity: 0.2; }
+
+/* Text-Only Card Enhancements */
+.p-card.text-only { padding-top: 20px; border-top: 1.5px solid var(--text-main); }
+.p-card.text-only .badge-item { color: var(--text-main); }
+.p-card.text-only h3 { font-size: 1.8rem; margin-bottom: 12px; font-weight: 900; }
+.p-meta { margin-top: 24px; display: grid; gap: 16px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 24px; }
+.p-meta-item { display: flex; flex-direction: column; gap: 4px; }
+.p-meta-label { font-size: 0.65rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); opacity: 0.5; }
+.p-meta-value { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
 
 
 
-.p-info { padding: 32px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.p-info { padding: 8px 4px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 
-.p-info h3 { font-family: var(--font-heading); font-size: 1.6rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text-main); margin-bottom: 8px; }
-.p-info p { color: var(--text-muted); font-size: 0.95rem; line-height: 1.7; }
+.p-info h3 { font-family: var(--font-heading); font-size: 1.15rem; font-weight: 900; letter-spacing: -0.04em; color: var(--text-main); margin-bottom: 2px; text-transform: uppercase; }
+.p-info p { 
+    color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    line-clamp: 2;
+}
 .p-arrow { flex-shrink: 0; width: 44px; height: 44px; background: var(--bg-alt); border: 1px solid rgba(0,0,0,0.04); border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.4s; margin-top: 4px; }
 .p-card:hover .p-arrow { background: var(--primary); border-color: var(--primary); transform: translate(4px,-4px); }
 .p-card:hover .p-arrow svg { stroke: #fff; }
 .p-arrow svg { stroke: var(--text-main); transition: stroke 0.3s; }
 
 /* ── TESTIMONIALS (Editorial Layout) ── */
-.testimonials-section { background: var(--bg); padding: 120px 60px; }
+.testimonials-section { background: var(--bg); padding: 80px 60px; }
 .testimonials-header { max-width: 1240px; margin: 0 auto 80px; text-align: center; }
 .testimonials-grid { 
     max-width: 1240px; margin: 0 auto; 
     display: grid; grid-template-columns: repeat(12, 1fr); gap: 32px; 
 }
 .t-card { 
-    background: var(--bg-alt); border-radius: 24px; padding: 48px; 
-    border: 1px solid rgba(0,0,0,0.04); transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+    background: var(--bg); border-radius: 8px; padding: 40px; 
+    border: 1px solid rgba(0,0,0,0.08); transition: all 0.4s cubic-bezier(.16,1,.3,1);
     position: relative;
     grid-column: span 6;
 }
@@ -163,7 +447,7 @@
 .t-stars { color: #f59e0b; font-size: 0.9rem; margin-bottom: 16px; letter-spacing: 3px; }
 
 /* ══════════════════════ FAQ ══════════════════════ */
-.faq-section { background: var(--bg-alt); padding: 100px 60px; }
+.faq-section { background: var(--bg-alt); padding: 80px 60px; }
 .faq-inner { max-width: 780px; margin: 0 auto; }
 .faq-header { text-align: center; margin-bottom: 52px; }
 .faq-item { border-bottom: 1.5px solid rgba(0,0,0,0.08); }
@@ -177,7 +461,7 @@
 .faq-item.open .faq-a { display: block; }
 
 /* ── PRICING (Tiered Glassmorphism) ── */
-.pricing-section { background: var(--bg); padding: 140px 60px; }
+.pricing-section { background: var(--bg); padding: 80px 60px; }
 .pricing-header { max-width: 1240px; margin: 0 auto 80px; text-align: center; }
 .pricing-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 40px; align-items: stretch; }
 .pricing-card { 
@@ -223,42 +507,24 @@
 .pricing-btn:hover { transform: scale(1.03); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
 
 /* ── CONTACT (Minimalist Portal) ── */
-.contact-section { background: var(--bg-alt); padding: 120px 60px; }
-.contact-inner { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1.2fr; gap: 100px; align-items: start; }
-.contact-desc { color: var(--text-muted); font-size: 1.1rem; line-height: 1.8; margin-bottom: 56px; }
-.contact-items { display: grid; grid-template-columns: 1fr; gap: 20px; }
-.c-item { 
-    display: flex; align-items: center; gap: 20px; padding: 24px; 
-    background: var(--bg); border-radius: 20px; border: 1px solid rgba(0,0,0,0.04); 
-    transition: all 0.3s;
-}
-.c-item:hover { border-color: var(--primary); transform: translateX(8px); box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
-.c-icon { 
-    width: 48px; height: 48px; flex-shrink: 0; background: var(--primary-light); 
-    border-radius: 14px; display: flex; align-items: center; justify-content: center; 
-}
-.c-icon svg { stroke: var(--primary); width: 20px; height: 20px; }
-.c-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 4px; }
-.c-value { font-weight: 700; font-size: 1rem; color: var(--text-main); }
+.contact-section { background: var(--bg); padding: 120px var(--gutter); min-height: 100vh; display: flex; align-items: center; }
+.contact-inner { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 100px; width: 100%; }
+.contact-desc { color: var(--text-muted); font-size: 1.05rem; line-height: 1.7; margin: 24px 0 48px; opacity: 0.8; }
 
 .contact-form-card { 
-    background: var(--bg); border-radius: 32px; padding: 60px; 
-    box-shadow: 0 40px 100px rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.02);
+    background: var(--bg-alt); padding: 80px; 
+    border: 1px solid rgba(0,0,0,0.05);
 }
-.contact-form-card h3 { font-family: var(--font-heading); font-size: 2rem; font-weight: 700; color: var(--text-main); margin-bottom: 32px; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.form-group { display: flex; flex-direction: column; gap: 10px; }
-.form-group label { font-size: 0.85rem; font-weight: 700; color: var(--text-main); padding-left: 4px; }
+.contact-form-card h3 { font-family: var(--font-heading); font-size: 1.8rem; font-weight: 900; color: var(--text-main); margin-bottom: 40px; text-transform: uppercase; letter-spacing: -0.02em; }
+.form-stack { display: flex; flex-direction: column; gap: 32px; margin-bottom: 48px; }
+.form-group label { font-size: 0.75rem; font-weight: 900; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.6; }
 .form-group input, .form-group textarea { 
-    padding: 16px 20px; border: 1.5px solid rgba(0,0,0,0.08); border-radius: 14px; 
+    padding: 16px 0; border: none; border-bottom: 2px solid rgba(0,0,0,0.1); border-radius: 0; 
     font-family: var(--font-body); font-size: 1rem; color: var(--text-main); 
-    background: var(--bg-alt); outline: none; transition: all 0.3s; 
+    background: transparent; outline: none; transition: border-color 0.3s; 
 }
-.form-group input:focus, .form-group textarea:focus { 
-    border-color: var(--primary); background: #fff; box-shadow: 0 0 0 4px var(--primary-light); 
-}
-.form-stack { display: flex; flex-direction: column; gap: 24px; margin-bottom: 32px; }
-.btn-full { width: 100%; justify-content: center; padding: 18px; font-size: 1rem; border-radius: 100px; }
+.form-group input:focus, .form-group textarea:focus { border-color: var(--primary); }
+.btn-full { width: 100%; }
 
 /* ══════════════════════ RESPONSIVE ══════════════════════ */
 @media (max-width: 1024px) {
@@ -271,7 +537,7 @@
     .about-visual::before { display: none; }
     .about-badge { bottom: 14px; right: 14px; }
     .services-header { grid-template-columns: 1fr; gap: 16px; margin-bottom: 44px; }
-    .p-card:nth-child(1), .p-card:nth-child(2), .p-card:nth-child(3) { grid-column: span 12; }
+    .portfolio-grid.cols-2, .portfolio-grid.cols-3 { grid-template-columns: 1fr; }
     .stats-strip { gap: 40px; padding: 32px; }
     .pricing-card.highlighted { transform: none; }
 }
@@ -281,9 +547,7 @@
     .about-stats { grid-template-columns: 1fr; border: none; gap: 10px; }
     .about-stat { border-radius: 12px; border: 1.5px solid rgba(0,0,0,0.07); }
     .form-row { grid-template-columns: 1fr; }
-    .contact-form-card { padding: 28px 22px; }
-    .stats-strip { flex-direction: column; gap: 22px; padding: 32px 24px; }
-    .hero-cta-row { flex-direction: column; align-items: flex-start; }
+    .save-bar { bottom: 32px; right: 32px; left: 32px; width: auto; max-width: 500px; margin: 0 auto; }
 }
 </style>
 
@@ -294,41 +558,88 @@
 
   {# ── HERO ── #}
   {% if section == 'hero' %}
-  <section class="hero {% if not hero_img %}hero-no-img-center{% endif %}" id="home">
+  <section class="hero{% if not has_images %} hero-ni{% endif %}" id="home">
+    <div class="{% if has_images %}hero-container{% else %}hero-ni-inner{% endif %}" style="{% if not has_images %}display:contents{% endif %}">
 
-    {# Background elements per style #}
-    {% if hs == 'split-left' %}
-      {% if hero_img %}<div class="hero-right-panel"></div>{% endif %}
-    {% elif hs == 'fullbleed' %}
-      <div class="hero-bg">
-        {% if hero_img %}<img src="{{ hero_img }}" alt="{{ site_name }}">
-        {% else %}<div class="hero-bg-css"></div>{% endif %}
+      {% if has_images %}
+      {# ── WITH IMAGES: Original split-grid layout (UNCHANGED) ── #}
+      <div class="hero-top-row reveal">
+        <span class="section-label" contenteditable="true">{{ home.get('label','Premium Architecture') }}</span>
+        <h1 contenteditable="true">{{ site_title }}</h1>
       </div>
-      <div class="hero-overlay"></div>
-    {% else %}
-      <div class="hero-center-bg"></div>
-    {% endif %}
+      <div class="hero-bottom-grid">
+        <div class="hero-content reveal reveal-delay-1">
+          <p contenteditable="true">{{ home.subtitle }}</p>
+          <div class="v-pillars-grid">
+            <div class="v-pillar">
+              <div class="v-pillar-title" contenteditable="true">{{ home.get('pillar1_title', 'Engineered Precision') }}</div>
+              <div class="v-pillar-desc" contenteditable="true">{{ home.get('pillar1_desc', 'Meticulously crafted solutions that prioritize performance and robust architectural integrity.') }}</div>
+            </div>
+            <div class="v-pillar">
+              <div class="v-pillar-title" contenteditable="true">{{ home.get('pillar2_title', 'Strategic Impact') }}</div>
+              <div class="v-pillar-desc" contenteditable="true">{{ home.get('pillar2_desc', 'Transforming complex challenges into streamlined, high-performance digital experiences.') }}</div>
+            </div>
+          </div>
+          {% if home.cta %}
+          <div class="hero-cta-row" style="margin-top: 20px;">
+            <a href="#contact" class="btn" contenteditable="true">{{ home.cta }}</a>
+            {% if home.get('cta2') %}<a href="#portfolio" class="btn btn-secondary" contenteditable="true">{{ home.cta2 }}</a>{% endif %}
+          </div>
+          {% endif %}
+        </div>
+        <div class="hero-visual reveal reveal-delay-2">
+            <img src="{{ hero_img }}" alt="{{ site_name }}">
+        </div>
+      </div>
 
-    <div class="hero-text {% if not hero_img %}hero-text-center{% endif %}">
-      <span class="section-label" contenteditable="true">{{ home.get('label','Welcome') }}</span>
-      <h1 contenteditable="true">{{ site_title }}</h1>
-      <p contenteditable="true">{{ home.subtitle }}</p>
-      <div class="hero-cta-row">
-        <a href="#contact" class="btn" contenteditable="true">{{ home.cta }}</a>
-        {% if home.get('cta2') %}<a href="#portfolio" class="btn btn-ghost" contenteditable="true">{{ home.cta2 }}</a>{% endif %}
+      {% else %}
+      {# ── NO IMAGES: Light minimal premium editorial hero ── #}
+      <div class="hero-ni-glow"></div>
+
+      <div class="hero-ni-topbar">
+        <span class="hero-ni-topbar-label" contenteditable="true">{{ home.get('label', 'Premium Architecture') }}</span>
+        <span class="hero-ni-topbar-tag" contenteditable="true">{{ site_name }}</span>
       </div>
-      <div class="hero-trust">
-        <div class="hero-trust-dot"></div>
-        {{ tagline if tagline else home.get('label', site_name) }}
+
+      <div class="hero-ni-body reveal">
+        <div class="hero-ni-headline">
+          <div class="hero-ni-eyebrow">
+            <span class="hero-ni-eyebrow-line"></span>
+            <span class="hero-ni-eyebrow-text" contenteditable="true">{{ home.get('label', 'Premium Architecture') }}</span>
+          </div>
+          <h1 contenteditable="true">{{ site_title }}</h1>
+        </div>
+        <div class="hero-ni-right reveal reveal-delay-1">
+          <p contenteditable="true">{{ home.subtitle }}</p>
+          {% if home.cta %}
+          <div class="hero-ni-ctas">
+            <a href="#contact" class="btn" contenteditable="true">{{ home.cta }}</a>
+            {% if home.get('cta2') %}<a href="#portfolio" class="btn btn-secondary" contenteditable="true">{{ home.cta2 }}</a>{% endif %}
+          </div>
+          {% endif %}
+        </div>
       </div>
+
+      <div class="hero-ni-proof reveal reveal-delay-2">
+        <div class="hero-ni-proof-item">
+          <span class="ni-proof-num" contenteditable="true">{{ about.get('stat1_number', '12+') }}</span>
+          <span class="ni-proof-label" contenteditable="true">{{ about.get('stat1_label', 'Years of Expertise') }}</span>
+          <div class="ni-proof-desc" contenteditable="true">{{ home.get('pillar1_desc', 'Meticulously crafted solutions that prioritize performance and robust architectural integrity.') }}</div>
+        </div>
+        <div class="hero-ni-proof-item">
+          <span class="ni-proof-num" contenteditable="true">{{ about.get('stat2_number', '340+') }}</span>
+          <span class="ni-proof-label" contenteditable="true">{{ about.get('stat2_label', 'Clients Served') }}</span>
+          <div class="ni-proof-desc" contenteditable="true">{{ home.get('pillar2_desc', 'Transforming complex challenges into streamlined, high-performance digital experiences.') }}</div>
+        </div>
+        <div class="hero-ni-proof-item">
+          <span class="ni-proof-num" contenteditable="true">{{ about.get('stat3_number', '97%') }}</span>
+          <span class="ni-proof-label" contenteditable="true">{{ about.get('stat3_label', 'Client Satisfaction') }}</span>
+          <div class="ni-proof-desc">Consistently recognized for exceeding expectations and setting new industry benchmarks.</div>
+        </div>
+      </div>
+      {% endif %}
+
     </div>
-
-    {% if hs == 'split-left' and hero_img %}
-    <div class="hero-visual">
-        <img src="{{ hero_img }}" alt="{{ site_name }}">
-    </div>
-    {% endif %}
-
   </section>
 
   {# ── STATS ── #}
@@ -342,30 +653,38 @@
     {% endfor %}
   </div>
 
-  {# ── ABOUT ── #}
+  {# ── ABOUT (Restructured Layout) ── #}
   {% elif section == 'about' %}
-  <section class="about-section" id="about">
-    <div class="about-grid {% if not about_img %}about-grid-center{% endif %}">
-      <div class="reveal {% if not about_img %}about-text-center{% endif %}">
-        <span class="section-label" contenteditable="true">{{ about.get('label','Our Story') }}</span>
+  {% set a_bg = about_img %}
+  {% set a_bg_css = "linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.92)), url('" ~ a_bg ~ "')" if a_bg else "none" %}
+  <section class="about-section" id="about" style="background-image: {{ a_bg_css }}; border-bottom: 1px solid rgba(0,0,0,0.05);">
+    <div class="about-grid reveal">
+      
+      <div class="about-header-side">
         <h2 class="about-title" contenteditable="true">{{ about.heading }}</h2>
         <p class="about-desc" contenteditable="true">{{ about.description }}</p>
-        <a href="#contact" class="btn">Get in Touch</a>
-        <div class="about-stats {% if not about_img %}about-stats-center{% endif %}">
-          <div class="about-stat"><div class="about-stat-num" contenteditable="true">{{ about.get('stat1_number','10+') }}</div><div class="about-stat-lbl" contenteditable="true">{{ about.get('stat1_label','Years') }}</div></div>
-          <div class="about-stat"><div class="about-stat-num" contenteditable="true">{{ about.get('stat2_number','500+') }}</div><div class="about-stat-lbl" contenteditable="true">{{ about.get('stat2_label','Clients') }}</div></div>
-          <div class="about-stat"><div class="about-stat-num" contenteditable="true">{{ about.get('stat3_number','98%') }}</div><div class="about-stat-lbl" contenteditable="true">{{ about.get('stat3_label','Satisfaction') }}</div></div>
-        </div>
+        <a href="#services" class="btn" style="background:var(--primary); color:#fff; font-weight:900;" contenteditable="true">View Our Work</a>
       </div>
-      {% if about_img %}
-      <div class="about-visual reveal reveal-delay-2">
-        <img class="about-img" src="{{ about_img }}" alt="About {{ site_name }}">
-        <div class="about-badge">
-          <div class="about-badge-num" contenteditable="true">{{ about.get('stat2_number','500+') }}</div>
-          <div class="about-badge-lbl" contenteditable="true">Happy Clients</div>
+
+      <div class="about-services-side">
+        <h3 contenteditable="true">What We Do</h3>
+        {% for s in services[:3] %}
+        <div class="about-s-item reveal-delay-{{ loop.index }}">
+          <div class="about-s-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              {% if s.get('icon_type') == 'star' %}<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              {% elif s.get('icon_type') == 'zap' %}<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              {% else %}<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>{% endif %}
+            </svg>
+          </div>
+          <div class="about-s-info">
+            <h4 contenteditable="true">{{ s.title }}</h4>
+            <p contenteditable="true">{{ s.description }}</p>
+          </div>
         </div>
+        {% endfor %}
       </div>
-      {% endif %}
+
     </div>
   </section>
 
@@ -377,19 +696,12 @@
       <div><span class="section-label">What We Offer</span><h2 class="section-title">Our Services</h2></div>
       <p class="services-desc">Every service is built specifically for your goals — delivered with expertise and attention to detail.</p>
     </div>
-    <div class="services-grid">
+    <div class="services-grid eb-sortable" id="services-grid">
       {% for s in services %}
-      <div class="service-card cs-{{ cs }} reveal reveal-delay-{{ loop.index }}">
-        <div class="service-num">{{ '%02d' % loop.index }}</div>
+      <div class="service-card cs-{{ cs }} reveal reveal-delay-{{ loop.index }}" data-id="svc_{{ loop.index }}">
+        <div class="service-num">{{ loop.index | string | last }}</div>
         <div class="service-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            {% if s.get('icon_type') == 'star' %}<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            {% elif s.get('icon_type') == 'zap' %}<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-            {% elif s.get('icon_type') == 'heart' %}<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-            {% elif s.get('icon_type') == 'globe' %}<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            {% elif s.get('icon_type') == 'award' %}<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
-            {% else %}<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>{% endif %}
-          </svg>
+          {% if s.icon %}{{ s.icon | safe }}{% else %}<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>{% endif %}
         </div>
         <h3 contenteditable="true">{{ s.title }}</h3>
         <p contenteditable="true">{{ s.description }}</p>
@@ -403,37 +715,82 @@
   {% elif section == 'portfolio' %}
   <section class="portfolio-section" id="portfolio">
     <div class="portfolio-header reveal">
-      <span class="section-label">Our Work</span>
-      <h2 class="about-title">Selected Projects</h2>
-      <p>A curated look at our most impactful work — each project built with intention, delivered with absolute craft.</p>
+      <div>
+        <span class="section-label">Our Work</span>
+        <h2 class="about-title" style="margin-bottom: 0;">Selected Projects</h2>
+      </div>
+      <p>A curated look at our most impactful work — each project built with intention, delivered with absolute craft through technical and design excellence.</p>
     </div>
-    <div class="portfolio-grid">
-      {% set grads = [
-        'linear-gradient(135deg, ' ~ pdark ~ ' 0%, ' ~ primary ~ ' 100%)',
-        'linear-gradient(135deg, ' ~ primary ~ ' 0%, ' ~ accent ~ ' 100%)',
-        'linear-gradient(135deg, ' ~ accent ~ ' 0%, ' ~ pdark ~ ' 100%)'
-      ] %}
-      {% for p in portfolio %}
-      <div class="p-card reveal reveal-delay-{{ loop.index }}">
-        {% set has_p_img = (port_imgs and port_imgs|length > loop.index0) or (images and images|length > (loop.index0 + 2)) %}
-        <div class="p-img {{ 'no-img' if not has_p_img }}">
-          {% if port_imgs and port_imgs|length > loop.index0 %}
-            <img src="{{ port_imgs[loop.index0] }}" alt="{{ p.title }}">
-          {% elif images and images|length > (loop.index0 + 2) %}
-            <img src="{{ images[loop.index0 + 2] }}" alt="{{ p.title }}">
-          {% endif %}
+
+    {% if has_images %}
+    {# ── WITH IMAGES: Original grid layout (UNCHANGED) ── #}
+    {% set has_port_images = (port_imgs|length > 0) %}
+    {% set p_count = port_imgs|length if has_port_images else (portfolio|length) %}
+    <div class="portfolio-grid eb-sortable cols-{{ [p_count, 3]|min if has_port_images else 3 }}" id="portfolio-grid">
+      {% set loop_items = port_imgs if has_port_images else portfolio %}
+      {% for item in loop_items %}
+      {% if has_port_images %}
+          {% set p_img = item %}
+          {% set p = portfolio[loop.index0] if portfolio|length > loop.index0 else {"title": "Bespoke Case Study", "description": "Demonstrating architectural excellence and technical mastery.", "tag": "Strategic", "client": site_name, "outcome": "Success achieved through technical mastery."} %}
+      {% else %}
+          {% set p = item %}
+          {% set p_img = None %}
+      {% endif %}
+      <div class="p-card reveal reveal-delay-{{ loop.index }}" data-id="port_{{ loop.index }}">
+        <div class="p-img">
+          <img src="{{ p_img }}" alt="{{ p.title }}">
         </div>
         <div class="p-info">
           <div>
-            <div class="badge-item" contenteditable="true">{{ p.get('tag','Project') }}</div>
+            <div class="badge-item" contenteditable="true">{{ p.get('tag','Strategic') }}</div>
             <h3 contenteditable="true">{{ p.title }}</h3>
             <p contenteditable="true">{{ p.description }}</p>
+            <div class="p-meta">
+              <div class="p-meta-item">
+                <span class="p-meta-label">Client</span>
+                <span class="p-meta-value" contenteditable="true">{{ p.get('client', site_name) }}</span>
+              </div>
+              <div class="p-meta-item">
+                <span class="p-meta-label">Outcome</span>
+                <span class="p-meta-value" contenteditable="true">{{ p.get('outcome', 'Excellence achieved through precision.') }}</span>
+              </div>
+            </div>
           </div>
           <div class="p-arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></div>
         </div>
       </div>
       {% endfor %}
     </div>
+
+    {% else %}
+    {# ── NO IMAGES: Bold horizontal case-study list ── #}
+    <div class="portfolio-caselist eb-sortable" id="portfolio-grid">
+      {% for p in portfolio %}
+      <div class="portfolio-caserow reveal reveal-delay-{{ loop.index }}" data-id="port_{{ loop.index }}">
+        <div class="case-num">{{ '%02d' % loop.index }}</div>
+        <div class="case-body">
+          <span class="case-tag" contenteditable="true">{{ p.get('tag','Strategic') }}</span>
+          <div class="case-title" contenteditable="true">{{ p.title }}</div>
+          <div class="case-desc" contenteditable="true">{{ p.description }}</div>
+          <div class="case-meta">
+            <div class="case-meta-item">
+              <div class="case-meta-label">Client</div>
+              <div class="case-meta-value" contenteditable="true">{{ p.get('client', site_name) }}</div>
+            </div>
+            <div class="case-meta-item">
+              <div class="case-meta-label">Outcome</div>
+              <div class="case-meta-value" contenteditable="true">{{ p.get('outcome', 'Delivered with precision.') }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="case-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
   </section>
 
   {# ── TESTIMONIALS ── #}
@@ -443,9 +800,9 @@
       <span class="section-label">What Clients Say</span>
       <h2 class="section-title">Real Results, Real People</h2>
     </div>
-    <div class="testimonials-grid">
+    <div class="testimonials-grid eb-sortable" id="testimonials-grid">
       {% for t in testimonials %}
-      <div class="t-card reveal reveal-delay-{{ loop.index }}">
+      <div class="t-card reveal reveal-delay-{{ loop.index }}" data-id="test_{{ loop.index }}">
         <div class="t-stars">{% for i in range(t.get('rating',5)) %}★{% endfor %}</div>
         <div class="t-quote">"</div>
         <p class="t-text" contenteditable="true">{{ t.text }}</p>

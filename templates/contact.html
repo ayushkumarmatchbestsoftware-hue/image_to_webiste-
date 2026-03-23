@@ -2,60 +2,57 @@
 
 {% block content %}
 <style>
-    .contact-landing { background: var(--bg-alt); padding: 160px 80px 100px; }
+    .contact-landing { background: var(--bg); padding: 160px 10% 120px; min-height: 100vh; display: flex; align-items: center; }
     .contact-inner { 
-        max-width: 1240px; margin: 0 auto; 
-        display: grid; grid-template-columns: 1fr 1.2fr; gap: 120px; align-items: start; 
+        max-width: 1400px; margin: 0 auto; 
+        display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 100px; align-items: start; width: 100%;
     }
 
-    .contact-header { margin-bottom: 64px; }
+    .contact-header { margin-bottom: 48px; }
 
     .contact-title {
-        font-family: var(--font-heading); font-size: clamp(3rem, 6vw, 5.2rem); 
-        font-weight: 900; line-height: 1; letter-spacing: -0.05em; 
-        color: var(--text-main); margin-bottom: 40px;
+        font-family: var(--font-heading); font-size: clamp(2.5rem, 5vw, 4rem); 
+        font-weight: 900; line-height: 1.1; letter-spacing: -0.04em; 
+        color: var(--text-main); margin-bottom: 24px; text-transform: uppercase;
     }
     .contact-description {
-        font-size: 1.2rem; color: var(--text-muted); line-height: 1.8; 
-        margin-bottom: 48px; max-width: 480px;
+        font-size: 1.1rem; color: var(--text-muted); line-height: 1.8; 
+        margin-bottom: 48px; max-width: 480px; opacity: 0.8;
     }
 
-    .contact-items { display: grid; gap: 16px; }
+    .contact-items { display: grid; gap: 32px; }
     .c-item { 
-        display: flex; align-items: center; gap: 24px; padding: 32px; 
-        background: var(--bg); border-radius: 24px; 
-        border: 1px solid rgba(0,0,0,0.04); transition: all 0.4s;
+        display: flex; align-items: center; gap: 24px; padding: 0; 
+        background: transparent; border: none;
+        transition: all 0.4s;
     }
-    .c-item:hover { transform: translateX(12px); border-color: var(--primary); box-shadow: 0 20px 40px rgba(0,0,0,0.04); }
     .c-icon { 
-        width: 56px; height: 56px; flex-shrink: 0; background: var(--bg-alt); 
-        border-radius: 18px; display: flex; align-items: center; justify-content: center; 
+        width: 48px; height: 48px; flex-shrink: 0; background: var(--bg-alt); 
+        border-radius: 0; display: flex; align-items: center; justify-content: center; 
     }
-    .c-icon svg { stroke: var(--primary); width: 24px; height: 24px; }
-    .c-label { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 2px; }
-    .c-value { font-weight: 700; font-size: 1.1rem; color: var(--text-main); }
+    .c-icon svg { stroke: var(--primary); width: 22px; height: 22px; }
+    .c-label { font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-bottom: 4px; opacity: 0.6; }
+    .c-value { font-weight: 700; font-size: 1rem; color: var(--text-main); letter-spacing: -0.01em; }
 
     /* Form Card */
     .contact-form-card { 
-        background: var(--bg); border-radius: 40px; padding: 80px 64px; 
-        box-shadow: 0 50px 120px rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.02);
+        background: var(--bg-alt); padding: 80px; 
+        border: 1px solid rgba(0,0,0,0.05);
     }
     .contact-form-card h3 { 
-        font-family: var(--font-heading); font-size: 2.4rem; font-weight: 800; 
-        color: var(--text-main); margin-bottom: 48px; letter-spacing: -0.02em;
+        font-family: var(--font-heading); font-size: 1.8rem; font-weight: 900; 
+        color: var(--text-main); margin-bottom: 48px; letter-spacing: -0.02em; text-transform: uppercase;
     }
     
-    .form-group { margin-bottom: 32px; display: flex; flex-direction: column; gap: 12px; }
-    .form-group label { font-size: 0.85rem; font-weight: 800; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.05em; padding-left: 4px; }
+    .form-group { margin-bottom: 32px; display: flex; flex-direction: column; gap: 8px; }
+    .form-group label { font-size: 0.72rem; font-weight: 900; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.6; }
     .form-group input, .form-group textarea { 
-        padding: 20px 24px; border: 1.5px solid rgba(0,0,0,0.06); border-radius: 16px; 
+        padding: 16px 0; border: none; border-bottom: 2px solid rgba(0,0,0,0.1); border-radius: 0; 
         font-family: var(--font-body); font-size: 1rem; color: var(--text-main); 
-        background: var(--bg-alt); outline: none; transition: all 0.3s; 
+        background: transparent; outline: none; transition: border-color 0.3s; 
     }
-    .form-group input:focus, .form-group textarea:focus { 
-        border-color: var(--primary); background: #fff; box-shadow: 0 0 0 5px var(--primary-light); 
-    }
-    .btn-full { width: 100%; justify-content: center; padding: 22px; font-size: 1.1rem; border-radius: 100px; }
+    .form-group input:focus, .form-group textarea:focus { border-color: var(--primary); }
+    .btn-full { width: 100%; }
 
     @media (max-width: 1024px) {
         .contact-landing { padding: 120px 40px 80px; }
