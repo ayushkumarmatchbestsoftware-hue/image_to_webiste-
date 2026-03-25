@@ -2,14 +2,43 @@ import os
 import uuid
 import json
 import re
-from flask import Flask, render_template, request, jsonify, send_file
+import asyncio
+import logging
+import traceback
+from flask import Flask, render_template, request, jsonify, send_file, g
 from werkzeug.utils import secure_filename
 import google.generativeai as genai
 from PIL import Image
 from config import Config
 
+# --- LOGGING SETUP ---
+print(">>> [BOOT] App logging initializing...", flush=True)
+
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# --- AUTHENTICATION ---
+@app.before_request
+def authenticate_request():
+    print(f"\n>>> [REQUEST] {request.method} {request.path}", flush=True)
+    from core.auth import get_current_user_flask
+    user = get_current_user_flask()
+    if user:
+        g.user = user
+        g.user_id = str(user.user_id)
+        print(f">>> [AUTH] Success: {g.user_id}", flush=True)
+    else:
+        print(f">>> [AUTH] Unauthenticated request for {request.path}", flush=True)
+
+def require_auth(f):
+    from functools import wraps
+    @wraps(f)
+    async def decorated_function(*args, **kwargs):
+        if not getattr(g, 'user_id', None):
+            print(f">>> [DENIED] {request.path} - No user_id in g", flush=True)
+            return jsonify({"error": "Authentication required", "status": "error"}), 401
+        return await f(*args, **kwargs)
+    return decorated_function
 
 genai.configure(api_key=app.config['GEMINI_API_KEY'])
 
@@ -383,7 +412,12 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 
-def generate_website_content(prompt, image_paths=None, image_count=0):
+async def generate_website_content(prompt, image_paths=None, image_count=0):
+    # (Model initialization moved inside generate_website_content to avoid event loop issues)
+    model = genai.GenerativeModel(
+        "gemini-3.1-flash-image-preview",
+        system_instruction=system_prompt
+    )
     try:
         fallback = get_fallback_tokens(prompt)
         layout   = get_layout_blueprint(prompt)
@@ -431,19 +465,43 @@ CRITICAL RULES for Copy:
                     content_parts.append(f"--- ATTACHED IMAGE {i+1} ({label}) ---")
                     content_parts.append(img)
                 except Exception as e:
-                    print(f"Skipping image {path}: {e}")
+                    print(f">>> [IMG ERR] {path}: {str(e)}", flush=True)
 
-        response = model.generate_content(
+        print(f">>> [AI START] Model: {model.model_name} | Images: {image_count}", flush=True)
+        
+        # Using asyncio.to_thread with the synchronous generate_content method
+        # for better stability and to avoid "Event loop is closed" errors with gRPC.
+        response = await asyncio.to_thread(
+            model.generate_content,
             content_parts,
             generation_config={"temperature": 0.85, "max_output_tokens": 4000}
         )
 
-        text = response.text.strip()
+        if not response:
+            print(">>> [AI ERR] Empty response object", flush=True)
+            return None
+
+        # Check for safety blocks or errors in response
+        try:
+            text = response.text.strip()
+            print(f">>> [AI RAW] {text[:150]}...", flush=True)
+        except ValueError as ve:
+            print(f">>> [AI BLOCKED] Error: {ve}", flush=True)
+            if hasattr(response, 'prompt_feedback'):
+                print(f">>> [AI FEEDBACK] {response.prompt_feedback}", flush=True)
+            return None
+
+        # Cleaning Markdown if present
         text = re.sub(r'^```[a-z]*\n?', '', text, flags=re.MULTILINE)
         text = re.sub(r'\n?```$', '', text, flags=re.MULTILINE)
         text = text.strip()
 
-        data = json.loads(text)
+        try:
+            data = json.loads(text)
+            print(">>> [AI JSON] Parsed successfully", flush=True)
+        except json.JSONDecodeError as je:
+            print(f">>> [AI JSON ERR] Text: {text}", flush=True)
+            return None
 
         # Auto-fix theme values
         data["theme"] = validate_and_fix_theme(
@@ -453,7 +511,8 @@ CRITICAL RULES for Copy:
         return data
 
     except Exception as e:
-        print("AI Error:", e)
+        print(f">>> [AI CRITICAL] {type(e).__name__}: {str(e)}", flush=True)
+        traceback.print_exc()
         return None
 
 
@@ -474,12 +533,14 @@ def build_image_map(image_context: list, layout: list) -> dict:
 
 
 @app.route('/')
-def index():
+async def index():
+    print(">>> [INDEX] Root page hit!", flush=True)
     return render_template('index.html')
 
 
 @app.route('/generate', methods=['POST'])
-def generate_website():
+@require_auth
+async def generate_website():
     try:
         prompt = request.form.get('prompt', '')
         logo_file = request.files.get('logo')
@@ -516,7 +577,7 @@ def generate_website():
                 image_context.append(web_path)
                 image_paths.append(filepath)
 
-        data = generate_website_content(prompt, image_paths, len(image_paths))
+        data = await generate_website_content(prompt, image_paths, len(image_paths))
         # ... and later pass logo=logo_web_path to base_ctx
 
         if not data:
@@ -580,12 +641,13 @@ def generate_website():
         })
 
     except Exception as e:
-        print("Generate error:", e)
+        print(f">>> [ROUTE CRITICAL] /generate - {str(e)}", flush=True)
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
 @app.route('/preview/<website_id>/<page>')
-def preview_website(website_id, page):
+async def preview_website(website_id, page):
     page = os.path.basename(page)
     path = os.path.join(app.config['GENERATED_FOLDER'], website_id, page)
     if os.path.exists(path):
@@ -595,7 +657,7 @@ def preview_website(website_id, page):
 
 
 @app.route('/download/<website_id>')
-def download_website(website_id):
+async def download_website(website_id):
     folder = os.path.join(app.config['GENERATED_FOLDER'], website_id)
     if os.path.exists(folder):
         return send_file(
@@ -608,7 +670,8 @@ def download_website(website_id):
 
 
 @app.route('/list-websites')
-def list_websites():
+@require_auth
+async def list_websites():
     websites = []
     for folder in os.listdir(app.config['GENERATED_FOLDER']):
         websites.append({
@@ -619,7 +682,8 @@ def list_websites():
     return jsonify(websites)
  
 @app.route('/save-and-build', methods=['POST'])
-def save_and_build():
+@require_auth
+async def save_and_build():
     from flask import request
     data = request.json
     wid = data.get('website_id')
@@ -632,4 +696,12 @@ def save_and_build():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    from core.db import init_db
+    try:
+        asyncio.run(init_db())
+        print("Database initialized...")
+    except Exception as e:
+        print(f"Database init warning: {e}")
+    
+    print("--- SERVER STARTING ON PORT 5077 ---", flush=True)
+    app.run(debug=True, port=5077, use_reloader=False)
