@@ -22,29 +22,37 @@ class Base(DeclarativeBase):
 
 
 # ----------------------------
-# Create Async Engine
+# Lazy Engine Initializer
 # ----------------------------
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,
-)
+_engine = None
+_AsyncSessionLocal = None
 
+def get_engine():
+    global _engine
+    if _engine is None:
+        from sqlalchemy.ext.asyncio import create_async_engine
+        from sqlalchemy.pool import NullPool
+        _engine = create_async_engine(DATABASE_URL, echo=False, poolclass=NullPool)
+    return _engine
 
-# ----------------------------
-# Session Factory
-# ----------------------------
-AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+def get_session_factory():
+    global _AsyncSessionLocal
+    if _AsyncSessionLocal is None:
+        from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+        _AsyncSessionLocal = async_sessionmaker(
+            bind=get_engine(),
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+    return _AsyncSessionLocal
 
 
 # ----------------------------
 # Dependency for FastAPI
 # ----------------------------
 async def get_db():
-    async with AsyncSessionLocal() as session:
+    factory = get_session_factory()
+    async with factory() as session:
         yield session
 
 
@@ -56,5 +64,6 @@ async def init_db():
     from model.website_schema import WebsiteInfo
     from model.img_info_schema import ImageInfo
     
-    async with engine.begin() as conn:
+    eng = get_engine()
+    async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

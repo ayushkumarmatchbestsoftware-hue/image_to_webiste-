@@ -10,6 +10,11 @@ from werkzeug.utils import secure_filename
 import google.generativeai as genai
 from PIL import Image
 from config import Config
+import uuid as pyuuid
+from core.db import get_engine, get_session_factory
+from model.website_schema import WebsiteInfo
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import insert
 
 # --- LOGGING SETUP ---
 print(">>> [BOOT] App logging initializing...", flush=True)
@@ -17,11 +22,27 @@ print(">>> [BOOT] App logging initializing...", flush=True)
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# Global flag for lazy DB initialization
+_DB_READY = False
+
 # --- AUTHENTICATION ---
 @app.before_request
-def authenticate_request():
+async def authenticate_request():
+    global _DB_READY
+    
+    # Lazy Database initialization within the current request's event loop
+    if not _DB_READY:
+        from core.db import init_db
+        try:
+            await init_db()
+            print(">>> [DB] Database verified on current loop", flush=True)
+            _DB_READY = True
+        except Exception as e:
+            print(f">>> [DB ERR] Lazy init failed: {e}", flush=True)
+
     print(f"\n>>> [REQUEST] {request.method} {request.path}", flush=True)
     from core.auth import get_current_user_flask
+    # Note: get_current_user_flask is internally sync, which is fine here
     user = get_current_user_flask()
     if user:
         g.user = user
@@ -631,6 +652,28 @@ async def generate_website():
             with open(os.path.join(website_folder, out_name), "w", encoding="utf-8") as f:
                 f.write(html)
 
+        # --- DATABASE PERSISTENCE ---
+        try:
+            # Using lazy engine from get_engine() for absolute stability
+            eng = get_engine()
+            async with eng.begin() as conn:
+                from sqlalchemy import insert
+                await conn.execute(
+                    insert(WebsiteInfo).values(
+                        website_id=pyuuid.UUID(website_id),
+                        user_id=pyuuid.UUID(g.user_id),
+                        prompt=prompt,
+                        status="completed",
+                        progress="100",
+                        final_url=f"/preview/{website_id}/home.html"
+                    )
+                )
+            print(f">>> [DB] Saved website record: {website_id}", flush=True)
+        except Exception as db_err:
+            print(f">>> [DB ERR] Failed to persist website info: {db_err}", flush=True)
+            # We don't return 500 here because the website WAS generated successfully on disk
+            # but we definitely want to see the error in logs.
+
         return jsonify({
             "success": True,
             "website_id": website_id,
@@ -696,12 +739,5 @@ async def save_and_build():
 
 
 if __name__ == "__main__":
-    from core.db import init_db
-    try:
-        asyncio.run(init_db())
-        print("Database initialized...")
-    except Exception as e:
-        print(f"Database init warning: {e}")
-    
     print("--- SERVER STARTING ON PORT 5077 ---", flush=True)
-    app.run(debug=True, port=5077, use_reloader=False)
+    app.run(debug=True, port=5077, use_reloader=False)
