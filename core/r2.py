@@ -46,13 +46,17 @@ r2_client = boto3.client(
 def upload_media_to_r2(
     file_bytes: bytes,
     content_type: str,
-    folder: str = "reelscreation",
+    folder: str = "websites",
+    filename: Optional[str] = None,
     file_extension: Optional[str] = None,
 ) -> str:
 
-    # Generate unique filename
-    extension = file_extension or content_type.split("/")[-1]
-    object_key = f"{folder}/{uuid.uuid4()}.{extension}"
+    # Generate filename
+    if filename:
+        object_key = f"{folder}/{filename}"
+    else:
+        extension = file_extension or content_type.split("/")[-1]
+        object_key = f"{folder}/{uuid.uuid4()}.{extension}"
 
     # Upload object to R2
     r2_client.put_object(

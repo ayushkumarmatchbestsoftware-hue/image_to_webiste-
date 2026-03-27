@@ -13,8 +13,10 @@ from config import Config
 import uuid as pyuuid
 from core.db import get_engine, get_session_factory
 from model.website_schema import WebsiteInfo
+from model.img_info_schema import ImageInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import insert
+from core.r2 import upload_media_to_r2, R2_PUBLIC_URL
 
 # --- LOGGING SETUP ---
 print(">>> [BOOT] App logging initializing...", flush=True)
@@ -577,26 +579,91 @@ async def generate_website():
         if len(files) > MAX_IMAGES:
             return jsonify({"error": f"Max {MAX_IMAGES} images allowed."}), 400
 
+        website_id = str(uuid.uuid4())
+        website_folder = os.path.join(app.config['GENERATED_FOLDER'], website_id)
+        os.makedirs(website_folder, exist_ok=True)
+
+        import io
+        db_image_records = []
         logo_web_path = None
         if logo_file and logo_file.filename and allowed_file(logo_file.filename):
             logo_filename = secure_filename(logo_file.filename)
             unique_logo_name = f"logo_{uuid.uuid4()}_{logo_filename}"
             logo_filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_logo_name)
             logo_file.save(logo_filepath)
-            logo_web_path = "/" + logo_filepath.replace("\\", "/")
+            
+            with open(logo_filepath, "rb") as f:
+                logo_bytes = f.read()
+            
+            try:
+                img = Image.open(io.BytesIO(logo_bytes))
+                img.verify()
+                img = Image.open(io.BytesIO(logo_bytes))
+                l_width, l_height = img.size
+                l_format = img.format or "UNKNOWN"
+            except Exception as e:
+                return jsonify({"error": f"Invalid logo image: {str(e)}"}), 400
+
+            logo_web_path = await asyncio.to_thread(
+                upload_media_to_r2,
+                logo_bytes,
+                logo_file.mimetype,
+                folder=f"websites/{website_id}/assets"
+            )
+            
+            db_image_records.append({
+                "file_url": logo_web_path,
+                "file_name": logo_filename,
+                "file_format": l_format,
+                "file_size_mb": len(logo_bytes) / (1024 * 1024),
+                "width": l_width,
+                "height": l_height,
+                "image_type": "logo",
+                "is_generated": False
+            })
 
         image_context = []
         image_paths   = []
 
-        for file in files:
+        for i, file in enumerate(files):
             if file and file.filename and allowed_file(file.filename):
                 filename        = secure_filename(file.filename)
                 unique_filename = f"{uuid.uuid4()}_{filename}"
                 filepath        = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
                 file.save(filepath)
-                web_path = "/" + filepath.replace("\\", "/")
+                
+                with open(filepath, "rb") as f:
+                    file_bytes = f.read()
+                
+                try:
+                    img = Image.open(io.BytesIO(file_bytes))
+                    img.verify()
+                    img = Image.open(io.BytesIO(file_bytes))
+                    i_width, i_height = img.size
+                    i_format = img.format or "UNKNOWN"
+                except Exception as e:
+                    return jsonify({"error": f"Invalid image file: {filename}"}), 400
+
+                web_path = await asyncio.to_thread(
+                    upload_media_to_r2,
+                    file_bytes,
+                    file.mimetype,
+                    folder=f"websites/{website_id}/assets"
+                )
                 image_context.append(web_path)
                 image_paths.append(filepath)
+                
+                img_type = "hero" if i == 0 else ("about" if i == 1 else "portfolio")
+                db_image_records.append({
+                    "file_url": web_path,
+                    "file_name": filename,
+                    "file_format": i_format,
+                    "file_size_mb": len(file_bytes) / (1024 * 1024),
+                    "width": i_width,
+                    "height": i_height,
+                    "image_type": img_type,
+                    "is_generated": False
+                })
 
         data = await generate_website_content(prompt, image_paths, len(image_paths))
         # ... and later pass logo=logo_web_path to base_ctx
@@ -604,9 +671,7 @@ async def generate_website():
         if not data:
             return jsonify({"error": "AI failed to generate content. Please try again."}), 500
 
-        website_id     = str(uuid.uuid4())
-        website_folder = os.path.join(app.config['GENERATED_FOLDER'], website_id)
-        os.makedirs(website_folder, exist_ok=True)
+        # website_id and folder are already created above now
 
         site_name  = data.get("site_info", {}).get("display_name", "My Business")
         site_title = data.get("site_info", {}).get("site_title", site_name)
@@ -640,6 +705,14 @@ async def generate_website():
         )
         with open(os.path.join(website_folder, "home.html"), "w", encoding="utf-8") as f:
             f.write(home_html)
+        
+        await asyncio.to_thread(
+            upload_media_to_r2,
+            home_html.encode('utf-8'),
+            "text/html",
+            folder=f"websites/{website_id}",
+            filename="home.html"
+        )
 
         page_templates = {
             "about.html":     ("about.html",     dict(**base_ctx, about=data.get("about",{}), services=data.get("services",[]), images=image_context)),
@@ -651,6 +724,14 @@ async def generate_website():
             html = render_template(tmpl, **ctx)
             with open(os.path.join(website_folder, out_name), "w", encoding="utf-8") as f:
                 f.write(html)
+            
+            await asyncio.to_thread(
+                upload_media_to_r2,
+                html.encode('utf-8'),
+                "text/html",
+                folder=f"websites/{website_id}",
+                filename=out_name
+            )
 
         # --- DATABASE PERSISTENCE ---
         try:
@@ -665,12 +746,28 @@ async def generate_website():
                         prompt=prompt,
                         status="completed",
                         progress="100",
-                        final_url=f"/preview/{website_id}/home.html"
+                        final_url=f"{R2_PUBLIC_URL}/websites/{website_id}/home.html"
                     )
                 )
-            print(f">>> [DB] Saved website record: {website_id}", flush=True)
+                
+                for record in db_image_records:
+                    await conn.execute(
+                        insert(ImageInfo).values(
+                            website_id=pyuuid.UUID(website_id),
+                            file_url=record["file_url"],
+                            file_name=record["file_name"],
+                            file_format=record["file_format"],
+                            file_size_mb=record["file_size_mb"],
+                            width=record["width"],
+                            height=record["height"],
+                            image_type=record["image_type"],
+                            is_generated=record["is_generated"]
+                        )
+                    )
+                    
+            print(f">>> [DB] Saved website and {len(db_image_records)} image records: {website_id}", flush=True)
         except Exception as db_err:
-            print(f">>> [DB ERR] Failed to persist website info: {db_err}", flush=True)
+            print(f">>> [DB ERR] Failed to persist info: {db_err}", flush=True)
             # We don't return 500 here because the website WAS generated successfully on disk
             # but we definitely want to see the error in logs.
 
