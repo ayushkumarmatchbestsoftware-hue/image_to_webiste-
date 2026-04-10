@@ -128,6 +128,7 @@ jobs:
           host: ${{ secrets.EC2_HOST_FLASK_APP_STAGING }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY_FLASK_APP_STAGING }}
+          envs: WEB_NEW_IMAGE,WORKER_NEW_IMAGE,WEB_IMAGE_ARCHIVE,WORKER_IMAGE_ARCHIVE
           script: |
             set -euo pipefail
       
