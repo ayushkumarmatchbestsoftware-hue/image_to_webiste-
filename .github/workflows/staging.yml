@@ -21,7 +21,7 @@ jobs:
     env:
       WEB_IMAGE_NAME: flask-app-web
       WORKER_IMAGE_NAME: flask-app-worker
-      APP_DIRECTORY: /home/ubuntu/your-app-directory
+      APP_DIRECTORY:  /home/ubuntu/website-generator
       BRANCH: deploy/staging
       TEMP_IMAGE_DIR: /tmp/flask-app-images
       HEALTHCHECK_URL: http://127.0.0.1:5077/health
@@ -137,7 +137,7 @@ jobs:
           script: |
             set -euo pipefail
       
-            APP_DIRECTORY="/home/ubuntu/your-app-directory"
+            APP_DIRECTORY=" /home/ubuntu/website-generator"
             TEMP="/tmp/flask-app-images"
             HEALTHCHECK_URL="http://127.0.0.1:5077/health"
       
