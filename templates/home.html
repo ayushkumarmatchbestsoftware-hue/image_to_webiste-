@@ -275,28 +275,46 @@
 
 /* ── ABOUT (Architectural Hybrid) ── */
 .about-section { 
-    background-color: var(--bg-alt);
-    background-image: var(--about-bg-url);
+    background-color: var(--primary-dark);
     background-size: cover; background-position: center; background-attachment: fixed;
-    background-blend-mode: normal;
-    padding: 80px var(--gutter); position: relative; color: var(--text-main);
+    padding: 120px var(--gutter); position: relative; overflow: hidden;
 }
-.about-grid { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 120px; align-items: center; }
 
-.about-header-side { border-left: 5px solid var(--primary); padding-left: 40px; }
+/* Dark cinematic overlay so text is always legible over the image */
+.about-section::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(
+        135deg,
+        rgba(0,0,0,0.82) 0%,
+        rgba(0,0,0,0.55) 50%,
+        rgba(0,0,0,0.72) 100%
+    );
+    z-index: 1;
+    pointer-events: none;
+}
+
+.about-grid { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 120px; align-items: center; position: relative; z-index: 2; }
+
+
+/* All text inside about-section is forced white — dark overlay ensures legibility */
+.about-section, .about-section * { color: #fff !important; }
+.about-header-side { border-left: 5px solid var(--accent); padding-left: 40px; }
 .about-title { 
     font-family: var(--font-heading); font-size: clamp(2.5rem, 5vw, 4rem); 
-    font-weight: 900; color: var(--text-main); line-height: 1.1; 
+    font-weight: 900; color: #fff !important; line-height: 1.1; 
     letter-spacing: -0.04em; margin-bottom: 32px; text-transform: uppercase;
 }
-.about-desc { font-size: 1.15rem; color: var(--text-muted); line-height: 1.8; margin-bottom: 48px; max-width: 600px; }
+.about-desc { font-size: 1.15rem; color: rgba(255,255,255,0.78) !important; line-height: 1.8; margin-bottom: 48px; max-width: 600px; }
 
 .about-services-side { display: flex; flex-direction: column; gap: 40px; }
-.about-services-side h3 { font-family: var(--font-heading); font-size: 1.8rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; }
+.about-services-side h3 { font-family: var(--font-heading); font-size: 1.8rem; font-weight: 800; color: #fff !important; margin-bottom: 12px; }
 .about-s-item { display: flex; gap: 24px; align-items: flex-start; }
-.about-s-icon { width: 44px; height: 44px; color: var(--primary); flex-shrink: 0; }
-.about-s-info h4 { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
-.about-s-info p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
+.about-s-icon { width: 44px; height: 44px; color: var(--accent) !important; flex-shrink: 0; }
+.about-s-icon svg { stroke: var(--accent) !important; }
+.about-s-info h4 { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 800; color: #fff !important; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.about-s-info p { font-size: 0.9rem; color: rgba(255,255,255,0.7) !important; line-height: 1.6; }
+.about-header-side .btn { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
 
 /* ══════════════════════ SERVICES ══════════════════════ */
 .services-section { background: var(--bg); padding: 80px 60px; }
@@ -547,7 +565,7 @@
     .about-stats { grid-template-columns: 1fr; border: none; gap: 10px; }
     .about-stat { border-radius: 12px; border: 1.5px solid rgba(0,0,0,0.07); }
     .form-row { grid-template-columns: 1fr; }
-    .save-bar { bottom: 32px; right: 32px; left: 32px; width: auto; max-width: 500px; margin: 0 auto; }
+    #save-bar { bottom: 32px; right: 32px; left: 32px; width: auto; max-width: 500px; margin: 0 auto; }
 }
 </style>
 
@@ -588,7 +606,9 @@
           {% endif %}
         </div>
         <div class="hero-visual reveal reveal-delay-2">
-            <img src="{{ hero_img }}" alt="{{ site_name }}">
+            {% if hero_img %}
+                <img src="{{ hero_img }}" alt="{{ site_name }}">
+            {% endif %}
         </div>
       </div>
 
@@ -642,7 +662,52 @@
     </div>
   </section>
 
-  {# ── STATS ── #}
+  {# ── OVERFLOW PHOTO GALLERY ──
+     Renders ONLY when extra images couldn't be placed in any selected section.
+     Shows a premium horizontal photo ribbon directly below the Hero. #}
+  {% if overflow_imgs %}
+  <div class="overflow-gallery reveal" id="overflow-gallery">
+    <div class="overflow-gallery-inner">
+      {% for img in overflow_imgs %}
+      <div class="overflow-img-wrap">
+        <img src="{{ img }}" alt="{{ site_name }} — Photo {{ loop.index }}">
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <style>
+  .overflow-gallery {
+    background: var(--bg-alt);
+    padding: 0 var(--gutter) 80px;
+    overflow: hidden;
+  }
+  .overflow-gallery-inner {
+    max-width: 1440px;
+    margin: 0 auto;
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat({{ overflow_imgs|length }}, 1fr);
+  }
+  @media (max-width: 768px) {
+    .overflow-gallery-inner { grid-template-columns: 1fr; }
+  }
+  .overflow-img-wrap {
+    border-radius: 20px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+    background: var(--bg);
+  }
+  .overflow-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    display: block;
+  }
+  .overflow-img-wrap:hover img { transform: scale(1.05); }
+  </style>
+  {% endif %}
+
   {% elif section == 'stats' %}
   <div class="stats-strip reveal" id="stats">
     {% for s in stats %}
@@ -656,8 +721,7 @@
   {# ── ABOUT (Restructured Layout) ── #}
   {% elif section == 'about' %}
   {% set a_bg = about_img %}
-  {% set a_bg_css = "linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.92)), url('" ~ a_bg ~ "')" if a_bg else "none" %}
-  <section class="about-section" id="about" style="background-image: {{ a_bg_css }}; border-bottom: 1px solid rgba(0,0,0,0.05);">
+  <section class="about-section" id="about" {% if a_bg %}style="background-image: url('{{ a_bg }}');"{% endif %}>
     <div class="about-grid reveal">
       
       <div class="about-header-side">
@@ -692,10 +756,21 @@
   {# ── SERVICES ── #}
   {% elif section == 'services' %}
   <section class="services-section" id="services">
+    {% if services_img %}
+    {# ── WITH IMAGE: Atmosphere banner above cards ── #}
+    <div class="services-banner reveal" style="background-image: url('{{ services_img }}');background-size:cover;background-position:center;height:280px;margin-bottom:60px;border-radius:24px;overflow:hidden;position:relative;">
+      <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(0,0,0,0.62) 0%,rgba(0,0,0,0.18) 100%);"></div>
+      <div style="position:relative;z-index:2;height:100%;display:flex;flex-direction:column;justify-content:center;padding:0 60px;">
+        <span class="section-label" style="color:rgba(255,255,255,0.6);">What We Offer</span>
+        <h2 class="section-title" style="color:#fff;margin-top:8px;">Our Services</h2>
+      </div>
+    </div>
+    {% else %}
     <div class="services-header reveal">
       <div><span class="section-label">What We Offer</span><h2 class="section-title">Our Services</h2></div>
       <p class="services-desc">Every service is built specifically for your goals — delivered with expertise and attention to detail.</p>
     </div>
+    {% endif %}
     <div class="services-grid eb-sortable" id="services-grid">
       {% for s in services %}
       <div class="service-card cs-{{ cs }} reveal reveal-delay-{{ loop.index }}" data-id="svc_{{ loop.index }}">
@@ -738,7 +813,9 @@
       {% endif %}
       <div class="p-card reveal reveal-delay-{{ loop.index }}" data-id="port_{{ loop.index }}">
         <div class="p-img">
-          <img src="{{ p_img }}" alt="{{ p.title }}">
+          {% if p_img %}
+            <img src="{{ p_img }}" alt="{{ p.title }}">
+          {% endif %}
         </div>
         <div class="p-info">
           <div>
@@ -795,20 +872,20 @@
 
   {# ── TESTIMONIALS ── #}
   {% elif section == 'testimonials' %}
-  <section class="testimonials-section" id="testimonials">
+  <section class="testimonials-section" id="testimonials" {% if testimonials_img %}style="background-image:linear-gradient(rgba(0,0,0,0.82), rgba(0,0,0,0.82)), url('{{ testimonials_img }}');background-size:cover;background-position:center;background-attachment:fixed;"{% endif %}>
     <div class="testimonials-header reveal">
-      <span class="section-label">What Clients Say</span>
-      <h2 class="section-title">Real Results, Real People</h2>
+      <span class="section-label" {% if testimonials_img %}style="color:rgba(255,255,255,0.55);"{% endif %}>What Clients Say</span>
+      <h2 class="section-title" {% if testimonials_img %}style="color:#fff;"{% endif %}>Real Results, Real People</h2>
     </div>
     <div class="testimonials-grid eb-sortable" id="testimonials-grid">
       {% for t in testimonials %}
-      <div class="t-card reveal reveal-delay-{{ loop.index }}" data-id="test_{{ loop.index }}">
+      <div class="t-card reveal reveal-delay-{{ loop.index }}" data-id="test_{{ loop.index }}" {% if testimonials_img %}style="background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.1);backdrop-filter:blur(12px);"{% endif %}>
         <div class="t-stars">{% for i in range(t.get('rating',5)) %}★{% endfor %}</div>
         <div class="t-quote">"</div>
-        <p class="t-text" contenteditable="true">{{ t.text }}</p>
+        <p class="t-text" contenteditable="true" {% if testimonials_img %}style="color:rgba(255,255,255,0.85);"{% endif %}>{{ t.text }}</p>
         <div class="t-author">
           <div class="t-avatar">{{ (t.name or 'A')[0] }}</div>
-          <div><div class="t-name" contenteditable="true">{{ t.name }}</div><div class="t-role" contenteditable="true">{{ t.role }}</div></div>
+          <div><div class="t-name" contenteditable="true" {% if testimonials_img %}style="color:#fff;"{% endif %}>{{ t.name }}</div><div class="t-role" contenteditable="true" {% if testimonials_img %}style="color:rgba(255,255,255,0.5);"{% endif %}>{{ t.role }}</div></div>
         </div>
       </div>
       {% endfor %}
@@ -850,31 +927,60 @@
     </div>
   </section>
 
-  {# ── CONTACT ── #}
+    {# ── CONTACT ── #}
   {% elif section == 'contact' %}
   <section class="contact-section" id="contact">
-    <div class="contact-inner">
+    <style>
+      .form-group { display: flex; flex-direction: column; gap: 8px; }
+      .contact-details-card {
+          background: var(--bg-alt); padding: 60px;
+          border-left: 5px solid var(--primary);
+      }
+      .contact-details-card h3 { 
+          font-family: var(--font-heading); font-size: 1.5rem; font-weight: 900; 
+          color: var(--text-main); margin-bottom: 30px; text-transform: uppercase; 
+          letter-spacing: -0.02em; 
+      }
+      .detail-row { margin-bottom: 20px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 20px; }
+      .detail-row:last-child { border-bottom: none; }
+      .detail-label { font-size: 0.65rem; font-weight: 900; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.5; margin-bottom: 8px; }
+      .detail-value { font-family: var(--font-body); font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+    </style>
+
+    {% if contact_img %}
+    {# ── WITH IMAGE: Three-column layout — info | visual | connections ── #}
+    <div style="max-width:1400px;margin:0 auto;display:grid;grid-template-columns:0.8fr 1fr 1fr;gap:80px;width:100%;align-items:center;">
       <div class="reveal">
-        <span class="section-label" contenteditable="true">{{ contact.get('label','Contact Us') }}</span>
+        <span class="section-label" contenteditable="true">{{ contact.get('label','How to Connect') }}</span>
         <h2 class="section-title" contenteditable="true">{{ contact.title }}</h2>
         <p class="contact-desc" contenteditable="true">{{ contact.description }}</p>
-        <div class="contact-items">
-          <div class="c-item"><div class="c-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><div><div class="c-label">Email</div><div class="c-value" contenteditable="true">{{ contact.email }}</div></div></div>
-          <div class="c-item"><div class="c-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.13 11.88 19.79 19.79 0 0 1 1.06 3.25 2 2 0 0 1 3 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div><div class="c-label">Phone</div><div class="c-value" contenteditable="true">{{ contact.get('phone','+1 (555) 000-0000') }}</div></div></div>
-          <div class="c-item"><div class="c-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div><div><div class="c-label">Location</div><div class="c-value" contenteditable="true">{{ contact.get('address','City, Country') }}</div></div></div>
-        </div>
       </div>
-      <div class="contact-form-card reveal reveal-delay-2">
-        <h3>Send a Message</h3>
-        <div class="form-stack">
-          <div class="form-row"><div class="form-group"><label>First Name</label><input type="text" placeholder="Jane"></div><div class="form-group"><label>Last Name</label><input type="text" placeholder="Doe"></div></div>
-          <div class="form-group"><label>Email</label><input type="email" placeholder="jane@example.com"></div>
-          <div class="form-group"><label>Subject</label><input type="text" placeholder="How can we help?"></div>
-          <div class="form-group"><label>Message</label><textarea rows="5" placeholder="Tell us about your project..."></textarea></div>
-        </div>
-        <button type="submit" class="btn btn-full">Send Message →</button>
+      <div class="reveal" style="border-radius:24px;overflow:hidden;height:450px;">
+        <img src="{{ contact_img }}" alt="Contact" style="width:100%;height:100%;object-fit:cover;">
+      </div>
+      <div class="contact-details-card reveal reveal-delay-2">
+        <h3 contenteditable="true">Our Details</h3>
+        <div class="detail-row"><div class="detail-label">Direct Email</div><div class="detail-value" contenteditable="true">{{ contact.email }}</div></div>
+        <div class="detail-row"><div class="detail-label">Phone Inquiry</div><div class="detail-value" contenteditable="true">{{ contact.get('phone','+1 (555) 000-0000') }}</div></div>
+        <div class="detail-row"><div class="detail-label">Main Office</div><div class="detail-value" contenteditable="true">{{ contact.get('address','City, Country') }}</div></div>
       </div>
     </div>
+    {% else %}
+    {# ── NO IMAGE: Bold two-column info layout ── #}
+    <div class="contact-inner">
+      <div class="reveal">
+        <span class="section-label" contenteditable="true">{{ contact.get('label','How to Connect') }}</span>
+        <h2 class="section-title" contenteditable="true">{{ contact.title }}</h2>
+        <p class="contact-desc" contenteditable="true" style="margin-bottom:0;">{{ contact.description }}</p>
+      </div>
+      <div class="contact-details-card reveal reveal-delay-2">
+        <h3 contenteditable="true">Our Details</h3>
+        <div class="detail-row"><div class="detail-label">Direct Email</div><div class="detail-value" contenteditable="true">{{ contact.email }}</div></div>
+        <div class="detail-row"><div class="detail-label">Phone Inquiry</div><div class="detail-value" contenteditable="true">{{ contact.get('phone','+1 (555) 000-0000') }}</div></div>
+        <div class="detail-row"><div class="detail-label">Main Office</div><div class="detail-value" contenteditable="true">{{ contact.get('address','City, Country') }}</div></div>
+      </div>
+    </div>
+    {% endif %}
   </section>
 
   {% endif %}

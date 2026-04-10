@@ -4,32 +4,42 @@
 {% set about_img = image_map.get('about') if image_map else None %}
 <style>
     .about-landing { 
-        background-color: var(--bg-alt);
-        background-image: var(--about-bg); 
+        background-color: var(--primary-dark);
         background-size: cover; background-position: center; background-attachment: fixed;
-        background-blend-mode: normal;
-        padding: 120px var(--gutter) 100px; color: var(--text-main); min-height: 60vh; display: flex; align-items: center;
+        padding: 120px var(--gutter) 100px; min-height: 60vh; display: flex; align-items: center;
+        position: relative; overflow: hidden;
     }
+    .about-landing::before {
+        content: '';
+        position: absolute; inset: 0;
+        background: linear-gradient(135deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.72) 100%);
+        z-index: 1; pointer-events: none;
+    }
+    .about-landing, .about-landing * { color: #fff !important; }
+    
     .about-grid { 
         max-width: 1440px; margin: 0 auto; 
         display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 120px; align-items: center; 
+        position: relative; z-index: 2;
     }
-    .about-header-side { border-left: 5px solid var(--primary); padding-left: 40px; }
+    .about-header-side { border-left: 5px solid var(--accent); padding-left: 40px; }
     .about-landing h1 { 
         font-family: var(--font-heading); font-size: clamp(3rem, 7vw, 5rem); 
         font-weight: 950; line-height: 1; letter-spacing: -0.05em; 
-        margin-bottom: 32px; text-transform: uppercase; color: var(--text-main);
+        margin-bottom: 32px; text-transform: uppercase; color: #fff !important;
     }
     .about-landing p { 
-        font-size: 1.25rem; line-height: 1.8; color: var(--text-muted); 
+        font-size: 1.25rem; line-height: 1.8; color: rgba(255,255,255,0.78) !important; 
         max-width: 600px; margin-bottom: 48px; 
     }
     .about-services-side { display: flex; flex-direction: column; gap: 40px; }
-    .about-services-side h3 { font-family: var(--font-heading); font-size: 1.8rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; }
+    .about-services-side h3 { font-family: var(--font-heading); font-size: 1.8rem; font-weight: 800; color: #fff !important; margin-bottom: 12px; }
     .about-s-item { display: flex; gap: 24px; align-items: flex-start; }
-    .about-s-icon { width: 44px; height: 44px; color: var(--primary); flex-shrink: 0; }
-    .about-s-info h4 { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
-    .about-s-info p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
+    .about-s-icon { width: 44px; height: 44px; color: var(--accent) !important; flex-shrink: 0; }
+    .about-s-icon svg { stroke: var(--accent) !important; }
+    .about-s-info h4 { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 800; color: #fff !important; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .about-s-info p { font-size: 0.9rem; color: rgba(255,255,255,0.7) !important; line-height: 1.6; }
+    .about-header-side .btn { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
 
     @media (max-width: 1024px) {
         .about-landing { padding: 120px 24px 80px; }
@@ -37,12 +47,13 @@
     }
 </style>
 
-<section class="about-landing" style="background-image: {{ "linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.92)), url('" ~ (about_img or hero_img) ~ "')" if (about_img or hero_img) else "none" }}; border-bottom: 1px solid rgba(0,0,0,0.05);">
+{% set a_bg = about_img or hero_img %}
+<section class="about-landing" id="about" {% if a_bg %}style="background-image: url('{{ a_bg }}');"{% endif %}>
     <div class="about-grid reveal">
         <div class="about-header-side">
             <h1 contenteditable="true">{{ about.heading }}</h1>
             <p contenteditable="true">{{ about.description }}</p>
-            <a href="services.html" class="btn" style="background:var(--primary); color:#fff; font-weight:900;">View Our Expertise</a>
+            <a href="services.html" class="btn" contenteditable="true">View Our Expertise</a>
         </div>
 
         <div class="about-services-side">

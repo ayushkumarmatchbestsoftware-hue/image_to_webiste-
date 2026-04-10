@@ -5,6 +5,8 @@ from sqlalchemy import (
     Text,
     TIMESTAMP,
     CheckConstraint,
+    JSON,
+    ForeignKey,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
@@ -67,6 +69,39 @@ class WebsiteInfo(Base):
         TIMESTAMP(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
+        nullable=False,
+    )
+
+    industry = Column(String(100), nullable=True)
+    site_name = Column(String(255), nullable=True)
+    tagline = Column(Text, nullable=True)
+    layout = Column(JSON, nullable=True)
+    theme = Column(JSON, nullable=True)
+    footer = Column(JSON, nullable=True)
+    ai_data = Column(JSON, nullable=True)
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        index=True,
+    )
+    website_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("website_info.website_id"),
+        nullable=False,
+        index=True,
+    )
+    role = Column(String(20), nullable=False)
+    content = Column(Text, nullable=False)
+    action_type = Column(String(100), nullable=True)
+    created_at = Column(
+        TIMESTAMP(timezone=True),
+        server_default=func.now(),
         nullable=False,
     )
 

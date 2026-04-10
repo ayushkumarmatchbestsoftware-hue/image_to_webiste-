@@ -1,97 +1,146 @@
-# 🛠️ Product Requirements Document (PRD): SiteForge AI
+# 🎨 UI/UX Design Requirements Document: SiteForge AI (Pomeli)
 
-**Version**: 1.2  
-**Status**: Ready for UI/UX & Frontend Development (Unified Workflow Edition)  
-**Project Objective**: To build an elite, AI-driven website generator that produces professional, niche-perfect, and "non-AI looking" websites in under 30 seconds.
-
----
-
-## 1. Product Overview
-Pomeli is an AI website builder utilizing **Gemini 3.1 Flash Image Preview** to create fully-themed, multi-page websites. The focus is on **high-end aesthetics**, **Roboto-driven typography**, and **WCAG-compliant accessibility**.
+**Version**: 2.1  
+**Target Audience**: UI/UX Designers & Product Managers
+**Project Objective**: To design an elite, frictionless user journey that allows non-technical users to generate, visually edit, and officially deploy premium, "non-AI-looking" websites in under a minute.
 
 ---
 
-## 2. Core Functional Requirements (Asset Handling)
 
-### 2.1 User Input & Assets
-*   **Prompt Entry**: A textarea for descriptions (Limit: **1,000 words**).
-*   **Optional Files**: 
-    *   **5 Images** (Max **5 MB** each)
-    *   **1 Logo** (Max **2 MB**)
-    *   **30 MB Total** request limit.
-*   **Supported Formats**: JPG, PNG, GIF, WEBP, and iPhone-native **HEIC/HEIF**.
+## 1. The End-to-End User Journey (Macro Flow)
+
+The Pomeli Web Builder utilizes a strict **Two-Tab Architecture**. There are exactly two distinct UI layouts:
+
+1. **The Generation Dashboard (Tab 1)**: The primary data entry form.
+2. **The Live Editor & Deployment Canvas (Tab 2)**: An interactive workspace that opens in a completely separate browser tab after generation starts.
 
 ---
 
-## 3. The Unified User Journey (UI/UX Flow)
+### **2.1 Sequence 1: Core Configuration**
+The UI designers must implement form components in the following chronological user-input order, mirroring the official mockup provided:
 
-The system uses a **Two-Tab Architecture** (Dashboard ↔ Editor).
+1.  **Business Name** `[REQUIRED | Text Input]`
+    *   **UI Type**: Standard single-line text input.
+    *   **Placeholder Example**: "Apex Studio"
+    *   **Function**: Primary brand name displayed across the website header and title.
 
-### **Phase 1: The Initial Dashboard (Tab 1)**
-1.  User enters prompt/uploads assets and clicks **"Create Site."**
-2.  Once generated, the UI shows a single primary action: **`🚀 Preview & Download`**.
+2.  **What does your business do? (Prompt)** `[REQUIRED | Text Input]`
+    *   **UI Type**: Large responsive textarea.
+    *   **Function**: Provides the raw context for the AI to generate tailored content.
+    *   **Constraint (Limit)**: Absolute maximum of 1,000 words. Real-time word counter required.
 
-### **Phase 2: The Visual Editor (Tab 2)**
-1.  **Opening Editor**: Clicking the dashboard button opens the site in a **New Tab** (`GET /preview/.../home.html`).
-2.  **Live Editing**: All text and images are "editable" (e.g., using `contenteditable` or specialized overlays).
-3.  **The Final Action**: At the bottom of the page, the user clicks a single button: **`✅ Save & Download .HTML`**. 
-4.  **Backend Chain**:
-    *   **Save**: Frontend sends `POST /save-and-build` (syncs edits to server).
-    *   **Download**: Frontend immediately triggers `GET /download/<id>` (starts browser file download).
-    *   **Completion**: Tab 2 **automatically closes**, returning the user to Tab 1.
+3.  **Industry / Type** ` [Default: 'Let AI decide (auto-detect)']`
+    *   **UI Type**: Fixed Dropdown List.
+    *   **Function**: Informs the design logic. 'Auto-detect' uses the business description to choose the best-fit niche.
+    *   **The 11 Official UI Options**:
+        1.  `Let AI decide (auto-detect)`
+        2.  `Restaurant / Food`
+        3.  `SaaS / Tech`
+        4.  `Agency / Studio`
+        5.  `Law Firm / Legal`
+        6.  `Consulting / Professional`
+        7.  `Spa / Wellness`
+        8.  `Gym / Fitness`
+        9.  `Personal Portfolio`
+        10. `E-commerce / Retail`
+        11. `Real Estate / Property`
 
-### **Phase 3: The Deployment (Back to Tab 1)**
-1.  **Site Ready**: The Dashboard (Tab 1) detects that the project is "Finalized."
-2.  **Go Live**: The UI now displays a high-impact button: **`🚀 Deploy to Vercel`**.
-3.  **Result**: Clicking this triggers the deployment logic, resulting in a **Permanent Live URL**.
+4.  **Website Type (Pages)** `[Default: Home]`
+    *   **UI Type**: Multi-select pills or checkboxes.
+    *   **Function**: Determines which sub-pages(sections) are generated.
 
----
+5.  **Visual Style (Personality)** `[REQUIRED UI Component | Default: 'Let AI choose']`
+    *   **UI Type**: High-impact Visual Cards or Swatches.
+    *   **Function**: Selection of design personality is MANDATORY in the UI. If the user skips choosing a specific mood, 'Let AI choose' remains the default logic.
+    *   **Personality Profiles**: 
+        - `Elegant & Timeless`
+        - `Modern & Clean` 
+        - `Vibrant & Bold`
+        - `Dark & Sophisticated`
+        - `Minimalist` (Maximized white space)
 
-## 4. API Endpoints & Frontend Responses
+### **2.2 Sequence 2: Media Uploads (Drag & Drop Zone)**
+The UI team must design a sleek, unified drop-zone or two separate uploaders positioned *after* the core configuration:
 
-### **4.1 Website Generation**
-*   **Endpoint**: `POST /generate`
-*   **Response**:
-    ```json
-    {
-        "success": true,
-        "website_id": "415d1830-4e3e-4613-810a-dd70356c9d0f",
-        "preview_url": "/preview/415d1830-4e3e-4613-810a-dd70356c9d0f/home.html"
-    }
-    ```
+5.  **Logo Upload** `[OPTIONAL | Default: None]`
+    *   **Limit**: 1 file maximum.
+    *   **Size Constraint**: Max 2 MB.
 
-### **4.2 Editor Synchronization**
-*   **Endpoint**: `POST /save-and-build`
-*   **Response**:
-    ```json
-    {
-        "success": true,
-        "preview_url": "/preview/<id>/home.html"
-    }
-    ```
+6.  **Images (Product/Vibe Shots)** `[OPTIONAL | Default: Generative AI Images used]`
+    *   **Limit**: Maximum 5 images.
+    *   **Size Constraint**: Max 5 MB per image.
+    *   **Accepted Formats**: `.JPG, .PNG, .GIF, .WEBP, .HEIC, .HEIF`
 
-### **4.3 Final Fulfillment**
-*   **Endpoint**: `GET /download/<website_id>`
-*   **Response**: Binary data (Starts `.html` file download in the browser).
+*   **Total Request Size Limit**: 30 MB absolute max across all files combined.
 
-### **4.4 Web Deployment**
-*   **Endpoint**: `POST /deploy/vercel`
-*   **Response**:
-    ```json
-    {
-        "success": true,
-        "live_url": "https://my-boutique-bakery.vercel.app",
-        "message": "Deployment Successful!"
-    }
-    ```
+*   **Primary CTA**: A massive, highly encouraging button: **"✨ Generate My Website"**
 
 ---
 
-## 5. System Normalization (Reliability)
-*   **Contrast Guard**: Auto-fixes colors to ensure a **4.5:1 contrast ratio**.
-*   **Typography Guard**: Forces fallback to **Roboto** for all fonts.
-*   **No-Image Logic**: Automatically uses a `bold-center` layout if no user photos are provided.
+## 3. The Generation & Tab Handoff
+**Goal**: Handle the AI generation queue (takes ~20-40 seconds) without overriding or freezing the dashboard.
 
+*   **The Handoff Mechanism**: 
+    1.  When the user clicks "Generate", Tab 1 must NOT transition into a new UI. The form stays exactly as is (perhaps just adding a small, non-intrusive loading spinner on the button itself).
+    2.  The browser immediately opens a brand new window / tab (**Tab 2**).
+    3.  Inside **Tab 2**, display a skeleton loader or fun cycling text (e.g., "Analyzing Industry...", "Selecting Layouts...") while pinging the backend until the generated website drops in.
 
+---
 
-Contrast Guard ensures all text is readable by automatically adjusting colors to meet accessibility standards (4.5:1 ratio), so generated websites don’t look visually weak or hard to read.
+## 4. Stage 2: The Live Editor & Deployment Canvas (Tab 2)
+**Goal**: Once generation is completed, transition the user directly into a full-screen editing workspace.
+
+### **4.1 The Live Website Preview**
+*   **Visual Layout**: The generated website sits center-screen.
+*   **Interactions for Users**:
+    *   **Text Editing**: When users click on text (Headlines, paragraphs), they can edit it natively on the screen like a Word Document. (Show a subtle hover border on editable text).
+    *   **Image Replace(The only drag option)**: When users hover over an image, a dark overlay with "Replace Image" appears. Users can drag an image file directly from their desktop and drop it onto the image target to instantly swap it natively. (Note: There is no drag-and-drop section sorting, just image replacing and text typing).
+
+### **4.2 The AI Chat Assistant**
+*   **Visual Layout**: A floating chat widget (or toggleable sidebar) where the user can natively talk to the AI to execute bulk edits.
+*   **Placeholder Example**: "Make the tone of the whole website more aggressive and mysterious."
+*   **Action**: When the user hits send, a local loading spinner appears within the chat while the AI natively updates the website preview in real-time.
+
+### **4.3 The "Final Actions" Floating Control Bar**
+*   **Location**: A fixed, floating "pill-shaped" glassmorphism bar placed at the **Bottom-Right** of the screen.
+*   **Components**:
+    1.  **Save & Download .ZIP**: A highly visible button to save progress and download the offline HTML source files.
+    2.  **Deploy to Vercel**: A premium, distinguished CTA (perhaps with a rocket icon). 
+        *   **Action**: When clicked, it turns into a brief loading state. Upon success, a beautiful modal or toast notification appears displaying the permanent live URL (e.g., `https://my-site-hash.vercel.app`) with a "Copy Link" and "Visit Site" button.
+        *   **(Note)**: There is NO "Undo All" button in this bar. Users undo edits by simply giving the AI Chat Assistant a new instruction to revert changes.
+
+---
+
+## 5. UI Guardrails & Error Handling
+
+*   **File Size Errors**: If a user drops a 10MB image, the UI must intercept it instantly and show an elegant red "File too large (Max 5MB)" error attached to the specific file.
+*   **Missing Fields**: If the Business Prompt is empty, clearly highlight the textarea red before allowing the backend request.
+*   **Deployment Errors**: If Vercel fails or times out, present a friendly, actionable error dialog with a "Retry" button rather than technical json jargon.
+
+---
+
+## 6. Feature Delivery Map (The User's POV)
+
+To assist with wireframing and prototyping, here is the chronological timeline of features the user will natively experience:
+
+**Step 1. The Entry Point (Dashboard Form)**
+* The user interacts with form inputs categorized by required text constraints (1,000 words), optional dropdowns, and file upload validations (Max 30 MB combined).
+* **Action Trigger**: The user clicks the main CTA `"Generate My Website"`.
+
+**Step 2. The Core Hand-Off**
+* The visual dashboard remains entirely open on the current screen. A loading spinner attaches to the clicked button to acknowledge the click.
+* **Action Trigger**: The browser immediately spawns a background request and automatically opens a **brand new browser tab** pointing to the workspace workspace URL.
+
+**Step 3. The Workspace Loading State**
+* Inside the newly opened tab, the UI team must design a high-end transitional state (e.g., cycling status text: `"Analyzing your industry..."` -> `"Creating your layout..."`).
+* **Action Trigger**: Once the backend queue resolves, the skeleton UI snaps directly into the fully operational, interactive Website Preview.
+
+**Step 4. Live Modifications**
+* **Inline Text**: The user directly interacts with the visible text, treating the screen like a native document.
+* **Image Drag**: The user drags a `.png` from their desktop and drops it natively over any website photo to instantly swap it.
+* **AI Chat**: The user opens the floating AI Chat Module and types `"Make this darker,"` relying on the backend to automatically refresh the live preview.
+
+**Step 5. Final Fulfillment**
+* When completely satisfied, the user interacts with the glassmorphic Bottom-Right Control Bar.
+* **Offline Path**: Clicking `"Save & Download .ZIP"` streams an offline-ready source code file natively into their browser's download manager.
+* **Live Path**: Clicking `"Deploy to Vercel"` triggers a micro-loading state, culminating in a celebration modal presenting their permanent, live `vercel.app` URL.

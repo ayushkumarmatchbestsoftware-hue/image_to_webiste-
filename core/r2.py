@@ -66,5 +66,15 @@ def upload_media_to_r2(
         ContentType=content_type,
     )
 
-    # Return public URL
+    # Return the full public URL so the caller can embed it in HTML templates
     return f"{R2_PUBLIC_URL}/{object_key}"
+
+def fetch_media_from_r2(object_key: str) -> bytes:
+    """
+    Fetch an object from R2.
+    """
+    response = r2_client.get_object(
+        Bucket=R2_BUCKET_NAME,
+        Key=object_key,
+    )
+    return response["Body"].read()

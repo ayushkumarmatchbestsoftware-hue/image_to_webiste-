@@ -8,6 +8,7 @@ class Config:
     # Authentication
     JWT_SECRET = os.getenv("JWT_SECRET")
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+    DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
 
     # File upload settings
     UPLOAD_FOLDER = "static/uploads"

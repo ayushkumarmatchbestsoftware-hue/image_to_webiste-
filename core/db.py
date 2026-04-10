@@ -32,7 +32,7 @@ def get_engine():
     if _engine is None:
         from sqlalchemy.ext.asyncio import create_async_engine
         from sqlalchemy.pool import NullPool
-        _engine = create_async_engine(DATABASE_URL, echo=False, poolclass=NullPool)
+        _engine = create_async_engine(DATABASE_URL, echo=True, poolclass=NullPool)
     return _engine
 
 def get_session_factory():
@@ -61,8 +61,10 @@ async def get_db():
 # ----------------------------
 async def init_db():
     # Import inside function to register models only when needed
-    from model.website_schema import WebsiteInfo
+    from model.website_schema import WebsiteInfo, ChatMessage
     from model.img_info_schema import ImageInfo
+    from model.user_credit_balance import UserCreditBalance
+    from model.credit_transaction import CreditTransaction
     
     eng = get_engine()
     async with eng.begin() as conn:

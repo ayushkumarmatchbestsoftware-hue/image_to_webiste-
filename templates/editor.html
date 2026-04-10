@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomeli AI | Website Editor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1115;
+            --panel: #181c25;
+            --accent: #6366f1;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --border: rgba(255,255,255,0.08);
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Sidebar Panels */
+        .sidebar {
+            width: 380px;
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        .panel-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-header h1 {
+            font-size: 18px;
+            margin: 0;
+            font-weight: 600;
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Chat Area */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .chat-bubbles {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .bubble {
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            max-width: 85%;
+        }
+
+        .bubble.ai { background: rgba(255,255,255,0.05); color: var(--text); align-self: flex-start; }
+        .bubble.user { background: var(--accent); color: white; align-self: flex-end; }
+
+        .chat-input-wrapper {
+            margin-top: auto;
+            position: relative;
+        }
+
+        .chat-input {
+            width: 100%;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 45px 14px 16px;
+            color: white;
+            font-family: inherit;
+            resize: none;
+            transition: all 0.3s ease;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .send-btn {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            background: var(--accent);
+            border: none;
+            color: white;
+            padding: 6px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Bottom Controls */
+        .controls {
+            padding: 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .primary-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .primary-btn:hover { transform: translateY(-2px); opacity: 0.9; }
+        .primary-btn:active { transform: translateY(0); }
+
+        .vercel-btn { background: #fff; color: #000; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .vercel-btn:hover { background: #eaeaea; }
+
+        /* Preview Area */
+        .preview-main {
+            flex: 1;
+            background: #000;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .device-frame {
+            flex: 1;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Saving State */
+        .save-indicator {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(16, 185, 129, 0.1);
+            backdrop-filter: blur(8px);
+            padding: 6px 12px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #10b981;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            z-index: 100;
+        }
+
+        .dot { 
+            width: 6px; height: 6px; background: #10b981; border-radius: 50%; 
+            animation: pulse-dot 1.5s infinite;
+        }
+        @keyframes pulse-dot {
+            0% { transform: scale(0.9); opacity: 0.6; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.6; }
+        }
+
+        /* Generation Overlay */
+        #generation-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 1000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .skeleton-preview {
+            width: 80%; max-width: 900px; height: 60%;
+            background: #111; border-radius: 20px;
+            overflow: hidden; padding: 40px;
+            display: flex; flex-direction: column; gap: 20px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .sk-line {
+            height: 20px; background: linear-gradient(90deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+            background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px;
+        }
+        .sk-title { height: 40px; width: 60%; }
+        .sk-body { height: 100px; width: 100%; }
+        .sk-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+        .sk-card { height: 120px; }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .status-label {
+            margin-top: 30px; font-size: 18px; color: var(--text-dim);
+            letter-spacing: 0.05em; font-weight: 500;
+            animation: pulse-text 2s infinite;
+        }
+        @keyframes pulse-text { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+        /* Responsive Breakpoints - Mobile Overlay Action */
+        .mobile-nav-toggle {
+            display: none;
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            background: var(--accent);
+            color: #fff;
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
+            z-index: 900;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        
+        .mobile-nav-toggle:active { transform: scale(0.9); }
+
+        .overlay-backdrop {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(2px);
+            z-index: 990;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar { width: 280px; }
+        }
+
+        /* Deployment Toast */
+        .deploy-toast {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: #1e293b;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 16px;
+            z-index: 10000;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            opacity: 0;
+            border: 1px solid rgba(255,255,255,0.1);
+            min-width: 400px;
+        }
+        .deploy-toast.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        .toast-content {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .toast-icon { font-size: 24px; }
+        .toast-body { flex: 1; }
+        .toast-title { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
+        .toast-desc { font-size: 13px; opacity: 0.7; }
+        .toast-btn {
+            background: var(--accent);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .toast-btn:hover { transform: scale(1.05); filter: brightness(1.1); }
+        .toast-close {
+            background: none; border: none; color: white; opacity: 0.4;
+            cursor: pointer; font-size: 20px; transition: opacity 0.2s;
+            padding: 0 4px;
+        }
+        .toast-close:hover { opacity: 1; }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -100%;
+                top: 0;
+                bottom: 0;
+                width: 85%;
+                max-width: 320px;
+                z-index: 1000;
+                transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                box-shadow: 20px 0 50px rgba(0,0,0,0.5);
+            }
+            .sidebar.open {
+                left: 0;
+            }
+            .sidebar.open + .preview-main .overlay-backdrop {
+                display: block;
+                opacity: 1;
+            }
+            .preview-main { padding: 0; }
+            .device-frame { border-radius: 0; box-shadow: none; }
+            .mobile-nav-toggle { display: flex; }
+        }
+    </style>
+</head>
+<body>
+    <div id="generation-overlay">
+        <div class="skeleton-preview">
+            <div class="sk-line sk-title"></div>
+            <div class="sk-line sk-body"></div>
+            <div class="sk-grid">
+                <div class="sk-line sk-card"></div>
+                <div class="sk-line sk-card"></div>
+                <div class="sk-line sk-card"></div>
+            </div>
+        </div>
+        <div class="status-label" id="status-text">AI is crafting your brand personality...</div>
+    </div>
+    <div id="deploy-toast" class="deploy-toast">
+        <div class="toast-content">
+            <div class="toast-icon">🚀</div>
+            <div class="toast-body">
+                <div class="toast-title">Site is Live!</div>
+                <div class="toast-desc">Successfully deployed to Vercel production.</div>
+            </div>
+            <a id="toast-link" href="#" target="_blank" class="toast-btn">View Live Site</a>
+            <button class="toast-close" onclick="document.getElementById('deploy-toast').classList.remove('visible')">&times;</button>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="panel-header">
+            <h1>WEBSITE EDITOR</h1>
+        </div>
+
+
+        {% if chat_enabled %}
+        <div class="chat-container">
+            <div class="chat-bubbles" id="chat-bubbles">
+                <div class="bubble ai">I've built your site. You can edit any text by clicking it, or just tell me what to change!</div>
+            </div>
+            <div class="chat-input-wrapper">
+                <textarea class="chat-input" id="chat-prompt" placeholder="Ask AI to edit..."></textarea>
+                <button class="send-btn" onclick="sendChat()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="controls">
+            <button class="primary-btn vercel-btn" id="deploy-btn" onclick="triggerDeploy()">
+                <svg width="16" height="16" viewBox="0 0 256 222" fill="currentColor"><path d="M128 0l128 221.7H0z"/></svg>
+                Deploy to Vercel
+            </button>
+            <button class="primary-btn" id="save-btn" onclick="triggerDownload()" style="background: rgba(255,255,255,0.05); color: var(--text);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download ZIP
+            </button>
+        </div>
+    </div>
+
+    <div class="preview-main">
+        <div class="overlay-backdrop" onclick="document.querySelector('.sidebar').classList.remove('open')"></div>
+        <button class="mobile-nav-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <div class="device-frame">
+            <div id="save-indicator" class="save-indicator">
+                <div class="dot"></div> Auto-saving...
+            </div>
+            <iframe id="preview-iframe" src="/preview/{{ website_id }}/home.html"></iframe>
+        </div>
+    </div>
+
+    <!-- Hidden file input for image swapping -->
+    <input type="file" id="image-upload" accept="image/*" style="display:none">
+
+    <script>
+        const website_id = "{{ website_id }}";
+        const iframe = document.getElementById('preview-iframe');
+        const saveIndicator = document.getElementById('save-indicator');
+        const imageInput = document.getElementById('image-upload');
+        let currentEditingImg = null;
+        let saveTimeout = null;
+        let lastSavedHTML = null;
+        let isAIGenerating = false;
+
+        // --- AUTOMATIC GENERATION POLLING ---
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const jobId = urlParams.get('job_id');
+            const overlay = document.getElementById('generation-overlay');
+            const statusLabel = document.getElementById('status-text');
+
+            if (jobId) {
+                overlay.style.display = 'flex';
+                const poll = setInterval(async () => {
+                    try {
+                        const res = await fetch(`/job-status/${jobId}`);
+                        const data = await res.json();
+                        
+                        if (data.status === 'processing') {
+                            statusLabel.textContent = "AI is writing your code and choosing styles...";
+                        }
+                        
+                        if (data.status === 'completed') {
+                            clearInterval(poll);
+                            statusLabel.textContent = "Almost ready...";
+                            
+                            // Refresh iframe to load the actual site
+                            iframe.src = iframe.src;
+                            
+                            // Fade out overlay
+                            setTimeout(() => {
+                                overlay.style.transition = 'opacity 0.8s ease';
+                                overlay.style.opacity = '0';
+                                setTimeout(() => overlay.style.display = 'none', 800);
+                            }, 1000);
+                        } else if (data.status === 'failed') {
+                            clearInterval(poll);
+                            statusLabel.textContent = "Generation failed. Redirecting...";
+                            setTimeout(() => window.location.href = '/', 3000);
+                        }
+                    } catch (e) { console.error("Poll error", e); }
+                }, 2500);
+            }
+        });
+
+        // --- Iframe DOM Management ---
+        iframe.onload = () => {
+            const doc = iframe.contentDocument;
+            const win = iframe.contentWindow;
+            lastSavedHTML = doc.documentElement.outerHTML;
+            
+            // Check current path relative to the proxy
+            const path = win.location.pathname;
+            const filename = path.split('/').pop() || 'home.html';
+            console.log(">>> [EDITOR] Loaded page:", filename);
+
+            // FORCE SAVE ON NAVIGATE: If user clicks a link, save current changes immediately
+            win.addEventListener('beforeunload', () => {
+                const currentHTML = doc.documentElement.outerHTML;
+                if (currentHTML !== lastSavedHTML) {
+                    // Use a synchronous-ish fetch or just fire and forget
+                    performSave(currentHTML, filename);
+                }
+            });
+
+            // Inject helper styles into the iframe for editor UI
+            const style = doc.createElement('style');
+            style.textContent = `
+                /* Hide legacy editor UI (if any remains) */
+                #save-bar, #edit-toolbar, #edit-hint-bar { 
+                    display: none !important; 
+                }
+                
+                .eb-editable:hover { outline: 2px dashed #6366f1 !important; cursor: pointer; }
+                .eb-img-edit:hover { outline: 4px solid #6366f1 !important; cursor: pointer; position: relative; }
+            `;
+            doc.head.appendChild(style);
+            
+            setupEditableFields(doc);
+        };
+
+        function setupEditableFields(doc) {
+            // Text Editing
+            doc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span').forEach(el => {
+                // EXCLUDE NAVIGATION & FOOTER: Do not make structural links/text editable
+                if (el.closest('nav') || el.closest('footer')) return;
+
+                el.classList.add('eb-editable');
+                el.addEventListener('click', (e) => {
+                    // Hold Shift/Ctrl/Alt/Cmd to navigate instead of editing
+                    if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+
+                    e.preventDefault();
+                    el.setAttribute('contenteditable', 'true');
+                    el.focus();
+                });
+                el.addEventListener('blur', () => {
+                    el.removeAttribute('contenteditable');
+                    checkAndAutoSave();
+                });
+            });
+
+            // Image Editing
+            doc.querySelectorAll('img').forEach(el => {
+                // EXCLUDE NAVIGATION & FOOTER: Do not make the Logo replaceable
+                if (el.closest('nav') || el.closest('footer')) return;
+
+                el.classList.add('eb-img-edit');
+                el.addEventListener('click', (e) => {
+                    if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+
+                    e.preventDefault();
+                    currentEditingImg = el;
+                    imageInput.click();
+                });
+            });
+        }
+
+        // Image Upload Logic
+        imageInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file || !currentEditingImg) return;
+
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('website_id', website_id);
+
+            try {
+                const res = await fetch('/upload-image', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.url) {
+                    currentEditingImg.src = data.url;
+                    checkAndAutoSave();
+                }
+            } catch (err) { console.error("Image upload failed", err); }
+        });
+
+        function getCurrentPageName() {
+            try {
+                const url = iframe.contentWindow.location.pathname;
+                const filename = url.split('/').pop() || 'home.html';
+                return filename.split('?')[0];
+            } catch(e) { return 'home.html'; }
+        }
+
+        function checkAndAutoSave() {
+            if (isAIGenerating) return;
+            clearTimeout(saveTimeout);
+
+            // CAPTURE STATE IMMEDIATELY (to avoid race conditions during navigation)
+            const doc = iframe.contentDocument;
+            if (!doc) return;
+            const snapshotHTML = doc.documentElement.outerHTML;
+            const snapshotPage = getCurrentPageName();
+
+            if (snapshotHTML === lastSavedHTML) return;
+
+            saveTimeout = setTimeout(async () => {
+                await performSave(snapshotHTML, snapshotPage);
+            }, 1000);
+        }
+
+        async function performSave(html, page_name) {
+            if (!html || !page_name) return;
+            saveIndicator.style.display = 'flex';
+            try {
+                const res = await fetch('/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ website_id, html, page_name })
+                });
+                if (res.ok) {
+                    lastSavedHTML = html;
+                }
+            } catch (err) { 
+                console.error("Save failed", err); 
+            } finally {
+                setTimeout(() => saveIndicator.style.display = 'none', 800);
+            }
+        }
+
+        {% if chat_enabled %}
+        // --- Chat Edit ---
+        async function sendChat() {
+            if (isAIGenerating) return;
+
+            const promptInput = document.getElementById('chat-prompt');
+            const instruction = promptInput.value.trim();
+            if (!instruction) return;
+
+            isAIGenerating = true;
+            addBubble('user', instruction);
+            promptInput.value = '';
+            
+            // Show a "Lock" on the preview
+            iframe.style.opacity = '0.5';
+            iframe.style.pointerEvents = 'none';
+
+            const currentHTML = iframe.contentDocument.documentElement.outerHTML;
+            const page_name = getCurrentPageName();
+
+            try {
+                const res = await fetch('/chat-edit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        website_id, 
+                        instruction,
+                        html: currentHTML,
+                        page_name
+                    })
+                });
+                
+                const data = await res.json();
+                if (data.html) {
+                    const doc = iframe.contentDocument;
+                    doc.open();
+                    doc.write(data.html);
+                    doc.close();
+                    
+                    // Small timeout to allow re-rendering
+                    setTimeout(() => {
+                        setupEditableFields(doc);
+                        lastSavedHTML = doc.documentElement.outerHTML; 
+                        addBubble('ai', data.summary || "Done! I've updated your site.");
+                    }, 200);
+                } else {
+                    addBubble('ai', "Error updating site: " + (data.error || "Unknown error"));
+                }
+            } catch (err) { 
+                console.error(err);
+                addBubble('ai', "Connection error. Please try again.");
+            } finally {
+                isAIGenerating = false;
+                iframe.style.opacity = '1';
+                iframe.style.pointerEvents = 'auto';
+            }
+        }
+        {% endif %}
+        function addBubble(role, text, isHTML=false) {
+            // Guard against calling dom functions if the chat UI doesn't exist
+            const container = document.getElementById('chat-bubbles');
+            if (!container) return;
+
+            const b = document.createElement('div');
+            b.className = `bubble ${role}`;
+            if (isHTML) {
+                b.innerHTML = text;
+            } else {
+                b.textContent = text;
+            }
+            container.appendChild(b);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function triggerDeploy() {
+            if (isAIGenerating) return;
+            const btn = document.getElementById('deploy-btn');
+            const originalText = btn.innerHTML;
+            
+            // Loading state
+            btn.innerHTML = `<div class="dot" style="background:#000; display:inline-block; margin-right:8px;"></div> Deploying...`;
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.8';
+
+            // Ensure any pending changes are saved
+            const currentHTML = iframe.contentDocument.documentElement.outerHTML;
+            await performSave(currentHTML);
+            
+            addBubble('ai', "Provisioning project and deploying to Vercel... (this may take up to 30 seconds)");
+            
+            try {
+                const res = await fetch(`/deploy/${website_id}`, { method: 'POST' });
+                const data = await res.json();
+                
+                if (data.success && data.url) {
+                    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Deployed!`;
+                    btn.style.background = '#10b981';
+                    btn.style.color = '#fff';
+                    btn.style.borderColor = '#10b981';
+                    
+                    // 1. Show clickable toast in the main view
+                    const toast = document.getElementById('deploy-toast');
+                    const toastLink = document.getElementById('toast-link');
+                    if (toast && toastLink) {
+                        toastLink.href = data.url;
+                        toast.classList.add('visible');
+                    }
+
+                    // 2. Add to chat for record
+                    addBubble('ai', `Success! Your website is live! 🚀 <br><br><a href="${data.url}" target="_blank" style="color: #6366f1; text-decoration: underline; font-weight: 600;">Click here to view it</a>`, true);
+                    
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.style.background = '#fff';
+                        btn.style.color = '#000';
+                        btn.style.pointerEvents = 'auto';
+                        btn.style.opacity = '1';
+                    }, 5000);
+                } else {
+                    addBubble('ai', "Deployment failed: " + (data.error || "Unknown error"));
+                    btn.innerHTML = originalText;
+                    btn.style.pointerEvents = 'auto';
+                    btn.style.opacity = '1';
+                }
+            } catch (err) {
+                console.error(err);
+                addBubble('ai', "Could not connect to deployment server.");
+                btn.innerHTML = originalText;
+                btn.style.pointerEvents = 'auto';
+                btn.style.opacity = '1';
+            }
+        }
+
+        async function triggerDownload() {
+            const currentHTML = iframe.contentDocument.documentElement.outerHTML;
+            await performSave(currentHTML);
+            window.location.href = `/download/${website_id}`;
+        }
+    </script>
+</body>
+</html>

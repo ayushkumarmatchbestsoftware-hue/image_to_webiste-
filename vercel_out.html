@@ -3,28 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ site_name }} — {{ site_title }}</title>
+    <title>boba bakes — bobabakes — Crafting Moments, Fresh Daily</title>
 
-    {% set hf = theme.get('font_heading', 'Outfit') if theme else 'Outfit' %}
-    {% set bf = theme.get('font_body', 'Plus Jakarta Sans') if theme else 'Plus Jakarta Sans' %}
+    
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300..900&family=Roboto:ital,wght@0,300..900;1,300..900&family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
 
     <style>
         :root {
-            --primary:       {{ theme.get('primary',       '#6366f1') if theme else '#6366f1' }};
-            --primary-dark:  {{ theme.get('primary_dark',  '#4338ca') if theme else '#4338ca' }};
-            --primary-light: {{ theme.get('primary_light', 'rgba(99,102,241,0.1)') if theme else 'rgba(99,102,241,0.1)' }};
-            --accent:        {{ theme.get('accent',        '#f59e0b') if theme else '#f59e0b' }};
-            --bg:            {{ theme.get('bg',            '#ffffff') if theme else '#ffffff' }};
-            --bg-alt:        {{ theme.get('bg_alt',        '#f9fafb') if theme else '#f9fafb' }};
-            --text-main:     {{ theme.get('text_main',     '#111827') if theme else '#111827' }};
-            --text-muted:    {{ theme.get('text_muted',    '#4b5563') if theme else '#4b5563' }};
-            --nav-bg:        {{ theme.get('nav_bg',        'rgba(255,255,255,0.7)') if theme else 'rgba(255,255,255,0.7)' }};
-            --font-heading:  '{{ theme.get('font_heading', 'Roboto') }}', sans-serif;
-            --font-body:     '{{ theme.get('font_body', 'Roboto') }}', sans-serif;
+            --primary:       #c9a96e;
+            --primary-dark:  #a07840;
+            --primary-light: rgba(128,0,0,0.12);
+            --accent:        #c9a96e;
+            --bg:            #0f0f0f;
+            --bg-alt:        #1a1a1a;
+            --text-main:     #f5f0e8;
+            --text-muted:    #b8a98a;
+            --nav-bg:        rgba(255,253,250,0.92);
+            --font-heading:  'Fraunces', sans-serif;
+            --font-body:     'Roboto', sans-serif;
             --gutter:        max(60px, 8%);
             --card-shadow:   0 20px 50px rgba(0,0,0,0.05);
             --card-hover:    0 30px 70px rgba(0,0,0,0.08);
@@ -125,9 +125,12 @@
         .nav-links a:hover { opacity: 1; color: var(--primary); transform: translateY(-1px); }
         .nav-links a.active { opacity: 1; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 4px; }
 
-        /* ── EDITORIAL CORE (Graceful Degradation) ── */
-        .reveal { transition: all 1s cubic-bezier(0.16, 1, 0.3, 1); opacity: 1; transform: none; }
-        .reveal.js-hidden { opacity: 0; transform: translateY(40px); }
+        /* ── EDITORIAL CORE ── */
+        .reveal { opacity: 0; transform: translateY(40px); transition: all 1s cubic-bezier(0.16, 1, 0.3, 1); }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
+        .reveal-delay-1 { transition-delay: 0.1s; }
+        .reveal-delay-2 { transition-delay: 0.2s; }
+        .reveal-delay-3 { transition-delay: 0.3s; }
 
         @keyframes heroUp {
             from { opacity: 0; transform: translateY(60px); }
@@ -222,8 +225,8 @@
 
 
         /* ── EDIT HIGHLIGHT ── */
-        [contenteditable="true"]:hover { outline: 1px dashed rgba(var(--primary), 0.2); outline-offset: 4px; border-radius: 4px; }
-        [contenteditable="true"]:focus { outline: 1px solid var(--primary); outline-offset: 4px; border-radius: 4px; }
+        []:hover { outline: 1px dashed rgba(var(--primary), 0.2); outline-offset: 4px; border-radius: 4px; }
+        []:focus { outline: 1px solid var(--primary); outline-offset: 4px; border-radius: 4px; }
 
         /* ── FOOTER (Refined Amazon Style) ── */
         .back-to-top {
@@ -327,105 +330,280 @@
         @media (max-width: 768px) {
             nav { padding: 0 24px; height: 72px; }
             .nav-links { display: none; }
-            .nav-links.open {
-                display: flex;
-                flex-direction: column;
-                position: absolute;
-                top: 72px;
-                left: 0;
-                width: 100%;
-                background: var(--bg);
-                padding: 20px;
-                border-bottom: 1px solid var(--border);
-                box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-                z-index: 1000;
-            }
             .footer-grid { grid-template-columns: 1fr; }
             footer { padding: 80px 24px 40px; }
             #save-bar { bottom: 16px; right: 16px; }
         }
-    </style>
+        .about-landing, .about-section { position: relative; overflow: hidden; }
+    .about-landing::before, .about-section::before {
+        content: ''; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(135deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.72) 100%);
+        z-index: 1;
+    }
+    .about-landing, .about-landing *, .about-section, .about-section * { color: #fff !important; }
+    .about-grid { position: relative; z-index: 2; }
+</style>
 </head>
 <body>
 
-{% set nav_map = {
-    'about': ('About', 'about.html'),
-    'services': ('Services', 'services.html'),
-    'portfolio': ('Portfolio', 'portfolio.html'),
-    'testimonials': ('Testimonials', 'home.html#testimonials'),
-    'stats': ('Stats', 'home.html#stats'),
-    'faq': ('FAQ', 'home.html#faq'),
-    'pricing': ('Pricing', 'home.html#pricing'),
-    'contact': ('Contact', 'contact.html')
-} %}
 
 <nav id="main-nav">
     <div class="nav-inner">
-        <a href="home.html" class="nav-logo {{ 'text-logo' if not logo else '' }}">
-            {% if logo and logo != 'None' %}
-                <img src="{{ logo }}" alt="{{ site_name }}">
-            {% else %}
-                {{ site_name }}
-            {% endif %}
+        <a href="index.html" class="nav-logo ">
+            
+                <img src="assets/3fa723ed-2658-4a03-840b-0db10a5826fa.webp" alt="boba bakes">
+            
         </a>
         <div class="nav-toggle" onclick="toggleNav()"><span></span><span></span><span></span></div>
         <div class="nav-links" id="nav-links">
-            <a href="home.html">Home</a>
-            {% for section in layout %}
-                {% if section != 'hero' and section in nav_map %}
-                <a href="{{ nav_map[section][1] }}">{{ nav_map[section][0] }}</a>
-                {% endif %}
-            {% endfor %}
+            <a href="index.html">Home</a>
+            
+            
+                
+            
+                
+                <a href="about.html">About</a>
+                
+            
+                
+                <a href="services.html">Services</a>
+                
+            
+                
+                <a href="portfolio.html">Portfolio</a>
+                
+            
+                
+                <a href="index.html#pricing">Pricing</a>
+                
+            
+                
+                <a href="contact.html">Contact</a>
+                
+            
         </div>
     </div>
 </nav>
 
-{% block content %}{% endblock %}
 
-{% set divider = theme.get('divider_style', 'diagonal') if theme else 'diagonal' %}
-{% if divider == 'diagonal' %}
+<style>
+    .contact-landing { background: var(--bg); padding: 160px 10% 120px; min-height: 100vh; display: flex; align-items: center; }
+    .contact-inner { 
+        max-width: 1400px; margin: 0 auto; 
+        display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 100px; align-items: start; width: 100%;
+    }
+
+    .contact-header { margin-bottom: 48px; }
+
+    .contact-title {
+        font-family: var(--font-heading); font-size: clamp(2.5rem, 5vw, 4rem); 
+        font-weight: 900; line-height: 1.1; letter-spacing: -0.04em; 
+        color: var(--text-main); margin-bottom: 24px; text-transform: uppercase;
+    }
+    .contact-description {
+        font-size: 1.1rem; color: var(--text-muted); line-height: 1.8; 
+        margin-bottom: 48px; max-width: 480px; opacity: 0.8;
+    }
+
+    .contact-items { display: grid; gap: 32px; }
+    .c-item { 
+        display: flex; align-items: center; gap: 24px; padding: 0; 
+        background: transparent; border: none;
+        transition: all 0.4s;
+    }
+    .c-icon { 
+        width: 48px; height: 48px; flex-shrink: 0; background: var(--bg-alt); 
+        border-radius: 0; display: flex; align-items: center; justify-content: center; 
+    }
+    .c-icon svg { stroke: var(--primary); width: 22px; height: 22px; }
+    .c-label { font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-bottom: 4px; opacity: 0.6; }
+    .c-value { font-weight: 700; font-size: 1rem; color: var(--text-main); letter-spacing: -0.01em; }
+
+    /* Form Card */
+    .contact-form-card { 
+        background: var(--bg-alt); padding: 80px; 
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    .contact-form-card h3 { 
+        font-family: var(--font-heading); font-size: 1.8rem; font-weight: 900; 
+        color: var(--text-main); margin-bottom: 48px; letter-spacing: -0.02em; text-transform: uppercase;
+    }
+    
+    .form-group { margin-bottom: 32px; display: flex; flex-direction: column; gap: 8px; }
+    .form-group label { font-size: 0.72rem; font-weight: 900; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.6; }
+    .form-group input, .form-group textarea { 
+        padding: 16px 0; border: none; border-bottom: 2px solid rgba(0,0,0,0.1); border-radius: 0; 
+        font-family: var(--font-body); font-size: 1rem; color: var(--text-main); 
+        background: transparent; outline: none; transition: border-color 0.3s; 
+    }
+    .form-group input:focus, .form-group textarea:focus { border-color: var(--primary); }
+    .btn-full { width: 100%; }
+
+    @media (max-width: 1024px) {
+        .contact-landing { padding: 120px 40px 80px; }
+        .contact-inner { grid-template-columns: 1fr; gap: 80px; }
+        .contact-form-card { padding: 60px 32px; }
+    }
+    .about-landing, .about-section { position: relative; overflow: hidden; }
+    .about-landing::before, .about-section::before {
+        content: ''; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(135deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.72) 100%);
+        z-index: 1;
+    }
+    .about-landing, .about-landing *, .about-section, .about-section * { color: #fff !important; }
+    .about-grid { position: relative; z-index: 2; }
+</style>
+
+<section class="contact-landing">
+    <div class="contact-inner">
+
+        <!-- INFO SIDE -->
+        <div class="reveal">
+            <div class="contact-header">
+                <span class="section-label">Visit Us</span>
+                <h2 class="contact-title">Reserve a Table</h2>
+                <p class="contact-description">Join us for a cozy meal or simply pop in to see what&#39;s fresh out of the oven.</p>
+            </div>
+
+            <div class="contact-items">
+                <div class="c-item">
+                    <div class="c-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="c-label">Direct Inquiry</div>
+                        <div class="c-value">reservations@bobabakes.local</div>
+                    </div>
+                </div>
+
+                <div class="c-item">
+                    <div class="c-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.13 11.88 19.79 19.79 0 0 1 1.06 3.25 2 2 0 0 1 3 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="c-label">Call Us</div>
+                        <div class="c-value">+1 (555) BAKE-NOW</div>
+                    </div>
+                </div>
+
+                <div class="c-item">
+                    <div class="c-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="c-label">Global Office</div>
+                        <div class="c-value">123 Artisan Alley, Oakland, CA</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FORM SIDE -->
+        <div class="contact-form-card reveal">
+            <h3>Start a Project</h3>
+            <div class="form-stack">
+                <div class="form-group">
+                    <label>Your Name</label>
+                    <input type="text" placeholder="Johnathan Doe">
+                </div>
+                <div class="form-group">
+                    <label>Work Email</label>
+                    <input type="email" placeholder="john@company.com">
+                </div>
+                <div class="form-group">
+                    <label>Your Message</label>
+                    <textarea rows="6" placeholder="Briefly describe your vision..."></textarea>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-full">Secure a consultation →</button>
+        </div>
+
+    </div>
+</section>
+
+
+
+
+
 <div class="section-divider" style="background:var(--bg); margin-top: -1px; overflow: hidden; line-height: 0;">
     <svg viewBox="0 0 1440 120" preserveAspectRatio="none" style="width: 100%; height: 120px; display: block;">
-        <path d="M0,120 L1440,0 L1440,120 L0,120 Z" fill="{{ theme.get('primary_dark','#0f0f1a') if theme else '#0f0f1a' }}"/>
+        <path d="M0,60 C320,120 420,0 720,60 C1020,120 1120,0 1440,60 L1440,120 L0,120 Z" fill="#a07840"/>
     </svg>
 </div>
-{% elif divider == 'wave' %}
-<div class="section-divider" style="background:var(--bg); margin-top: -1px; overflow: hidden; line-height: 0;">
-    <svg viewBox="0 0 1440 120" preserveAspectRatio="none" style="width: 100%; height: 120px; display: block;">
-        <path d="M0,60 C320,120 420,0 720,60 C1020,120 1120,0 1440,60 L1440,120 L0,120 Z" fill="{{ theme.get('primary_dark','#0f0f1a') if theme else '#0f0f1a' }}"/>
-    </svg>
-</div>
-{% endif %}
+
 
 <a href="#" class="back-to-top">Back to top</a>
 <footer>
-    <div class="footer-grid" style="grid-template-columns: 1fr; text-align: center;">
+    <div class="footer-grid">
         <div>
-            <div class="footer-head">Explore</div>
-            <div class="footer-links" style="flex-direction: row; justify-content: center; flex-wrap: wrap; gap: 24px;">
-                <a href="home.html">Home</a>
-                {% for section in layout %}
-                    {% if section != 'hero' and section in nav_map %}
-                    <a href="{{ nav_map[section][1] }}">{{ nav_map[section][0] }}</a>
-                    {% endif %}
-                {% endfor %}
+            <div class="footer-head">Get to Know Us</div>
+            <div class="footer-links">
+                <a href="about.html">About boba bakes</a>
+                <a href="services.html">Our Services</a>
+                <a href="portfolio.html">Portfolio</a>
+                <a href="contact.html">Contact Us</a>
+            </div>
+        </div>
+        <div>
+            <div class="footer-head">Make Money with Us</div>
+            <div class="footer-links">
+                <a href="#">Sell on boba bakes</a>
+                <a href="#">Become an Affiliate</a>
+                <a href="#">Advertise Your Products</a>
+                <a href="#">Self-Publish with Us</a>
+            </div>
+        </div>
+        <div>
+            <div class="footer-head">boba bakes Payment</div>
+            <div class="footer-links">
+                <a href="#">Business Card</a>
+                <a href="#">Shop with Points</a>
+                <a href="#">Reload Your Balance</a>
+                <a href="#">Currency Converter</a>
+            </div>
+        </div>
+        <div>
+            <div class="footer-head">Let Us Help You</div>
+            <div class="footer-links">
+                <a href="#">Your Account</a>
+                <a href="#">Your Orders</a>
+                <a href="#">Shipping Rates</a>
+                <a href="#">Policies</a>
+                <a href="contact.html">Help</a>
             </div>
         </div>
     </div>
     
     <div class="footer-bottom-bar">
-        <div class="footer-bottom-inner" style="justify-content: center;">
-            <a href="home.html" class="footer-logo-bottom" style="margin: 0; display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.25rem;">
-                {% if logo and logo != 'None' %}
-                    <img src="{{ logo }}" alt="{{ site_name }}" style="height: 32px; width: auto;">
-                {% endif %}
-                <span>{{ site_name }}</span>
+        <div class="footer-bottom-inner">
+            <a href="index.html" class="footer-logo-bottom">
+                
+                    <img src="assets/3fa723ed-2658-4a03-840b-0db10a5826fa.webp" alt="boba bakes">
+                
             </a>
+            <div class="footer-selectors">
+                <a href="#" class="footer-selector">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    English
+                </a>
+                <a href="#" class="footer-selector">
+                    INR - Indian Rupee
+                </a>
+                <a href="#" class="footer-selector">
+                    United States
+                </a>
+            </div>
         </div>
     </div>
 
     <div class="footer-copyright">
-        &copy; {{ current_year or '2026' }}, {{ site_name }}.
+        &copy; 2026, boba bakes, Inc. or its affiliates
     </div>
 </footer>
 
@@ -435,51 +613,20 @@ const nav = document.getElementById('main-nav');
 window.addEventListener('scroll', () => nav.classList.toggle('scrolled', window.scrollY > 20));
 function toggleNav() { document.getElementById('nav-links').classList.toggle('open'); }
 
-// ── SCROLL REVEAL (Graceful Fallback) ──
+// ── SCROLL REVEAL ──
 const observer = new IntersectionObserver(entries => {
-    entries.forEach(e => { 
-        if (e.isIntersecting) {
-            e.target.classList.remove('js-hidden'); 
-            observer.unobserve(e.target);
-        }
-    });
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.12 });
-
-document.querySelectorAll('.reveal').forEach(el => {
-    el.classList.add('js-hidden'); // Only hide if JS is alive
-    observer.observe(el);
-});
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
 // ── ACTIVE LINKS ──
 document.querySelectorAll('.nav-links a').forEach(link => {
     const href = link.getAttribute('href');
-    const pathname = window.location.pathname;
-    
-    // Improved detection: matches if pathname ends with the link, 
-    // or if we're at root and the link is home.html
-    const isHome = (href === 'home.html' || href === '/');
-    const isAtRoot = (pathname === '/' || pathname.endsWith('/preview/{{ website_id }}/'));
-    
-    if (pathname.endsWith(href) || (isHome && isAtRoot)) {
+    if (window.location.pathname.endsWith(href) || (href === 'home.html' && window.location.pathname.endsWith('index.html'))) {
         link.classList.add('active');
         link.addEventListener('click', (e) => {
-            // ONLY prevent default if it's a SAME-PAGE hash link (e.g. #stats on home page)
-            // or if we're clicking the same page we're already on.
-            if (href.includes('#')) {
-                // If the link is home.html#something and we're on home, just scroll
-                const [targetPage, targetHash] = href.split('#');
-                if (pathname.endsWith(targetPage) || (isAtRoot && targetPage === 'home.html')) {
-                    const el = document.getElementById(targetHash);
-                    if (el) {
-                        el.scrollIntoView({ behavior: 'smooth' });
-                        e.preventDefault();
-                    }
-                }
-            } else {
-                // Clicking "Home" while already on Home
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                e.preventDefault();
-            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            e.preventDefault();
         });
     }
 });
@@ -508,11 +655,11 @@ function setImgSrc(el, src) {
             el.style.backgroundImage = `url("${src}")`;
         }
     }
-    showSaveIndicator();
+    
 }
 
-function initImageDropZones() {
-    if (!document.querySelectorAll('[contenteditable="true"]').length) return;
+function {
+    if (!document.querySelectorAll('[]').length) return;
 
     // 1. Wrap <img> tags and handle them
     document.querySelectorAll('img').forEach(img => {
@@ -622,18 +769,14 @@ function setupDropEvents(zone, target) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    initImageDropZones();
+    
     document.querySelectorAll('.eb-sortable').forEach(el => {
-        new Sortable(el, {
-            animation: 350,
-            ghostClass: 'eb-sortable-ghost',
-            onEnd: () => showSaveIndicator()
-        });
+        
     });
 });
 </script>
 
-{% block extra_scripts %}{% endblock %}
+
 
 </body>
 </html>

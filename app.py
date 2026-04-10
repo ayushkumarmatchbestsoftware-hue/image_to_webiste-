@@ -3,6 +3,7 @@ import uuid
 import json
 import re
 import asyncio
+import random
 import logging
 import traceback
 from flask import Flask, render_template, request, jsonify, send_file, g
@@ -11,21 +12,46 @@ import google.generativeai as genai
 from PIL import Image
 from config import Config
 import uuid as pyuuid
-from core.db import get_engine, get_session_factory
-from model.website_schema import WebsiteInfo
-from model.img_info_schema import ImageInfo
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import insert
-from core.r2 import upload_media_to_r2, R2_PUBLIC_URL
+from sqlalchemy import insert, update, select
+from core.mongo import insert_website_data, get_website_layout, update_website_layout, insert_chat_message
+from core.r2 import upload_media_to_r2, R2_PUBLIC_URL, fetch_media_from_r2
+from middleware.require_credits import require_credits
+from handlers.credit_handler import website_credits_debits
+import os
+import io
+import shutil
+import tempfile
+from dotenv import load_dotenv
+load_dotenv()
+
+POMELI_CREDIT_COST = os.getenv("POMELI_CREDIT_COST")
 
 # --- LOGGING SETUP ---
 print(">>> [BOOT] App logging initializing...", flush=True)
 
+from flask_cors import CORS
+
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# --- CORS SECURITY ---
+# Get allowed origins from .env (comma-separated if multiple)
+# Default securely to local frontend testing only. NEVER put "*" here.
+raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+allowed_origins = [orig.strip() for orig in raw_origins.split(",") if orig.strip()]
+
+CORS(app, origins=allowed_origins, supports_credentials=True)
+
 # Global flag for lazy DB initialization
 _DB_READY = False
+
+# In-memory website context store — persists original AI data + layout per website_id
+# so the /chat-edit route can re-render sections without requiring the user to re-generate
+WEBSITE_CONTEXTS: dict = {}
+
+# Feature flag to easily toggle chat-edit capabilities for Phase 2
+ENABLE_CHAT_EDIT = os.getenv("ENABLE_CHAT_EDIT", "False").lower() == "true"
 
 # --- AUTHENTICATION ---
 @app.before_request
@@ -43,8 +69,15 @@ async def authenticate_request():
             print(f">>> [DB ERR] Lazy init failed: {e}", flush=True)
 
     print(f"\n>>> [REQUEST] {request.method} {request.path}", flush=True)
+
+    # DEV_MODE: skip all auth, inject a fake user
+    if app.config.get('DEV_MODE'):
+        g.user_id = "00000000-0000-0000-0000-000000000001"
+        g.user = None
+        print(">>> [AUTH] DEV_MODE active — auth bypassed", flush=True)
+        return
+
     from core.auth import get_current_user_flask
-    # Note: get_current_user_flask is internally sync, which is fine here
     user = get_current_user_flask()
     if user:
         g.user = user
@@ -57,6 +90,11 @@ def require_auth(f):
     from functools import wraps
     @wraps(f)
     async def decorated_function(*args, **kwargs):
+        # DEV_MODE: bypass auth for local testing only
+        if app.config.get('DEV_MODE'):
+            if not getattr(g, 'user_id', None):
+                g.user_id = "00000000-0000-0000-0000-000000000001"
+            return await f(*args, **kwargs)
         if not getattr(g, 'user_id', None):
             print(f">>> [DENIED] {request.path} - No user_id in g", flush=True)
             return jsonify({"error": "Authentication required", "status": "error"}), 401
@@ -110,31 +148,105 @@ NICHE_DESIGN = {
     "food":         {"font_heading": "Roboto",             "font_body": "Roboto",            "primary": "#991b1b", "primary_dark": "#7f1d1d", "bg": "#fffcf9", "bg_alt": "#fef2f2", "text_main": "#7f1d1d", "text_muted": "#dc2626", "accent": "#f59e0b", "mood": "artisanal quality"},
 }
 
-LAYOUT_BLUEPRINTS = {
-    "restaurant":  ["hero", "about", "services", "testimonials", "portfolio", "contact"],
-    "cafe":        ["hero", "about", "services", "portfolio", "contact"],
-    "bakery":      ["hero", "services", "about", "portfolio", "contact"],
-    "bar":         ["hero", "about", "services", "portfolio", "contact"],
-    "hotel":       ["hero", "services", "about", "testimonials", "contact"],
-    "spa":         ["hero", "about", "services", "testimonials", "contact"],
-    "yoga":        ["hero", "about", "services", "testimonials", "contact"],
-    "fitness":     ["hero", "stats", "services", "about", "testimonials", "contact"],
-    "gym":         ["hero", "stats", "services", "about", "portfolio", "contact"],
-    "law":         ["hero", "about", "services", "testimonials", "faq", "contact"],
-    "finance":     ["hero", "about", "services", "stats", "testimonials", "contact"],
-    "consulting":  ["hero", "services", "about", "testimonials", "faq", "contact"],
-    "saas":        ["hero", "stats", "services", "about", "pricing", "faq", "contact"],
-    "startup":     ["hero", "stats", "services", "about", "testimonials", "contact"],
-    "software":    ["hero", "services", "about", "pricing", "faq", "contact"],
-    "tech":        ["hero", "stats", "services", "about", "portfolio", "contact"],
-    "agency":      ["hero", "portfolio", "services", "about", "testimonials", "contact"],
-    "photography": ["hero", "portfolio", "about", "services", "testimonials", "contact"],
-    "fashion":     ["hero", "portfolio", "about", "services", "contact"],
-    "ecommerce":   ["hero", "services", "portfolio", "testimonials", "contact"],
-    "medical":     ["hero", "services", "about", "faq", "contact"],
-    "dental":      ["hero", "services", "about", "testimonials", "faq", "contact"],
-    "real estate": ["hero", "services", "portfolio", "about", "testimonials", "contact"],
-    "default":     ["hero", "about", "services", "portfolio", "contact"],
+LAYOUT_POOLS = {
+    "restaurant":  [
+        ["hero", "about", "services", "testimonials", "portfolio", "contact"],
+        ["hero", "services", "about", "portfolio", "contact"],
+        ["hero", "portfolio", "services", "about", "testimonials", "contact"]
+    ],
+    "cafe":        [
+        ["hero", "about", "services", "portfolio", "contact"],
+        ["hero", "services", "about", "contact"]
+    ],
+    "bakery":      [
+        ["hero", "services", "about", "portfolio", "contact"],
+        ["hero", "about", "services", "contact"]
+    ],
+    "bar":         [
+        ["hero", "about", "services", "portfolio", "contact"],
+        ["hero", "services", "about", "contact"]
+    ],
+    "hotel":       [
+        ["hero", "services", "about", "testimonials", "contact"],
+        ["hero", "about", "services", "portfolio", "contact"]
+    ],
+    "spa":         [
+        ["hero", "about", "services", "testimonials", "contact"],
+        ["hero", "services", "about", "contact"]
+    ],
+    "yoga":        [
+        ["hero", "about", "services", "testimonials", "contact"],
+        ["hero", "services", "about", "contact"]
+    ],
+    "fitness":     [
+        ["hero", "stats", "services", "about", "testimonials", "contact"],
+        ["hero", "about", "services", "stats", "contact"]
+    ],
+    "gym":         [
+        ["hero", "stats", "services", "about", "portfolio", "contact"],
+        ["hero", "services", "about", "stats", "contact"]
+    ],
+    "law":         [
+        ["hero", "about", "services", "testimonials", "faq", "contact"],
+        ["hero", "services", "about", "faq", "contact"]
+    ],
+    "finance":     [
+        ["hero", "about", "services", "stats", "testimonials", "contact"],
+        ["hero", "services", "about", "stats", "contact"]
+    ],
+    "consulting":  [
+        ["hero", "services", "about", "testimonials", "faq", "contact"],
+        ["hero", "about", "services", "faq", "contact"]
+    ],
+    "saas":        [
+        ["hero", "stats", "services", "about", "pricing", "faq", "contact"],
+        ["hero", "services", "about", "pricing", "contact"]
+    ],
+    "startup":     [
+        ["hero", "stats", "services", "about", "testimonials", "contact"],
+        ["hero", "about", "services", "stats", "contact"]
+    ],
+    "software":    [
+        ["hero", "services", "about", "pricing", "faq", "contact"],
+        ["hero", "about", "services", "pricing", "contact"]
+    ],
+    "tech":        [
+        ["hero", "stats", "services", "about", "portfolio", "contact"],
+        ["hero", "services", "about", "stats", "contact"]
+    ],
+    "agency":      [
+        ["hero", "portfolio", "services", "about", "testimonials", "contact"],
+        ["hero", "about", "services", "portfolio", "contact"]
+    ],
+    "photography": [
+        ["hero", "portfolio", "about", "services", "testimonials", "contact"],
+        ["hero", "about", "portfolio", "services", "contact"]
+    ],
+    "fashion":     [
+        ["hero", "portfolio", "about", "services", "contact"],
+        ["hero", "about", "portfolio", "services", "contact"]
+    ],
+    "ecommerce":   [
+        ["hero", "services", "portfolio", "testimonials", "contact"],
+        ["hero", "portfolio", "services", "contact"]
+    ],
+    "medical":     [
+        ["hero", "services", "about", "faq", "contact"],
+        ["hero", "about", "services", "faq", "contact"]
+    ],
+    "dental":      [
+        ["hero", "services", "about", "testimonials", "faq", "contact"],
+        ["hero", "about", "services", "faq", "contact"]
+    ],
+    "real estate": [
+        ["hero", "services", "portfolio", "about", "testimonials", "contact"],
+        ["hero", "portfolio", "about", "services", "contact"]
+    ],
+    "default":     [
+        ["hero", "about", "services", "portfolio", "contact"],
+        ["hero", "services", "about", "portfolio", "contact"],
+        ["hero", "about", "services", "contact"]
+    ],
 }
 
 def get_niche_key(prompt: str) -> str:
@@ -156,10 +268,31 @@ def get_fallback_tokens(prompt: str) -> dict:
 
 def get_layout_blueprint(prompt: str) -> list:
     p = prompt.lower()
-    for kw, layout in LAYOUT_BLUEPRINTS.items():
+    for kw, layouts in LAYOUT_POOLS.items():
         if kw in p:
-            return layout
-    return LAYOUT_BLUEPRINTS["default"]
+            return random.choice(layouts)
+    return random.choice(LAYOUT_POOLS["default"])
+
+# ---------------------------------------------------------------------------
+# PALETTE MAP — user's named palette overrides niche fallback
+# ---------------------------------------------------------------------------
+PALETTE_MAP = {
+    "luxury":    {"primary": "#c9a96e", "primary_dark": "#a07840", "bg": "#0f0f0f", "bg_alt": "#1a1a1a", "text_main": "#f5f0e8", "text_muted": "#b8a98a", "accent": "#c9a96e"},
+    "brutalist": {"primary": "#000000", "primary_dark": "#000000", "bg": "#ffffff", "bg_alt": "#f0f0f0", "text_main": "#000000", "text_muted": "#444444", "accent": "#f5c842"},
+    "soft":      {"primary": "#c2848a", "primary_dark": "#a06068", "bg": "#fdf6f0", "bg_alt": "#f9ede4", "text_main": "#4a2f35", "text_muted": "#9a6f75", "accent": "#f0b8bc"},
+    "dark":      {"primary": "#7c6af7", "primary_dark": "#5b48e0", "bg": "#0d0d14", "bg_alt": "#14141f", "text_main": "#e8e6ff", "text_muted": "#8b87c0", "accent": "#7c6af7"},
+    "earthy":    {"primary": "#9b6a44", "primary_dark": "#7a4f2e", "bg": "#f5f0e8", "bg_alt": "#ede5d8", "text_main": "#2d1f10", "text_muted": "#7a6045", "accent": "#c4894e"},
+    "neon":      {"primary": "#00ffcc", "primary_dark": "#00c9a0", "bg": "#050510", "bg_alt": "#0a0a1a", "text_main": "#e0fffa", "text_muted": "#00ffcc", "accent": "#ff2d78"},
+    # legacy names kept for backwards compatibility
+    "midnight":  {"primary": "#4338ca", "primary_dark": "#312e81", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#1e1b4b", "text_muted": "#4338ca", "accent": "#f59e0b"},
+    "slate":     {"primary": "#334155", "primary_dark": "#1e293b", "bg": "#fdfcfa", "bg_alt": "#f4f2ef", "text_main": "#1e293b", "text_muted": "#475569", "accent": "#f59e0b"},
+    "crimson":   {"primary": "#991b1b", "primary_dark": "#7f1d1d", "bg": "#fffcf9", "bg_alt": "#fef2f2", "text_main": "#7f1d1d", "text_muted": "#dc2626", "accent": "#f59e0b"},
+    "forest":    {"primary": "#065f46", "primary_dark": "#064e3b", "bg": "#fcfaf8", "bg_alt": "#f4f0ec", "text_main": "#064e3b", "text_muted": "#059669", "accent": "#f59e0b"},
+    "ocean":     {"primary": "#1e40af", "primary_dark": "#1e3a8a", "bg": "#ffffff", "bg_alt": "#f8fafc", "text_main": "#1e293b", "text_muted": "#3b82f6", "accent": "#f59e0b"},
+    "gold":      {"primary": "#92400e", "primary_dark": "#78350f", "bg": "#fffcf9", "bg_alt": "#f7f3f0", "text_main": "#451a03", "text_muted": "#b45309", "accent": "#10b981"},
+    "rose":      {"primary": "#9d174d", "primary_dark": "#831843", "bg": "#ffffff", "bg_alt": "#fdf2f8", "text_main": "#500724", "text_muted": "#be185d", "accent": "#f59e0b"},
+    "onyx":      {"primary": "#1c1917", "primary_dark": "#000000", "bg": "#ffffff", "bg_alt": "#fafaf9", "text_main": "#1c1917", "text_muted": "#78716c", "accent": "#f59e0b"},
+}
 
 # ---------------------------------------------------------------------------
 # COLOR VALIDATOR — auto-corrects bad Gemini theme values
@@ -435,7 +568,146 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 
-async def generate_website_content(prompt, image_paths=None, image_count=0):
+# ---------------------------------------------------------------------------
+# INDUSTRY TEMPLATES  — the secret design intelligence
+# When user picks an industry, this block is secretly injected into the AI
+# prompt, pre-wiring sections, tone, fonts, CTAs, and sensory language.
+# ---------------------------------------------------------------------------
+INDUSTRY_TEMPLATES = {
+    "restaurant": {
+        "label": "Restaurant / Food",
+        "inject": """INDUSTRY DESIGN BRIEF: Restaurant & Dining
+VISUAL DIRECTION: Warm, sensory, and inviting. Make visitors feel hungry and welcome.
+TONE: Artisan, neighborhood, beloved. Use words like: crafted, seasonal, sourced, slow-fermented, wood-fired, local.
+SECTIONS TO PRIORITIZE: Dramatic full-bleed hero with atmosphere shot, chef story in About, menu categories in Services, diner reviews in Testimonials, opening hours + reservation in Contact.
+KEY CTAs: 'Reserve a Table', 'View Menu', 'Book Private Dining', 'Order Online'
+FONTS DIRECTION: Serif headings for warmth (Playfair Display or Fraunces). Clean body font.
+PALETTE DIRECTION: Warm ivory backgrounds, deep burgundy or forest green primary, gold accents.
+BANNED WORDS: fast, quick, efficient, solution, platform, scalable.""",
+        "default_sections": ["hero", "about", "services", "stats", "testimonials", "contact"],
+        "palette_hint": "earthy",
+    },
+    "saas": {
+        "label": "SaaS / Tech",
+        "inject": """INDUSTRY DESIGN BRIEF: SaaS & Technology Product
+VISUAL DIRECTION: Precise, technical, confident. Dark or clean-light aesthetic with sharp product logic.
+TONE: Direct, technical, no-nonsense. Use specialist terms: orchestration, API-first, rate limiting, concurrency, webhooks, state management.
+SECTIONS TO PRIORITIZE: Conversion hero with product screenshot/dashboard, feature grid in Services, social proof stats (users, uptime %, requests/sec), pricing tiers, testimonials from engineering leads.
+KEY CTAs: 'Start Free Trial', 'View Docs', 'Book a Demo', 'See Pricing'
+FONTS DIRECTION: Modern geometric sans-serif. Outfit or Plus Jakarta Sans.
+PALETTE DIRECTION: Deep navy or near-black bg, indigo or electric blue primary, white text on dark.
+BANNED WORDS: journey, warm, artisan, cozy, beloved, handcrafted.""",
+        "default_sections": ["hero", "services", "stats", "testimonials", "pricing", "contact"],
+        "palette_hint": "dark",
+    },
+    "law": {
+        "label": "Law Firm / Legal",
+        "inject": """INDUSTRY DESIGN BRIEF: Law Firm & Legal Services
+VISUAL DIRECTION: Authority, gravitas, and trust. Clean, structured, powerful. Never flashy.
+TONE: Authoritative and precise. Use specialist terms: litigation strategy, transactional integrity, due diligence, fiduciary duty, case precedent, motion practice, pro bono.
+SECTIONS TO PRIORITIZE: Strong editorial hero (no stock imagery feel), practice areas in Services, partner/attorney profiles in About, client testimonials, consultation CTA + office address in Contact.
+KEY CTAs: 'Schedule Consultation', 'View Practice Areas', 'Meet Our Attorneys', 'Submit a Case'
+FONTS DIRECTION: Classic serif for headings (Playfair Display or Fraunces). Clean body.
+PALETTE DIRECTION: Deep navy or dark slate primary, warm cream or white background, gold accent line.
+BANNED WORDS: awesome, amazing, cool, fun, cozy, vibrant, affordable.""",
+        "default_sections": ["hero", "about", "services", "testimonials", "stats", "contact"],
+        "palette_hint": "luxury",
+    },
+    "agency": {
+        "label": "Agency / Studio",
+        "inject": """INDUSTRY DESIGN BRIEF: Creative Agency & Design Studio
+VISUAL DIRECTION: The site itself is the portfolio statement. Bold, experimental, editorial. White space is structure.
+TONE: Opinionated, curatorial, confident. Use terms: brand identity, visual systems, motion language, typographic hierarchy, spatial composition, creative strategy.
+SECTIONS TO PRIORITIZE: Bold editorial hero (no image, strong typography), portfolio case studies with outcomes, services (branding, digital, motion, strategy), team with titles, inquiry form.
+KEY CTAs: 'View Case Studies', 'Start a Project', 'See Our Work', 'New Project Inquiry'
+FONTS DIRECTION: Contrasting type pairing. Bold display heading, neutral body. Fraunces or Outfit.
+PALETTE DIRECTION: High-contrast B&W with one vivid accent (electric blue, deep red, or neon yellow).
+BANNED WORDS: solution, comprehensive, affordable, scalable, synergy.""",
+        "default_sections": ["hero", "portfolio", "services", "about", "testimonials", "contact"],
+        "palette_hint": "brutalist",
+    },
+    "spa": {
+        "label": "Spa / Wellness",
+        "inject": """INDUSTRY DESIGN BRIEF: Spa, Wellness & Beauty
+VISUAL DIRECTION: Serene, minimal, unhurried. Every pixel breathes. Negative space is intentional.
+TONE: Gentle, considered, restorative. Use terms: botanical, meridian, somatic, restorative, mindful ritual, sensory journey, tissue depth, lymphatic.
+SECTIONS TO PRIORITIZE: Serene atmospheric hero, treatment menu in Services, philosophy/founder story in About, client testimonials, booking form in Contact.
+KEY CTAs: 'Book a Treatment', 'View Menu', 'Gift a Session', 'Reserve Your Time'
+FONTS DIRECTION: Elegant and airy. Fraunces italic for headings, clean body.
+PALETTE DIRECTION: Warm stone, blush, sage or natural linen tones. Never dark.
+BANNED WORDS: tech, scalable, efficient, ROI, leverage, platform, bold.""",
+        "default_sections": ["hero", "services", "about", "testimonials", "stats", "contact"],
+        "palette_hint": "soft",
+    },
+    "gym": {
+        "label": "Gym / Fitness",
+        "inject": """INDUSTRY DESIGN BRIEF: Gym, Fitness & Performance Training
+VISUAL DIRECTION: High-energy, powerful, raw. Dark bg with bold typography. Movement and momentum.
+TONE: Direct, challenging, results-oriented. Use terms: rep maxes, periodization, functional threshold, VO2 max, progressive overload, sport-specific conditioning.
+SECTIONS TO PRIORITIZE: Bold dark hero with power statement, programs/training styles in Services, coach credentials in About, transformation stats, member testimonials, membership pricing, Contact.
+KEY CTAs: 'Join Now', 'Book Free Trial Class', 'See Programs', 'Get Your Plan'
+FONTS DIRECTION: Heavy grotesque or condensed sans-serif. Outfit ExtraBold headings.
+PALETTE DIRECTION: Near-black background, electric or deep primary (red, orange, or electric blue), white text.
+BANNED WORDS: gentle, serene, mindful, relaxing, delicate, elegant.""",
+        "default_sections": ["hero", "services", "stats", "about", "testimonials", "pricing", "contact"],
+        "palette_hint": "neon",
+    },
+    "portfolio": {
+        "label": "Personal Portfolio",
+        "inject": """INDUSTRY DESIGN BRIEF: Personal Portfolio & Freelancer
+VISUAL DIRECTION: The work is the hero. Clean, editorial, distinctive. Typography-forward.
+TONE: Confident first-person. Direct and specific. Use the vocabulary of the person's exact craft.
+SECTIONS TO PRIORITIZE: Immediate name + role hero with one-line positioning, curated portfolio grid, skills/services, brief about, testimonials from clients, contact/booking.
+KEY CTAs: 'View My Work', 'Hire Me', 'Download Resume', 'Start a Conversation'
+FONTS DIRECTION: Distinctive editorial pair. Fraunces or Playfair Display + Plus Jakarta Sans.
+PALETTE DIRECTION: Clean white or warm off-white, one strong accent color that reflects personality.
+BANNED WORDS: synergy, leverage, solutions, enterprise, comprehensive.""",
+        "default_sections": ["hero", "portfolio", "services", "about", "testimonials", "contact"],
+        "palette_hint": "soft",
+    },
+    "ecommerce": {
+        "label": "E-commerce / Retail",
+        "inject": """INDUSTRY DESIGN BRIEF: E-commerce & Retail Brand
+VISUAL DIRECTION: Product-forward, editorial, lifestyle-feeling. NOT Amazon. More like Glossier or Aesop.
+TONE: Direct DTC (direct-to-consumer) voice. Specific ingredients, materials, origin stories. Trust-building.
+SECTIONS TO PRIORITIZE: Lifestyle hero (product-in-use), featured product grid in Services/Portfolio, brand story in About, customer reviews with star ratings + media in Testimonials, free shipping thresholds/returns in Contact/FAQ.
+KEY CTAs: 'Shop Now', 'View Collection', 'Get 10% Off', 'Find Your Match'
+FONTS DIRECTION: Clean modern sans. Outfit or Plus Jakarta Sans.
+PALETTE DIRECTION: Matches the product aesthetic — warm cream for skincare, stark white for tech, earthy for sustainable goods.
+BANNED WORDS: leverage, enterprise, scalable, API, deployment.""",
+        "default_sections": ["hero", "portfolio", "about", "stats", "testimonials", "faq", "contact"],
+        "palette_hint": "soft",
+    },
+    "consulting": {
+        "label": "Consulting / Professional",
+        "inject": """INDUSTRY DESIGN BRIEF: Consulting & Professional Services
+VISUAL DIRECTION: Clean, intelligent, trustworthy. Premium but not flashy. Like McKinsey's editorial clarity.
+TONE: Precise, evidence-based, senior. Use terms: operating model, organizational design, go-to-market, margin compression, first-principles, structural reform.
+SECTIONS TO PRIORITIZE: Headline with results-first positioning, service verticals in Services, client outcomes in Stats (e.g. '120M revenue unlocked'), case studies in Portfolio, team credibility in About, contact for new mandates.
+KEY CTAs: 'Start an Engagement', 'View Case Studies', 'Meet the Team', 'Request a Brief'
+FONTS DIRECTION: Clean precision type. Outfit or Roboto. No decorative fonts.
+PALETTE DIRECTION: Deep navy or slate bg headers, clean white content areas, gold or teal accent.
+BANNED WORDS: fun, awesome, trendy, creative, cool, vibrant.""",
+        "default_sections": ["hero", "services", "portfolio", "stats", "about", "testimonials", "contact"],
+        "palette_hint": "midnight",
+    },
+    "realestate": {
+        "label": "Real Estate / Property",
+        "inject": """INDUSTRY DESIGN BRIEF: Real Estate & Property
+VISUAL DIRECTION: Aspirational and premium. Architecture photography. Clean sophistication.
+TONE: Trusted advisor voice. Use terms: prime location, yield, cap rate, square footage, bespoke finishes, master-planned, leasehold vs freehold, off-plan.
+SECTIONS TO PRIORITIZE: Full-bleed architectural hero, listings/portfolio grid, agent/team in About, stats (properties sold, total value), client testimonials, valuation inquiry in Contact.
+KEY CTAs: 'Book a Viewing', 'Get a Valuation', 'Browse Listings', 'Speak to an Agent'
+FONTS DIRECTION: Elegant serif headings (Fraunces). Refined body font.
+PALETTE DIRECTION: Warm white or cream bg, deep charcoal or slate primary, gold accent.
+BANNED WORDS: cheap, discount, affordable, budget, scalable.""",
+        "default_sections": ["hero", "portfolio", "about", "stats", "services", "testimonials", "contact"],
+        "palette_hint": "luxury",
+    },
+}
+
+
+async def generate_website_content(prompt, image_paths=None, image_count=0, industry=None):
     # (Model initialization moved inside generate_website_content to avoid event loop issues)
     model = genai.GenerativeModel(
         "gemini-3.1-flash-image-preview",
@@ -453,7 +725,17 @@ async def generate_website_content(prompt, image_paths=None, image_count=0):
             if image_count >= 3:
                 image_summary += f"\n- Images 3 to {min(5, image_count)}: Portfolio Case Studies (You MUST generate exactly {expected_port_count} items in the 'portfolio' list)."
 
-        full_prompt = f"""Business: {prompt}
+        # --- INDUSTRY TEMPLATE INJECTION ---
+        # Silently build the full design brief like Stitch does
+        industry_block = ""
+        industry_template = INDUSTRY_TEMPLATES.get(industry) if industry else None
+        if industry_template:
+            industry_block = f"\n\n{industry_template['inject']}\n"
+            # Override fallback sections with industry defaults if user didn't specify
+            layout = industry_template["default_sections"]
+            print(f">>> [INDUSTRY] Template '{industry}' injected.", flush=True)
+
+        full_prompt = f"""Business: {prompt}{industry_block}
 {image_summary}
 
 DEVELOPER DESIGN TOKENS (pair these with Roboto for a premium look):
@@ -540,61 +822,146 @@ CRITICAL RULES for Copy:
 
 
 def build_image_map(image_context: list, layout: list) -> dict:
-    total = len(image_context)
-    mapping = {"hero": None, "about": None, "portfolio": []}
-    
-    # 1st Image -> Hero
-    if total >= 1: mapping["hero"] = image_context[0]
-    
-    # 2nd Image -> About
-    if total >= 2: mapping["about"] = image_context[1]
-    
-    # 3rd, 4th, 5th -> Portfolio Grid
-    if total >= 3: mapping["portfolio"] = image_context[2:5]
-        
+    """
+    Production-Grade Priority-Based Image Assignment Engine.
+
+    Priority Order (fixed, by visual impact):
+    ──────────────────────────────────────────────────────────────
+    1. hero          → Full split-layout (Image 1 — ALWAYS assigned)
+    2. about         → Full-bleed background with overlay
+    3. portfolio     → Multi-image grid (consumes up to 3 images)
+    4. services      → Cinematic banner above service cards
+    5. testimonials  → Darkened full-width background
+    ──────────────────────────────────────────────────────────────
+    ZERO image slots for: contact, stats, faq, pricing (intentional)
+
+    Overflow Rule:
+    • If images remain after all selected visual sections are filled,
+      they are collected into 'overflow' and shown as a Photo Gallery
+      strip on the Home page. Zero images are ever wasted.
+    """
+    # Step 1: Deep-clean — only accept real HTTP URLs
+    clean_images = [
+        img for img in image_context
+        if img and isinstance(img, str) and img.startswith('http')
+    ]
+    num_imgs = len(clean_images)
+
+    # Step 2: Initialize all section image slots
+    mapping = {
+        "hero":         None,   # 1 slot  — split layout visual
+        "about":        None,   # 1 slot  — full-bleed background
+        "portfolio":    [],     # 1-3 slots — image grid cards
+        "services":     None,   # 1 slot  — atmosphere banner
+        "testimonials": None,   # 1 slot  — dark background
+        # ── NO SLOTS ── contact / stats / faq / pricing
+        "overflow":     [],     # Safety net — extra images → Home gallery
+    }
+
+    if num_imgs == 0:
+        return mapping
+
+    # Step 3: Priority order — contact/stats/faq/pricing deliberately excluded
+    VISUAL_PRIORITY = ["hero", "about", "portfolio", "services", "testimonials"]
+
+    # Step 4: Build assignment queue from user's selected layout (hero always included)
+    user_layout_set = set(layout)
+    assignment_queue = []
+    for section in VISUAL_PRIORITY:
+        if section == "hero" or section in user_layout_set:
+            assignment_queue.append(section)
+
+    # Step 5: Assign images sequentially — zero duplicacy
+    img_idx = 0
+
+    for section in assignment_queue:
+        if img_idx >= num_imgs:
+            break
+
+        if section == "portfolio":
+            # Portfolio consumes up to 3 images for its grid
+            remaining = clean_images[img_idx:img_idx + 3]
+            if remaining:
+                mapping["portfolio"] = remaining
+                img_idx += len(remaining)
+        else:
+            # Single-slot sections (hero, about, services, testimonials)
+            mapping[section] = clean_images[img_idx]
+            img_idx += 1
+
+    # Step 6: OVERFLOW SAFETY — any unassigned images go back to the Home page
+    # These render as a professional horizontal photo gallery below the hero
+    if img_idx < num_imgs:
+        mapping["overflow"] = clean_images[img_idx:]
+
+    # Step 7: Debug log
+    log = {k: ("✓" if v else "—") for k, v in mapping.items() if k not in ("portfolio", "overflow")}
+    print(
+        f">>> [IMG MAP] {log} | portfolio={len(mapping['portfolio'])} | "
+        f"overflow={len(mapping['overflow'])} | used={img_idx}/{num_imgs}",
+        flush=True
+    )
+
     return mapping
 
 
 @app.route('/')
 async def index():
     print(">>> [INDEX] Root page hit!", flush=True)
-    return render_template('index.html')
+    return render_template('index_local_test.html')
 
 
 @app.route('/generate', methods=['POST'])
 @require_auth
+@require_credits(int(POMELI_CREDIT_COST) if POMELI_CREDIT_COST else 1)
 async def generate_website():
+    """
+    INTAKE ROUTE — Fast, non-blocking.
+    1. Validates inputs
+    2. Uploads binary files to R2 (gets stable public URLs)
+    3. Enqueues the job to Redis with all serializable data
+    4. Returns {job_id} immediately so the frontend can poll /job-status
+    The actual AI generation runs in worker.py.
+    """
     try:
-        prompt = request.form.get('prompt', '')
-        logo_file = request.files.get('logo')
+        prompt        = request.form.get('prompt', '')
+        logo_file     = request.files.get('logo')
+        user_pages    = request.form.get('pages', '')
+        user_palette  = request.form.get('palette', 'auto')
+        user_industry = request.form.get('industry', '').strip()
+        user_id       = getattr(g, 'user_id', '00000000-0000-0000-0000-000000000001')
+
+        print(f">>> [GENERATE] New request | industry={user_industry} pages={user_pages}", flush=True)
 
         if any(kw in prompt.lower() for kw in ["upload image", "add images yourself", "generate image", "create image"]):
-            return jsonify({"warning": "Please upload images manually. This AI generates branding and content, not the images themselves."}), 400
+            return jsonify({"warning": "Please upload images manually. AI generates content, not images."}), 400
 
         files = request.files.getlist('images')
 
         if not prompt:
-            return jsonify({'error': 'Please provide a description'}), 400
+            return jsonify({'error': 'Please provide a business description'}), 400
 
         if len(files) > MAX_IMAGES:
             return jsonify({"error": f"Max {MAX_IMAGES} images allowed."}), 400
 
-        website_id = str(uuid.uuid4())
+        # ── Create website ID and local folder ──
+        website_id     = str(uuid.uuid4())
         website_folder = os.path.join(app.config['GENERATED_FOLDER'], website_id)
         os.makedirs(website_folder, exist_ok=True)
+        print(f">>> [GENERATE] website_id={website_id}", flush=True)
 
         import io
         db_image_records = []
-        logo_web_path = None
+        logo_web_path    = None
+
+        # ── Upload logo to R2 ──
         if logo_file and logo_file.filename and allowed_file(logo_file.filename):
-            logo_filename = secure_filename(logo_file.filename)
+            logo_filename    = secure_filename(logo_file.filename)
             unique_logo_name = f"logo_{uuid.uuid4()}_{logo_filename}"
-            logo_filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_logo_name)
+            logo_filepath    = os.path.join(app.config['UPLOAD_FOLDER'], unique_logo_name)
             logo_file.save(logo_filepath)
-            
             with open(logo_filepath, "rb") as f:
                 logo_bytes = f.read()
-            
             try:
                 img = Image.open(io.BytesIO(logo_bytes))
                 img.verify()
@@ -605,25 +972,25 @@ async def generate_website():
                 return jsonify({"error": f"Invalid logo image: {str(e)}"}), 400
 
             logo_web_path = await asyncio.to_thread(
-                upload_media_to_r2,
-                logo_bytes,
-                logo_file.mimetype,
+                upload_media_to_r2, logo_bytes, logo_file.mimetype,
                 folder=f"websites/{website_id}/assets"
             )
-            
+            print(f">>> [GENERATE] Logo uploaded to R2: {logo_web_path}", flush=True)
+            # Clean up local temp file — the R2 copy is the permanent one
+            try:
+                os.remove(logo_filepath)
+            except Exception:
+                pass
             db_image_records.append({
-                "file_url": logo_web_path,
-                "file_name": logo_filename,
-                "file_format": l_format,
-                "file_size_mb": len(logo_bytes) / (1024 * 1024),
-                "width": l_width,
-                "height": l_height,
-                "image_type": "logo",
-                "is_generated": False
+                "file_url": logo_web_path, "file_name": logo_filename,
+                "file_format": l_format, "file_size_mb": len(logo_bytes) / (1024 * 1024),
+                "width": l_width, "height": l_height,
+                "image_type": "logo", "is_generated": False
             })
 
-        image_context = []
-        image_paths   = []
+        # ── Upload content images to R2 ──
+        image_urls  = []   # R2 public URLs → go into the queue payload
+        image_paths = []   # Local disk paths → used by Gemini Vision in worker
 
         for i, file in enumerate(files):
             if file and file.filename and allowed_file(file.filename):
@@ -631,10 +998,8 @@ async def generate_website():
                 unique_filename = f"{uuid.uuid4()}_{filename}"
                 filepath        = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
                 file.save(filepath)
-                
                 with open(filepath, "rb") as f:
                     file_bytes = f.read()
-                
                 try:
                     img = Image.open(io.BytesIO(file_bytes))
                     img.verify()
@@ -645,171 +1010,931 @@ async def generate_website():
                     return jsonify({"error": f"Invalid image file: {filename}"}), 400
 
                 web_path = await asyncio.to_thread(
-                    upload_media_to_r2,
-                    file_bytes,
-                    file.mimetype,
+                    upload_media_to_r2, file_bytes, file.mimetype,
                     folder=f"websites/{website_id}/assets"
                 )
-                image_context.append(web_path)
+                image_urls.append(web_path)
                 image_paths.append(filepath)
-                
+                print(f">>> [GENERATE] Image {i+1} uploaded: {web_path}", flush=True)
+
                 img_type = "hero" if i == 0 else ("about" if i == 1 else "portfolio")
                 db_image_records.append({
-                    "file_url": web_path,
-                    "file_name": filename,
-                    "file_format": i_format,
-                    "file_size_mb": len(file_bytes) / (1024 * 1024),
-                    "width": i_width,
-                    "height": i_height,
-                    "image_type": img_type,
-                    "is_generated": False
+                    "file_url": web_path, "file_name": filename,
+                    "file_format": i_format, "file_size_mb": len(file_bytes) / (1024*1024),
+                    "width": i_width, "height": i_height,
+                    "image_type": img_type, "is_generated": False
                 })
 
-        data = await generate_website_content(prompt, image_paths, len(image_paths))
-        # ... and later pass logo=logo_web_path to base_ctx
+        # ── Enqueue job to Redis (with graceful fallback if Redis is unavailable) ──
+        redis_available = False
+        try:
+            from core.redis import enqueue_pomeli_job, redis as redis_client
+            import redis.exceptions as redis_exc
+            # Quick ping to check if Redis is reachable before attempting enqueue
+            await redis_client.ping()
+            redis_available = True
+        except Exception as redis_check_err:
+            import traceback
+            print(f">>> [REDIS] Not available ({type(redis_check_err).__name__}): {redis_check_err}", flush=True)
+            traceback.print_exc()
+            print(">>> [REDIS] Falling back to synchronous generation...", flush=True)
 
-        if not data:
-            return jsonify({"error": "AI failed to generate content. Please try again."}), 500
+        if redis_available:
+            # ── QUEUE MODE: Fast return, worker processes async ──
+            job_id = await enqueue_pomeli_job(
+                website_id=website_id,
+                user_id=str(user_id),
+                prompt=prompt,
+                image_urls=image_urls,
+                image_paths=image_paths,
+                logo_url=logo_web_path,
+                user_pages=user_pages,
+                user_palette=user_palette,
+                user_industry=user_industry,
+                db_image_records=db_image_records,
+            )
+            print(f">>> [GENERATE] Job enqueued | job_id={job_id} website_id={website_id}", flush=True)
+            return jsonify({
+                "success":    True,
+                "job_id":     job_id,
+                "website_id": website_id,
+                "status":     "queued",
+            })
 
-        # website_id and folder are already created above now
+        else:
+            # ── SYNCHRONOUS FALLBACK MODE: Redis is down, run generation directly ──
+            print(f">>> [GENERATE] Running synchronous fallback for website_id={website_id}", flush=True)
 
-        site_name  = data.get("site_info", {}).get("display_name", "My Business")
-        site_title = data.get("site_info", {}).get("site_title", site_name)
-        tagline    = data.get("site_info", {}).get("tagline", "")
-        theme      = data.get("theme", {})
-        footer     = data.get("footer", {})
-        layout     = data.get("layout", ["hero", "about", "services", "portfolio", "contact"])
-        image_map  = build_image_map(image_context, layout)
+            data = await generate_website_content(
+                prompt, image_paths, len(image_paths),
+                industry=user_industry or None
+            )
+            if not data:
+                return jsonify({"error": "AI failed to generate content. Please try again."}), 500
 
-        base_ctx = dict(
-            site_name=site_name, site_title=site_title,
-            tagline=tagline, theme=theme, footer=footer,
-            layout=layout, image_map=image_map,
-            image_count=len(image_context),
-            has_images=(len(image_context) > 0),
-            logo=logo_web_path
-        )
+            # Clean up local temp files — Gemini Vision is done with them
+            for _fp in image_paths:
+                try:
+                    os.remove(_fp)
+                except Exception:
+                    pass
 
-        home_html = render_template(
-            "home.html", **base_ctx,
-            home=data.get("home", {}),
-            about=data.get("about", {}),
-            services=data.get("services", []),
-            portfolio=data.get("portfolio", []),
-            testimonials=data.get("testimonials", []),
-            faq=data.get("faq", []),
-            pricing=data.get("pricing", []),
-            stats=data.get("stats", []),
-            contact=data.get("contact", {}),
-            images=image_context,
-        )
-        with open(os.path.join(website_folder, "home.html"), "w", encoding="utf-8") as f:
-            f.write(home_html)
-        
-        await asyncio.to_thread(
-            upload_media_to_r2,
-            home_html.encode('utf-8'),
-            "text/html",
-            folder=f"websites/{website_id}",
-            filename="home.html"
-        )
+            site_name  = data.get("site_info", {}).get("display_name", "My Business")
+            site_title = data.get("site_info", {}).get("site_title", site_name)
+            tagline    = data.get("site_info", {}).get("tagline", "")
+            theme      = data.get("theme", {})
+            footer     = data.get("footer", {})
 
-        page_templates = {
-            "about.html":     ("about.html",     dict(**base_ctx, about=data.get("about",{}), services=data.get("services",[]), images=image_context)),
-            "services.html":  ("services.html",  dict(**base_ctx, services=data.get("services",[]), images=image_context)),
-            "portfolio.html": ("portfolio.html", dict(**base_ctx, portfolio=data.get("portfolio",[]), images=image_context)),
-            "contact.html":   ("contact.html",   dict(**base_ctx, contact=data.get("contact",{}), images=image_context)),
-        }
-        for out_name, (tmpl, ctx) in page_templates.items():
-            html = render_template(tmpl, **ctx)
-            with open(os.path.join(website_folder, out_name), "w", encoding="utf-8") as f:
-                f.write(html)
-            
-            await asyncio.to_thread(
-                upload_media_to_r2,
-                html.encode('utf-8'),
-                "text/html",
-                folder=f"websites/{website_id}",
-                filename=out_name
+            if user_pages:
+                valid_sections = {"hero","about","services","portfolio","testimonials","stats","faq","pricing","contact"}
+                requested = [s.strip() for s in user_pages.split(',') if s.strip() in valid_sections]
+                layout = requested if requested else data.get("layout", ["hero","about","services","contact"])
+            else:
+                layout = data.get("layout", ["hero","about","services","contact"])
+
+            if user_palette and user_palette != 'auto' and user_palette in PALETTE_MAP:
+                theme.update(PALETTE_MAP[user_palette])
+                print(f">>> [THEME] Palette '{user_palette}' applied.", flush=True)
+
+            clean_image_urls = [u for u in image_urls if u]
+            image_map = build_image_map(clean_image_urls, layout)
+
+            base_ctx = dict(
+                site_name=site_name, site_title=site_title,
+                tagline=tagline, theme=theme, footer=footer,
+                layout=layout, image_map=image_map,
+                image_count=len(clean_image_urls),
+                has_images=(len(clean_image_urls) > 0),
+                logo=logo_web_path,
+                services_img=image_map.get("services"),
+                testimonials_img=image_map.get("testimonials"),
+                overflow_imgs=image_map.get("overflow", []),
             )
 
-        # --- DATABASE PERSISTENCE ---
-        try:
-            # Using lazy engine from get_engine() for absolute stability
-            eng = get_engine()
-            async with eng.begin() as conn:
-                from sqlalchemy import insert
-                await conn.execute(
-                    insert(WebsiteInfo).values(
-                        website_id=pyuuid.UUID(website_id),
-                        user_id=pyuuid.UUID(g.user_id),
-                        prompt=prompt,
-                        status="completed",
-                        progress="100",
-                        final_url=f"{R2_PUBLIC_URL}/websites/{website_id}/home.html"
-                    )
-                )
-                
-                for record in db_image_records:
-                    await conn.execute(
-                        insert(ImageInfo).values(
-                            website_id=pyuuid.UUID(website_id),
-                            file_url=record["file_url"],
-                            file_name=record["file_name"],
-                            file_format=record["file_format"],
-                            file_size_mb=record["file_size_mb"],
-                            width=record["width"],
-                            height=record["height"],
-                            image_type=record["image_type"],
-                            is_generated=record["is_generated"]
-                        )
-                    )
-                    
-            print(f">>> [DB] Saved website and {len(db_image_records)} image records: {website_id}", flush=True)
-        except Exception as db_err:
-            print(f">>> [DB ERR] Failed to persist info: {db_err}", flush=True)
-            # We don't return 500 here because the website WAS generated successfully on disk
-            # but we definitely want to see the error in logs.
+            home_html = render_template(
+                "home.html", **base_ctx,
+                home=data.get("home", {}), about=data.get("about", {}),
+                services=data.get("services", []), portfolio=data.get("portfolio", []),
+                testimonials=data.get("testimonials", []), faq=data.get("faq", []),
+                pricing=data.get("pricing", []), stats=data.get("stats", []),
+                contact=data.get("contact", {}), images=clean_image_urls,
+            )
+            await asyncio.to_thread(
+                upload_media_to_r2, home_html.encode("utf-8"), "text/html",
+                folder=f"websites/{website_id}", filename="home.html"
+            )
+            print(f">>> [GENERATE] home.html uploaded to R2", flush=True)
 
-        return jsonify({
-            "success": True,
-            "website_id": website_id,
-            "preview_url": f"/preview/{website_id}/home.html",
-            "download_url": f"/download/{website_id}",
-            "layout": layout,
-            "image_count": len(image_context)
-        })
+            page_templates = {
+                "about.html":     ("about.html",     dict(**base_ctx, about=data.get("about",{}), services=data.get("services",[]), images=clean_image_urls)),
+                "services.html":  ("services.html",  dict(**base_ctx, services=data.get("services",[]), images=clean_image_urls)),
+                "portfolio.html": ("portfolio.html", dict(**base_ctx, portfolio=data.get("portfolio",[]), images=clean_image_urls)),
+                "contact.html":   ("contact.html",   dict(**base_ctx, contact=data.get("contact",{}), images=clean_image_urls)),
+            }
+            for out_name, (tmpl, ctx) in page_templates.items():
+                try:
+                    html = render_template(tmpl, **ctx)
+                    await asyncio.to_thread(
+                        upload_media_to_r2, html.encode("utf-8"), "text/html",
+                        folder=f"websites/{website_id}", filename=out_name
+                    )
+                    print(f">>> [GENERATE] {out_name} uploaded to R2", flush=True)
+                except Exception as page_err:
+                    print(f">>> [GENERATE WARN] {out_name} failed: {page_err}", flush=True)
+
+            # Backup
+            try:
+                await asyncio.to_thread(
+                    upload_media_to_r2, home_html.encode("utf-8"), "text/html",
+                    folder=f"websites/{website_id}", filename="home_backup.html"
+                )
+            except Exception:
+                pass
+
+            # DB persist (MongoDB)
+            try:
+                website_doc = {
+                    "website_id": website_id,
+                    "user_id": str(user_id),
+                    "prompt": prompt,
+                    "status": "completed",
+                    "progress": "100",
+                    "final_url": f"{R2_PUBLIC_URL}/websites/{website_id}/home.html",
+                    "industry": user_industry,
+                    "site_name": site_name,
+                    "tagline": tagline,
+                    "layout": list(layout),
+                    "theme": dict(theme),
+                    "footer": dict(footer) if isinstance(footer, dict) else footer,
+                    "ai_data": data,
+                    "chat_messages": []
+                }
+                await insert_website_data(website_doc, db_image_records)
+                print(f">>> [DB] Saved website + {len(db_image_records)} images to MongoDB: {website_id}", flush=True)
+            except Exception as db_err:
+                print(f">>> [DB ERR] MongoDB save failed: {db_err}", flush=True)
+
+            # In-memory context for chat-edit (only store if enabled to save memory)
+            if ENABLE_CHAT_EDIT:
+                WEBSITE_CONTEXTS[website_id] = {
+                    "prompt": prompt, "industry": user_industry, "layout": list(layout),
+                    "theme": dict(theme), "data": data, "image_context": clean_image_urls,
+                    "image_map": dict(image_map), "logo": logo_web_path,
+                    "site_name": site_name, "site_title": site_title,
+                    "tagline": tagline, "footer": footer,
+                }
+
+            # ── CREDIT DEDUCTION ──
+            if str(user_id) != '00000000-0000-0000-0000-000000000001':
+                cost = int(POMELI_CREDIT_COST) if POMELI_CREDIT_COST else 1
+                credit_result = await website_credits_debits({
+                    "userId": str(user_id),
+                    "resourceType": "website_generation",
+                    "resourceId": website_id,
+                    "type": "USAGE",
+                    "amount": -cost,
+                    "description": "Website Generation (Sync)"
+                })
+                if not credit_result.get("success"):
+                    print(f">>> [CREDIT ERR] Failed to deduct credits for sync generation: {credit_result.get('error')}", flush=True)
+
+            print(f">>> [GENERATE] Synchronous generation complete | website_id={website_id}", flush=True)
+
+            return jsonify({
+                "success":    True,
+                "website_id": website_id,
+                "status":     "completed",
+            })
 
     except Exception as e:
-        print(f">>> [ROUTE CRITICAL] /generate - {str(e)}", flush=True)
+        print(f">>> [GENERATE CRITICAL] {str(e)}", flush=True)
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/preview/<website_id>/<page>')
-async def preview_website(website_id, page):
-    page = os.path.basename(page)
-    path = os.path.join(app.config['GENERATED_FOLDER'], website_id, page)
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    return "Website not found", 404
+@app.route('/job-status/<job_id>', methods=['GET'])
+@require_auth
+async def job_status(job_id: str):
+    """
+    Polling endpoint for the frontend.
+    Returns the current status of a generation job.
+    Possible statuses: queued | processing | completed | failed
+    """
+    try:
+        from core.redis import get_job_status
+        data = await get_job_status(job_id)
+        if not data:
+            return jsonify({"error": "Job not found"}), 404
+        return jsonify(data)
+    except Exception as e:
+        print(f">>> [JOB STATUS ERR] {job_id}: {e}", flush=True)
+        return jsonify({"error": str(e)}), 500
 
+
+@app.route('/editor/<website_id>')
+@require_auth
+async def editor_page(website_id):
+    return render_template('editor.html', website_id=website_id, chat_enabled=ENABLE_CHAT_EDIT)
+
+@app.route('/preview/<website_id>/', defaults={'filename': 'home.html'})
+@app.route('/preview/<website_id>/<path:filename>')
+async def preview_proxy(website_id, filename):
+    """
+    Serves HTML pages from R2 for in-browser preview.
+
+    Critical fix: all relative page hrefs (home.html, about.html, etc.)
+    are rewritten to absolute /preview/<website_id>/... paths BEFORE the
+    HTML is sent to the browser. This means navigation works correctly from
+    ANY page — you can go from Contact → Home → Services and back without
+    getting a 404 or a broken relative-path resolution.
+    """
+    try:
+        # 1. NORMALIZE PATH
+        clean_filename = (filename or 'home.html').strip('/')
+        if not clean_filename or clean_filename == '.':
+            clean_filename = 'home.html'
+
+        object_key = f"websites/{website_id}/{clean_filename}"
+        html_bytes = None
+
+        # Helper: safely fetch from R2, returns None instead of raising
+        def _try_fetch(key):
+            try:
+                return fetch_media_from_r2(key)
+            except Exception:
+                return None
+
+        # 2. BUILD SEARCH QUEUE
+        search_keys = [object_key]
+        if clean_filename in ('home.html', 'index.html'):
+            alt = 'index.html' if clean_filename == 'home.html' else 'home.html'
+            search_keys.append(f"websites/{website_id}/{alt}")
+        if not clean_filename.endswith('.html'):
+            search_keys.append(f"{object_key}.html")
+        else:
+            search_keys.append(object_key.rsplit('.html', 1)[0])
+
+        # 3. TWO-PASS SEARCH (with R2 propagation wait between passes)
+        for attempt in range(2):
+            for key in search_keys:
+                html_bytes = await asyncio.to_thread(_try_fetch, key)
+                if html_bytes:
+                    if key != object_key or attempt > 0:
+                        print(f">>> [PREVIEW OK] Resolved on attempt {attempt+1}: {key}", flush=True)
+                    break
+            if html_bytes:
+                break
+            if attempt == 0:
+                print(f">>> [PREVIEW WAIT] Not found, waiting 2s for R2... ({object_key})", flush=True)
+                await asyncio.sleep(2.0)
+
+        # 4. ABSOLUTE RECOVERY: list the bucket to find any home-page variant
+        if not html_bytes:
+            print(f">>> [PREVIEW RECOVERY] Bucket scan for {website_id}...", flush=True)
+            try:
+                from core.r2 import r2_client, R2_BUCKET_NAME  # correct export names
+                response = await asyncio.to_thread(
+                    r2_client.list_objects_v2,
+                    Bucket=R2_BUCKET_NAME,
+                    Prefix=f"websites/{website_id}/"
+                )
+                for obj in (response.get('Contents') or []):
+                    key = obj['Key']
+                    if any(x in key.lower() for x in ['home.html', 'index.html']):
+                        print(f">>> [PREVIEW RECOVERY] Found: {key}", flush=True)
+                        html_bytes = await asyncio.to_thread(_try_fetch, key)
+                        if html_bytes:
+                            break
+            except Exception as scan_err:
+                print(f">>> [PREVIEW RECOVERY ERR] {scan_err}", flush=True)
+
+        # 5. STILL NOTHING — return auto-refresh page with retry limit (max 10 attempts)
+        if not html_bytes:
+            print(f">>> [PREVIEW 404] All attempts exhausted: {object_key}", flush=True)
+            return (
+                "<html><body style='font-family:sans-serif;padding:40px;color:#555'>"
+                "<h2 id='msg'>\u23f3 Still generating...</h2>"
+                "<p id='sub'>Your site is being built. Retrying automatically...</p>"
+                "<button id='btn' onclick='location.reload()' style='display:none;margin-top:16px;"
+                "padding:10px 24px;background:#6366f1;color:#fff;border:none;border-radius:8px;"
+                "font-size:1rem;cursor:pointer;'>Refresh Now</button>"
+                "<script>"
+                "var key='_pgRetry_'+location.pathname;"
+                "var n=parseInt(localStorage.getItem(key)||'0')+1;"
+                "localStorage.setItem(key,n);"
+                "if(n<=10){"
+                "  document.getElementById('sub').textContent='Attempt '+n+' of 10 — retrying in 3s...';"
+                "  setTimeout(()=>location.reload(),3000);"
+                "}else{"
+                "  localStorage.removeItem(key);"
+                "  document.getElementById('msg').textContent='\u26a0\ufe0f Generation may have failed';"
+                "  document.getElementById('sub').textContent='Still generating\u2026 please refresh manually.';"
+                "  document.getElementById('btn').style.display='inline-block';"
+                "}"
+                "</script>"
+                "</body></html>",
+                200,
+                {"Content-Type": "text/html; charset=utf-8"},
+            )
+
+        html = html_bytes.decode("utf-8")
+
+        # ── Strip editor-only UI elements ──────────────────────────────
+        html = re.sub(r'<div\s+id=["\']edit-toolbar["\'][\s\S]*?</div>(\s*</div>)?', '', html, flags=re.I)
+        html = re.sub(r'<div\s+id=["\']save-bar["\'][\s\S]*?</div>',                '', html, flags=re.I)
+        html = re.sub(r'<div\s+id=["\']edit-hint-bar["\'][\s\S]*?</div>',           '', html, flags=re.I)
+        html = re.sub(r'\s*contenteditable=["\']?(true|false)?["\']?',              '', html, flags=re.I)
+
+        # ── Rewrite inter-page hrefs to absolute preview paths ─────────
+        # This is the critical fix for navigation.  Without this, clicking
+        # "Home" from contact.html resolves to a relative URL that may 404.
+        #
+        # Strategy: replace  href="<page>.html"  and  href='<page>.html'
+        # (with optional #anchor suffix) → /preview/<id>/<page>.html[#anchor]
+        # We handle all five named pages plus any .html file that lives under
+        # this website's folder.
+        BASE = f"/preview/{website_id}"
+        NAMED_PAGES = ["home", "about", "services", "portfolio", "contact"]
+        page_pattern = "|".join(re.escape(p) for p in NAMED_PAGES)
+
+        # ── ROOT CAUSE FIX: Logo href rewrite ────────────────────────────────
+        # The logo in base.html is:  <a href="home.html" class="nav-logo ...">
+        # The old regex had 4 groups where group 4 expected a closing quote
+        # IMMEDIATELY after the anchor. But the logo has class="..." after it,
+        # so "home.html" was followed by a SPACE, not a quote — the regex never
+        # matched, the href stayed as "home.html" (relative), and the browser
+        # resolved it wrong inside the iframe → 404.
+        #
+        # Fix: Use 5 groups: (href=)(quote)(page)(anchor)(close-quote)
+        # The close-quote MUST match the open-quote. This works because
+        # href="home.html" the value ends at the closing quote, regardless
+        # of what attributes come after it in the tag.
+        html = re.sub(
+            rf'(href=)(["\'])({page_pattern})\.html(#[^"\']*)?(["\'])',
+            lambda m: (
+                f'{m.group(1)}{m.group(2)}'
+                f'{BASE}/{m.group(3)}.html'
+                f'{m.group(4) or ""}'
+                f'{m.group(5)}'
+            ),
+            html,
+            flags=re.IGNORECASE,
+        )
+
+        return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+    except Exception as e:
+        print(f">>> [PREVIEW ERR] {e}", flush=True)
+        traceback.print_exc()
+        return "Internal Proxy Error", 500
+
+
+@app.route('/save', methods=['POST'])
+@require_auth
+async def save_html():
+    try:
+        data = request.get_json()
+        website_id = data.get('website_id')
+        html = data.get('html')
+        page_name = data.get('page_name', 'home.html')
+        
+        if not website_id or not html:
+            return jsonify({"error": "Missing data"}), 400
+            
+        # Overwrite the specific page in R2 instantly
+        await asyncio.to_thread(
+            upload_media_to_r2,
+            html.encode('utf-8'), 
+            "text/html",
+            folder=f"websites/{website_id}",
+            filename=page_name
+        )
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f">>> [SAVE ERR] {e}", flush=True)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/upload-image', methods=['POST'])
+@require_auth
+async def editor_upload_image():
+    try:
+        file = request.files.get('image')
+        website_id = request.form.get('website_id')
+        if not file or not website_id:
+            return jsonify({"error": "Missing file or website_id"}), 400
+            
+        file_bytes = file.read()
+        url = upload_media_to_r2(
+            file_bytes,
+            file.mimetype,
+            folder=f"websites/{website_id}/assets"
+        )
+        return jsonify({"url": url})
+    except Exception as e:
+        print(f">>> [UPLOAD ERR] {e}", flush=True)
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/download/<website_id>')
-async def download_website(website_id):
-    folder = os.path.join(app.config['GENERATED_FOLDER'], website_id)
-    if os.path.exists(folder):
-        return send_file(
-            os.path.join(folder, "home.html"),
-            as_attachment=True,
-            download_name=f"website_{website_id}.html",
-            mimetype="text/html"
+@require_auth
+async def download_from_r2(website_id):
+    """
+    Production-grade website download endpoint.
+
+    Produces a fully self-contained ZIP that works 100% offline:
+      1. Fetches every HTML page from R2.
+      2. Scans HTML for ALL R2-hosted image URLs.
+      3. Downloads each image from R2, compresses it (WebP, max 1920px wide,
+         quality 82) to keep the ZIP size manageable.
+      4. Stores images at  assets/<filename>.webp  inside the ZIP.
+      5. Rewrites every R2 URL in the HTML to the matching relative path.
+      6. Strips all editor artefacts (toolbars, data-* attrs, eb-* classes).
+      7. Re-wires navigation so all inter-page links work offline.
+
+    Edge-cases handled:
+      • Image already fetched (deduplication via asset_map dict).
+      • Image fetch failure (skipped, original URL kept so the page still loads
+        via CDN if online).
+      • Corrupt / non-image bytes from R2 (caught, original URL preserved).
+      • R2_PUBLIC_URL trailing slash variants.
+      • Logo + portfolio + hero + about images all captured by a single regex.
+      • Pages not in R2 (optional sections) silently skipped.
+      • DB row missing (falls back to a sensible default page list).
+    """
+    import io
+    import zipfile
+    import posixpath
+    import urllib.parse
+
+    # Normalise the base URL so we can build object keys from full URLs
+    base_url = (R2_PUBLIC_URL or "").rstrip("/")
+
+    # ------------------------------------------------------------------
+    # Helper — compress image bytes with Pillow
+    # ------------------------------------------------------------------
+    def compress_image(raw_bytes: bytes, max_width: int = 1920, quality: int = 82) -> bytes:
+        """
+        Convert any image to WebP, scale down if wider than max_width.
+        Returns compressed bytes, or original raw_bytes if anything fails.
+        """
+        try:
+            img = Image.open(io.BytesIO(raw_bytes))
+            # Drop alpha for JPEG-like formats
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGBA")
+            else:
+                img = img.convert("RGB")
+            # Downscale only if needed
+            if img.width > max_width:
+                ratio = max_width / img.width
+                img = img.resize(
+                    (max_width, int(img.height * ratio)),
+                    Image.LANCZOS
+                )
+            out = io.BytesIO()
+            img.save(out, format="WEBP", quality=quality, method=4)
+            return out.getvalue()
+        except Exception as compress_err:
+            print(f">>> [ZIP IMG COMPRESS WARN] {compress_err}", flush=True)
+            return raw_bytes  # fall back to original bytes
+
+    # ------------------------------------------------------------------
+    # ── VALIDATION ──
+    try:
+        w_uuid = pyuuid.UUID(website_id)
+    except Exception:
+        return jsonify({"error": "Invalid website ID format."}), 400
+
+    # Helper — extract object_key from a full R2 URL
+    def url_to_object_key(url: str) -> str | None:
+        """
+        Given  https://pub.r2.dev/websites/<id>/assets/hero.jpg
+        returns              websites/<id>/assets/hero.jpg
+        """
+        if not base_url:
+            return None
+        url = url.strip()
+        if url.startswith(base_url):
+            return url[len(base_url):].lstrip("/")
+        # Handle URL-encoded variants
+        decoded = urllib.parse.unquote(url)
+        if decoded.startswith(base_url):
+            return decoded[len(base_url):].lstrip("/")
+        return None
+
+    try:
+        # ── 1. Resolve page list from DB ──────────────────────────────
+        saved_layout = await get_website_layout(website_id)
+
+        pages_to_zip = ["home", "about", "services", "portfolio", "contact"]
+        if saved_layout:
+            pages_to_zip = list(dict.fromkeys(pages_to_zip + saved_layout))  # preserve order, deduplicate
+
+        # ── 2. Collect all HTML pages from R2 ─────────────────────────
+        # Map:  page_slug  →  (zip_entry_name, raw_html_string)
+        page_htmls: dict[str, tuple[str, str]] = {}
+        for page in pages_to_zip:
+            filename   = f"{page}.html"
+            object_key = f"websites/{website_id}/{filename}"
+            try:
+                html_bytes = await asyncio.to_thread(fetch_media_from_r2, object_key)
+                if not html_bytes:
+                    continue
+                zip_name = "index.html" if page == "home" else filename
+                page_htmls[page] = (zip_name, html_bytes.decode("utf-8"))
+                print(f">>> [ZIP] Fetched from R2: {filename}", flush=True)
+            except Exception as fetch_err:
+                print(f">>> [ZIP SKIP] {page}: {fetch_err}", flush=True)
+
+        if not page_htmls:
+            return jsonify({"error": "No website pages found for this ID."}), 404
+
+        missing_pages = [f"{p}.html" for p in pages_to_zip if p not in page_htmls]
+
+        # ── 3. Discover ALL R2 image URLs across every page ───────────
+        # Matches  src="..."  and  url("...")  or  url('...')  in inline CSS
+        IMG_SRC_PATTERN = re.compile(
+            r'(?:src=["\']|url\(["\']?)(' + re.escape(base_url) + r'/[^"\')\s>]+)',
+            re.IGNORECASE
         )
-    return "Website not found", 404
+
+        # asset_map:  original_r2_url  →  relative path inside ZIP  (e.g. "assets/hero.webp")
+        asset_map: dict[str, str] = {}
+        # asset_bytes:  relative path  →  compressed bytes
+        asset_bytes_map: dict[str, bytes] = {}
+
+        all_html_combined = "\n".join(html for _, html in page_htmls.values())
+        seen_urls = set(IMG_SRC_PATTERN.findall(all_html_combined))
+
+        print(f">>> [ZIP] Discovered {len(seen_urls)} unique R2 asset URLs", flush=True)
+
+        # ── 4. Download + compress each image ─────────────────────────
+        for r2_url in seen_urls:
+            object_key = url_to_object_key(r2_url)
+            if not object_key:
+                continue
+
+            # Derive a safe local filename (preserving the original extension
+            # so we can detect non-images quickly, but output is always .webp)
+            original_filename = posixpath.basename(object_key)
+            # Strip query strings if any
+            original_filename = original_filename.split("?")[0]
+            stem = posixpath.splitext(original_filename)[0]
+            local_name = f"assets/{stem}.webp"
+
+            # Skip formats that clearly aren't raster images (SVG, fonts, etc.)
+            lower_key = object_key.lower()
+            if any(lower_key.endswith(ext) for ext in (".svg", ".woff", ".woff2", ".ttf", ".eot", ".otf", ".mp4", ".webm")):
+                # Keep as-is — copy the original bytes without compression
+                try:
+                    raw = await asyncio.to_thread(fetch_media_from_r2, object_key)
+                    if raw:
+                        no_compress_name = f"assets/{original_filename}"
+                        asset_map[r2_url]             = no_compress_name
+                        asset_bytes_map[no_compress_name] = raw
+                        print(f">>> [ZIP] Asset (no-compress): {no_compress_name}", flush=True)
+                except Exception as nc_err:
+                    print(f">>> [ZIP ASSET SKIP] {object_key}: {nc_err}", flush=True)
+                continue
+
+            # Raster image — download and compress
+            try:
+                raw = await asyncio.to_thread(fetch_media_from_r2, object_key)
+                if not raw:
+                    print(f">>> [ZIP ASSET EMPTY] {object_key}", flush=True)
+                    continue
+                compressed = await asyncio.to_thread(compress_image, raw)
+                asset_map[r2_url]         = local_name
+                asset_bytes_map[local_name] = compressed
+                saving_pct = round((1 - len(compressed) / len(raw)) * 100) if len(raw) else 0
+                print(
+                    f">>> [ZIP] Asset compressed: {local_name} "
+                    f"({len(raw)//1024}KB → {len(compressed)//1024}KB, -{saving_pct}%)",
+                    flush=True
+                )
+            except Exception as img_err:
+                # Non-fatal: leave original URL in HTML so it still works online
+                print(f">>> [ZIP ASSET FAIL] {object_key}: {img_err}", flush=True)
+
+        # ── 5. Build the ZIP ──────────────────────────────────────────
+        memory_zip = io.BytesIO()
+        with zipfile.ZipFile(memory_zip, "w", zipfile.ZIP_DEFLATED) as zf:
+
+            # 5a. Write assets
+            for local_path, data in asset_bytes_map.items():
+                zf.writestr(local_path, data)
+
+            # 5b. Process and write each HTML page
+            for page, (zip_name, html) in page_htmls.items():
+
+                # ── CLEANING ──
+                # Remove editor UI components
+                html = re.sub(r'<div\s+id="edit-toolbar"[\s\S]*?</div>\s*</div>', '', html)
+                html = re.sub(r'<div\s+id="save-bar"[\s\S]*?</div>',             '', html)
+                html = re.sub(r'<div\s+id="save-indicator"[\s\S]*?</div>',        '', html)
+                html = re.sub(r'<div\s+id="edit-hint-bar"[\s\S]*?</div>',         '', html)
+
+                # Strip editor markers and data attributes
+                html = re.sub(r'\s*contenteditable="true"',          '', html)
+                html = re.sub(r'\s*data-[a-zA-Z0-9_\-]+="[^"]*"',   '', html)
+
+                # --- Dead Link Auto-Scrubber ---
+                for missing in missing_pages:
+                    html = re.sub(rf'<a[^>]*href=["\']{missing}(#[^"\']*)?["\'][^>]*>.*?</a>', '', html, flags=re.IGNORECASE)
+                # -------------------------------
+
+                # Remove ONLY eb-* classes, keep all structural classes intact
+                def _clean_eb(m):
+                    sp     = m.group(1)
+                    kept   = [c for c in m.group(2).split() if not c.startswith("eb-")]
+                    return f'{sp}class="{" ".join(kept)}"' if kept else sp
+
+                html = re.sub(r'(\s*)class="([^"]*\beb-[^"]*)"', _clean_eb, html)
+
+                # ── Strip ALL editor-only JavaScript ────────────────────────
+                # 1. Remove SortableJS CDN <script> tag
+                html = re.sub(
+                    r'<script[^>]*sortablejs[^>]*>\s*</script>',
+                    '', html, flags=re.IGNORECASE
+                )
+
+                # 2. Remove the `new Sortable(...)` call block.
+                #    This block lives inside a DOMContentLoaded listener and
+                #    calls Sortable which no longer exists — causing a ReferenceError.
+                #    We strip it out safely without breaking {}, leaving the wrapper intact.
+                html = re.sub(r'new\s+Sortable\([^,]+,\s*\{[\s\S]*?\}\s*\)\s*;', '', html, flags=re.IGNORECASE)
+
+                # 3. Remove initImageDropZones() call (editor-only function)
+                html = html.replace('initImageDropZones();', '')
+
+                # 5. Remove showSaveIndicator() calls (editor-only function)
+                html = html.replace('showSaveIndicator();', '')
+
+                # ── URL REWRITING ──
+                # Replace every known R2 image URL with its local relative path
+                for r2_url, local_rel in asset_map.items():
+                    # Escape for use inside regex  (URLs may contain dots, slashes etc.)
+                    html = html.replace(r2_url, local_rel)
+
+                # Strip any remaining absolute preview paths → relative
+                html = re.sub(fr'/preview/{re.escape(website_id)}/', '', html)
+
+                # ── NAVIGATION RE-WIRING ────────────────────────────────────
+                # home.html must become index.html everywhere — this covers:
+                #   • href="home.html"          (double quote, nav link)
+                #   • href='home.html'          (single quote, Jinja output)
+                #   • href="home.html#stats"    (with anchor, sections like faq/stats/pricing)
+                #   • href='home.html#testimonials'
+                #   • Any occurrence in footer links, logo hrefs, etc.
+                html = re.sub(
+                    r'href=(["\'])home\.html(#[^"\']*)?(["\'])',
+                    lambda m: f'href={m.group(1)}index.html{m.group(2) or ""}{m.group(1)}',
+                    html,
+                    flags=re.IGNORECASE,
+                )
+
+                zf.writestr(zip_name, html)
+                print(f">>> [ZIP] Written: {zip_name}", flush=True)
+
+        # ── 6. Stream the ZIP to the client ──────────────────────────
+        memory_zip.seek(0)
+        total_kb = memory_zip.getbuffer().nbytes // 1024
+        print(f">>> [ZIP] Complete — {total_kb} KB | assets={len(asset_bytes_map)} | pages={len(page_htmls)}", flush=True)
+        return send_file(
+            memory_zip,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=f"website_{website_id}.zip",
+        )
+
+    except Exception as e:
+        print(f">>> [DOWNLOAD CRITICAL] {e}", flush=True)
+        traceback.print_exc()
+        return jsonify({"error": "Failed to prepare download. Please try again."}), 500
 
 
-@app.route('/list-websites')
+@app.route('/deploy/<website_id>', methods=['POST'])
+@require_auth
+async def deploy_to_vercel(website_id):
+    """
+    Deploys the generated site directly to Vercel via CLI.
+    Creates a temporary folder, writes all HTML and assets,
+    injects vercel.json, then runs the Vercel CLI to deploy automatically.
+    """
+    import io
+    import os
+    import re
+    import json
+    import tempfile
+    import shutil
+    import asyncio
+    import traceback
+    import urllib.parse
+    import uuid
+    from sqlalchemy import select
+
+    vercel_token = os.getenv("VERCEL_TOKEN")
+    if not vercel_token:
+        return jsonify({"error": "VERCEL_TOKEN environment variable is not configured."}), 500
+
+    base_url = (R2_PUBLIC_URL or "").rstrip("/")
+
+    # Compress helper
+    def compress_image(raw_bytes: bytes, max_width: int = 1920, quality: int = 82) -> bytes:
+        try:
+            img = Image.open(io.BytesIO(raw_bytes))
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGBA")
+            else:
+                img = img.convert("RGB")
+            if img.width > max_width:
+                ratio = max_width / img.width
+                img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
+            out = io.BytesIO()
+            img.save(out, format="WEBP", quality=quality, method=4)
+            return out.getvalue()
+        except Exception:
+            return raw_bytes
+
+    def url_to_object_key(url: str) -> str | None:
+        if not base_url: return None
+        url = url.strip()
+        if url.startswith(base_url): return url[len(base_url):].lstrip("/")
+        decoded = urllib.parse.unquote(url)
+        if decoded.startswith(base_url): return decoded[len(base_url):].lstrip("/")
+        return None
+
+    tmp_dir = tempfile.mkdtemp(prefix=f"deploy_{website_id[:8]}_")
+    try:
+        # 1. Resolve page list
+        saved_layout = await get_website_layout(website_id)
+
+        pages_to_build = ["home", "about", "services", "portfolio", "contact"]
+        if saved_layout:
+            pages_to_build = list(dict.fromkeys(pages_to_build + saved_layout))
+
+        # 2. Collect HTML
+        page_htmls = {}
+        for page in pages_to_build:
+            filename   = f"{page}.html"
+            object_key = f"websites/{website_id}/{filename}"
+            try:
+                html_bytes = await asyncio.to_thread(fetch_media_from_r2, object_key)
+                if not html_bytes: continue
+                out_name = "index.html" if page == "home" else filename
+                page_htmls[page] = (out_name, html_bytes.decode("utf-8"))
+            except Exception:
+                pass
+
+        if not page_htmls:
+            raise Exception("No website pages found for deployment.")
+
+        missing_pages = [f"{p}.html" for p in pages_to_build if p not in page_htmls]
+
+        # 3. Discover Images
+        IMG_SRC_PATTERN = re.compile(r'(?:src=["\']|url\(["\']?)(' + re.escape(base_url) + r'/[^"\')\s>]+)', re.IGNORECASE)
+        all_r2_urls = set()
+        for _, (_, html) in page_htmls.items():
+            matches = IMG_SRC_PATTERN.findall(html)
+            all_r2_urls.update(matches)
+
+        # 4. Fetch & Compress Images
+        asset_map, asset_bytes_map = {}, {}
+        for r2_url in all_r2_urls:
+            object_key = url_to_object_key(r2_url)
+            if not object_key: continue
+            local_name = f"assets/{object_key.split('/')[-1].split('?')[0]}"
+            if not local_name.lower().endswith('.webp'):
+                local_name = local_name.rsplit('.', 1)[0] + ".webp"
+            
+            try:
+                raw = await asyncio.to_thread(fetch_media_from_r2, object_key)
+                if not raw: continue
+                compressed = await asyncio.to_thread(compress_image, raw)
+                asset_map[r2_url] = local_name
+                asset_bytes_map[local_name] = compressed
+            except Exception:
+                pass
+
+        # 5. Build into Temp Folder
+        assets_dir = os.path.join(tmp_dir, "assets")
+        os.makedirs(assets_dir, exist_ok=True)
+        
+        for local_path, data in asset_bytes_map.items():
+            with open(os.path.join(tmp_dir, local_path), 'wb') as f:
+                f.write(data)
+
+        for page, (out_name, html) in page_htmls.items():
+            # Clean HTML exactly like download route
+            html = re.sub(r'<div\s+id="edit-toolbar"[\s\S]*?</div>\s*</div>', '', html)
+            html = re.sub(r'<div\s+id="save-bar"[\s\S]*?</div>', '', html)
+
+            # --- Dead Link Auto-Scrubber ---
+            for missing in missing_pages:
+                html = re.sub(rf'<a[^>]*href=["\']{missing}(#[^"\']*)?["\'][^>]*>.*?</a>', '', html, flags=re.IGNORECASE)
+            # -------------------------------
+            html = re.sub(r'<div\s+id="save-indicator"[\s\S]*?</div>', '', html)
+            html = re.sub(r'<div\s+id="edit-hint-bar"[\s\S]*?</div>', '', html)
+            html = re.sub(r'\s*contenteditable="true"', '', html)
+            html = re.sub(r'\s*data-[a-zA-Z0-9_\-]+="[^"]*"', '', html)
+
+            def _clean_eb(m):
+                sp = m.group(1)
+                kept = [c for c in m.group(2).split() if not c.startswith("eb-")]
+                return f'{sp}class="{" ".join(kept)}"' if kept else sp
+
+            html = re.sub(r'(\s*)class="([^"]*\beb-[^"]*)"', _clean_eb, html)
+            
+            # --- BACKWARDS COMPATIBILITY FIXES FOR OLD SITES ---
+            # Remove legacy white-wash gradient
+            html = html.replace('linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.92)), ', '')
+            html = html.replace('linear-gradient(var(--nav-bg), var(--nav-bg)), ', '')
+            
+            # Dynamically inject the new cinematic overlay style to old about-landing / about-sections
+            if '<style' in html:
+                html = html.replace('</style>', 
+                '''    .about-landing, .about-section { position: relative; overflow: hidden; }
+    .about-landing::before, .about-section::before {
+        content: ''; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(135deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.72) 100%);
+        z-index: 1;
+    }
+    .about-landing, .about-landing *, .about-section, .about-section * { color: #fff !important; }
+    .about-grid { position: relative; z-index: 2; }
+</style>''')
+            # ---------------------------------------------------
+
+            html = re.sub(r'<script[^>]*sortablejs[^>]*>\s*</script>', '', html, flags=re.IGNORECASE)
+            html = re.sub(r'new\s+Sortable\([^,]+,\s*\{[\s\S]*?\}\s*\)\s*;', '', html, flags=re.IGNORECASE)
+            html = html.replace('initImageDropZones();', '')
+            html = html.replace('showSaveIndicator();', '')
+
+            for r2_url, local_rel in asset_map.items():
+                html = html.replace(r2_url, local_rel)
+
+            html = re.sub(fr'/preview/{re.escape(website_id)}/', '', html)
+            html = re.sub(
+                r'href=(["\'])home\.html(#[^"\']*)?(["\'])',
+                lambda m: f'href={m.group(1)}index.html{m.group(2) or ""}{m.group(1)}',
+                html, flags=re.IGNORECASE
+            )
+
+            with open(os.path.join(tmp_dir, out_name), 'w', encoding='utf-8') as f:
+                f.write(html)
+
+        # Write vercel.json
+        safe_id = website_id.replace('-', '')
+        vercel_json = { "name": f"pomeli-site-{safe_id[:12]}" }
+        with open(os.path.join(tmp_dir, 'vercel.json'), 'w') as f:
+            json.dump(vercel_json, f)
+
+        # 6. Run Vercel Deploy via Subprocess
+        print(f">>> [DEPLOY] Running Vercel CLI in {tmp_dir}", flush=True)
+        cmd = 'npx.cmd' if os.name == 'nt' else 'npx'
+        
+        process = await asyncio.create_subprocess_exec(
+            cmd, '--yes', 'vercel', 'deploy', '--prod', '--yes', '--token', vercel_token,
+            cwd=tmp_dir,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout_bytes, stderr_bytes = await process.communicate()
+        out_str = stdout_bytes.decode('utf-8')
+        err_str = stderr_bytes.decode('utf-8')
+        
+        if process.returncode != 0:
+            print(f">>> [DEPLOY FAIL] {err_str}", flush=True)
+            return jsonify({"error": "Vercel CLI failed", "details": err_str}), 500
+            
+        print(f">>> [DEPLOY OK] stdout: {out_str}", flush=True)
+        
+        # 7. EXTRACT URL (Robust multi-pattern regex)
+        # We search for the standard .vercel.app link, including potential hyphens/underscores
+        deploy_pattern = re.compile(r'https://[a-zA-Z0-9\-\._]+\.vercel\.app', re.IGNORECASE)
+        urls = deploy_pattern.findall(out_str + err_str)
+        
+        if urls:
+            # Vercel often outputs multiple URLs (preview, inspect, etc.)
+            # We want the last actual deployment URL found in the stream.
+            final_url = urls[-1]
+            print(f">>> [DEPLOY DISCOVERY] Captured URL: {final_url}", flush=True)
+            return jsonify({"success": True, "url": final_url})
+        else:
+            # Fallback: Log everything for debugging but attempt a generic failure message
+            print(f">>> [DEPLOY PARSE FAIL] Full Output Context:\n{out_str}\n{err_str}", flush=True)
+            return jsonify({
+                "error": "Site successfully deployed to Vercel, but the automatic link-capture failed. Please check your Vercel Dashboard.", 
+                "details": "Regex failed to find .vercel.app in CLI output"
+            }), 500
+
+    except Exception as e:
+        print(f">>> [DEPLOY CRITICAL] {e}", flush=True)
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        # 8. Cleanup temp folder (always executes)
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        print(f">>> [DEPLOY CLEANUP] Removed {tmp_dir}", flush=True)
+
 @require_auth
 async def list_websites():
     websites = []
@@ -822,7 +1947,6 @@ async def list_websites():
     return jsonify(websites)
  
 @app.route('/save-and-build', methods=['POST'])
-@require_auth
 async def save_and_build():
     from flask import request
     data = request.json
@@ -835,6 +1959,186 @@ async def save_and_build():
     return jsonify({"success": True})
 
 
+# ---------------------------------------------------------------------------
+# CHAT-EDIT HELPERS
+# ---------------------------------------------------------------------------
+
+async def re_render_website(website_id: str, ctx: dict) -> str:
+    """Re-renders home.html from updated context and saves to disk.  Returns preview_url."""
+    data   = ctx["data"]
+    layout = ctx["layout"]
+    theme  = ctx["theme"]
+
+    base_ctx = dict(
+        site_name=ctx["site_name"], site_title=ctx["site_title"],
+        tagline=ctx["tagline"], theme=theme, footer=ctx["footer"],
+        layout=layout, image_map=ctx["image_map"],
+        image_count=len(ctx["image_context"]),
+        has_images=(len(ctx["image_context"]) > 0),
+        logo=ctx["logo"]
+    )
+    home_html = render_template(
+        "home.html", **base_ctx,
+        home=data.get("home", {}),
+        about=data.get("about", {}),
+        services=data.get("services", []),
+        portfolio=data.get("portfolio", []),
+        testimonials=data.get("testimonials", []),
+        faq=data.get("faq", []),
+        pricing=data.get("pricing", []),
+        stats=data.get("stats", []),
+        contact=data.get("contact", {}),
+        images=ctx["image_context"],
+    )
+    folder = ctx["website_folder"]
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, "home.html"), "w", encoding="utf-8") as f:
+        f.write(home_html)
+    
+    # Re-upload to R2
+    await asyncio.to_thread(
+        upload_media_to_r2,
+        home_html.encode('utf-8'),
+        "text/html",
+        folder=f"websites/{website_id}",
+        filename="home.html"
+    )
+
+    # Update the MongoDB with the new layout
+    try:
+        await update_website_layout(website_id, layout)
+    except Exception as e:
+        print(f">>> [DB UPDATE ERR] Could not update layout in MongoDB for {website_id}: {e}", flush=True)
+
+    return f"/preview/{website_id}/home.html"
+
+
+async def generate_section_content(ctx: dict, section_name: str) -> dict:
+    """Calls AI to generate content for a single new section that wasn't in the original generation."""
+    model = genai.GenerativeModel(
+        "gemini-3.1-flash-image-preview",
+        system_instruction=system_prompt
+    )
+    industry_label = INDUSTRY_TEMPLATES.get(ctx.get("industry", ""), {}).get("label", "general")
+    section_prompt = f"""
+Business: {ctx['prompt']}
+Industry: {industry_label}
+
+Generate ONLY the '{section_name}' section content for this website.
+Return ONLY valid JSON matching one of these schemas:
+
+- services: [{{'icon':'emoji','title':'str','desc':'str'}}] (exactly 4 items)
+- faq:       [{{'q':'str','a':'str'}}] (4–6 items)
+- pricing:   [{{'name':'str','price':'str','period':'str','features':['str'],'cta':'str','highlighted':bool}}] (2–3 tiers)
+- testimonials: [{{'name':'str','role':'str','quote':'str','stars':5}}] (3 items)
+- stats:     [{{'value':'str','label':'str'}}] (4 items)
+- portfolio: [{{'tag':'str','title':'str','description':'str','client':'str','outcome':'str'}}] (3 items)
+- about:     {{'headline':'str','body':'str','values':[{{'icon':'emoji','title':'str','desc':'str'}}]}}
+
+Return ONLY the JSON array or object for '{section_name}'. NO other text.
+"""
+    response = await asyncio.to_thread(
+        model.generate_content, section_prompt,
+        generation_config={"temperature": 0.7, "max_output_tokens": 1500}
+    )
+    text = response.text.strip()
+    text = re.sub(r'^```[a-z]*\n?', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\n?```$', '', text, flags=re.MULTILINE).strip()
+    try:
+        parsed = json.loads(text)
+        return {section_name: parsed}
+    except Exception:
+        return {}
+
+
+# ---------------------------------------------------------------------------
+# /chat-edit  — AI-powered live editing of generated websites
+# ---------------------------------------------------------------------------
+@app.route('/chat-edit', methods=['POST'])
+@require_auth
+@require_credits(1)
+async def chat_edit():
+    if not ENABLE_CHAT_EDIT:
+        return jsonify({"error": "Feature disabled in Phase 1", "status": "disabled"}), 403
+
+    try:
+        payload      = request.get_json()
+        website_id   = payload.get('website_id', '')
+        instruction  = payload.get('instruction', '').strip()
+        current_html = payload.get('html', '').strip()
+        page_name    = payload.get('page_name', 'home.html')
+
+        if not website_id or not instruction or not current_html:
+            return jsonify({'error': 'website_id, instruction, and current html are required'}), 400
+
+        # Save user message for audit
+        try:
+            await insert_chat_message(website_id, 'user', instruction)
+        except: pass
+
+        # ─── AI modifies the FULL HTML ───
+        edit_model = genai.GenerativeModel("gemini-3.1-flash-image-preview")
+        edit_prompt = f"""You are an expert web developer AI. 
+Modify the following HTML based on the user's instruction.
+Return the COMPLETE, UPDATED HTML. No explanations. No markdown formatting.
+
+USER INSTRUCTION: "{instruction}"
+
+CURRENT HTML:
+{current_html}
+"""
+
+        response = await asyncio.to_thread(
+            edit_model.generate_content,
+            edit_prompt,
+            generation_config={"temperature": 0.2}
+        )
+        
+        updated_html = response.text.strip()
+        # Clean AI markdown if any
+        updated_html = re.sub(r'^```[a-z]*\n?', '', updated_html, flags=re.MULTILINE)
+        updated_html = re.sub(r'\n?```$', '', updated_html, flags=re.MULTILINE).strip()
+
+        # ─── 8. CREDIT DEDUCTION (Charge only on success) ───
+        credit_result = await website_credits_debits({
+            "type": "USAGE",
+            "userId": g.user_id,
+            "amount": -1,  # Deduct 1 credit per AI edit
+            "resourceType": "chat_edit",
+            "resourceId": website_id,
+            "jobId": str(uuid.uuid4()),
+            "description": f"AI Chat Edit for website {website_id}",
+        })
+
+        if not credit_result.get("success"):
+            print(f">>> [CREDIT ERR] Failed to deduct credits for chat-edit: {credit_result.get('error')}", flush=True)
+            return jsonify({
+                "error": credit_result.get("error", "FAILED_TO_DEDUCT_CREDITS")
+            }), 402
+
+        # Save assistant message
+        try:
+            await insert_chat_message(website_id, 'assistant', "I've updated the website based on your instructions.")
+        except: pass
+
+        return jsonify({
+            'success': True,
+            'html': updated_html,
+            'summary': "Website updated successfully"
+        })
+
+    except Exception as e:
+        print(f">>> [CHAT-EDIT ERR] {e}", flush=True)
+        return jsonify({'error': str(e)}), 500
+
+    except json.JSONDecodeError:
+        return jsonify({'error': 'AI could not understand that instruction. Try rephrasing it.'}), 400
+    except Exception as e:
+        print(f">>> [CHAT-EDIT ERR] {e}", flush=True)
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == "__main__":
     print("--- SERVER STARTING ON PORT 5077 ---", flush=True)
-    app.run(debug=True, port=5077, use_reloader=False)
+    app.run(debug=True, port=5077, use_reloader=False)

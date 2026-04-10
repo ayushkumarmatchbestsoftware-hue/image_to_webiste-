@@ -1,0 +1,29 @@
+# ── Test & temp uploads (copied to R2, never needed in image) ──
+static/uploads/*
+!static/uploads/.gitkeep
+static/generated/*
+!static/generated/.gitkeep
+
+# ── Python cache ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# ── Environment & secrets (injected at runtime via .env / docker env) ──
+.env
+
+# ── Git metadata ──
+.git/
+.gitignore
+
+# ── Editor & OS artifacts ──
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# ── Docker files themselves ──
+Dockerfile
+docker-compose.yml
+.dockerignore

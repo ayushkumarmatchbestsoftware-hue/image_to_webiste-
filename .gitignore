@@ -10,3 +10,26 @@ static/uploads/*
 !static/uploads/.gitkeep
 static/generated/*
 !static/generated/.gitkeep
+
+# Local test UI — not for production; frontend team builds their own
+templates/index_local_test.html
+
+# Test scripts and test directories
+tests/
+test_*.py
+*_test.py
+generate_test_token.py
+*test*.py
+
+# Local testing output & logs
+models_check.txt
+models_raw.txt
+output_models.txt
+vercel_out.html
+*.html
+
+# Internal documentation (not for production codebase)
+R_AND_D.md
+FLOW_OVERVIEW.md
+FRONTEND_DEVELOPMENT_GUIDE.*
+PRODUCT_REQUIREMENTS_DOCUMENT.*
