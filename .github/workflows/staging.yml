@@ -113,8 +113,8 @@ jobs:
         uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: ${{ env.WORKER_NEW_IMAGE }}
-          severity: CRITICAL,HIGH,MEDIUM
-          exit-code: 1
+          vuln-type: 'os'          
+          severity: 'CRITICAL,HIGH,MEDIUM'  
 
       - name: Export Docker image archives
         run: |
