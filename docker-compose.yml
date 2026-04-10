@@ -1,6 +1,8 @@
 services:
   web:
-    build: .
+    image: ${WEB_NEW_IMAGE}
+    container_name: flask-app-web-staging
+    restart: always
     ports:
       - "5077:5000"
     env_file:
@@ -12,7 +14,9 @@ services:
       - cloudflare_net
 
   worker:
-    build: .
+    image: ${WORKER_NEW_IMAGE}
+    container_name: flask-app-worker-staging
+    restart: always
     env_file:
       - .env
     command: ["python", "worker.py"]
