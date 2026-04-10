@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir redis sqlalchemy boto3 asgiref
 COPY . .
 
 # Expose port (as seen in app.py main block)
-EXPOSE 5077
+EXPOSE 5000
 
 # Set environment variables for Flask
 ENV FLASK_APP=app.py
