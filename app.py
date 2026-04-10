@@ -8,7 +8,7 @@ import logging
 import traceback
 from flask import Flask, render_template, request, jsonify, send_file, g
 from werkzeug.utils import secure_filename
-import google.generativeai as genai
+from google import genai
 from PIL import Image
 from config import Config
 import uuid as pyuuid
@@ -101,7 +101,8 @@ def require_auth(f):
         return await f(*args, **kwargs)
     return decorated_function
 
-genai.configure(api_key=app.config['GEMINI_API_KEY'])
+# Initialize the new Google GenAI client (supports Protobuf 5.x)
+genai_client = genai.Client(api_key=app.config['GEMINI_API_KEY'])
 
 MAX_IMAGES = app.config["MAX_IMAGES"]
 
@@ -555,11 +556,6 @@ Return ONLY valid JSON. No markdown fences. No text outside JSON.
 13. BACKGROUNDS: If no images are provided, select professional Unsplash IDs for 'hero_bg_id' and 'about_bg_id'. Choose high-end architectural, nature, or abstract textures that complement the business niche. NO generic stock photos.
 """
 
-model = genai.GenerativeModel(
-    "gemini-3.1-flash-image-preview",
-    system_instruction=system_prompt
-)
-
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['GENERATED_FOLDER'], exist_ok=True)
 
@@ -708,12 +704,9 @@ BANNED WORDS: cheap, discount, affordable, budget, scalable.""",
 
 
 async def generate_website_content(prompt, image_paths=None, image_count=0, industry=None):
-    # (Model initialization moved inside generate_website_content to avoid event loop issues)
-    model = genai.GenerativeModel(
-        "gemini-3.1-flash-image-preview",
-        system_instruction=system_prompt
-    )
     try:
+        # The new SDK uses the client.models.generate_content interface
+        # We use gemini-1.5-flash for stable, production-grade generation.
         fallback = get_fallback_tokens(prompt)
         layout   = get_layout_blueprint(prompt)
 
@@ -772,14 +765,19 @@ CRITICAL RULES for Copy:
                 except Exception as e:
                     print(f">>> [IMG ERR] {path}: {str(e)}", flush=True)
 
-        print(f">>> [AI START] Model: {model.model_name} | Images: {image_count}", flush=True)
+        print(f">>> [AI START] Model: gemini-3.1-flash-image-preview | Images: {image_count}", flush=True)
         
         # Using asyncio.to_thread with the synchronous generate_content method
         # for better stability and to avoid "Event loop is closed" errors with gRPC.
         response = await asyncio.to_thread(
-            model.generate_content,
-            content_parts,
-            generation_config={"temperature": 0.85, "max_output_tokens": 4000}
+            genai_client.models.generate_content,
+            model="gemini-3.1-flash-image-preview",
+            contents=content_parts,
+            config={
+                "system_instruction": system_prompt,
+                "temperature": 0.85, 
+                "max_output_tokens": 4000
+            }
         )
 
         if not response:
@@ -2015,10 +2013,7 @@ async def re_render_website(website_id: str, ctx: dict) -> str:
 
 async def generate_section_content(ctx: dict, section_name: str) -> dict:
     """Calls AI to generate content for a single new section that wasn't in the original generation."""
-    model = genai.GenerativeModel(
-        "gemini-3.1-flash-image-preview",
-        system_instruction=system_prompt
-    )
+    # The new SDK uses the Client interface
     industry_label = INDUSTRY_TEMPLATES.get(ctx.get("industry", ""), {}).get("label", "general")
     section_prompt = f"""
 Business: {ctx['prompt']}
@@ -2038,8 +2033,14 @@ Return ONLY valid JSON matching one of these schemas:
 Return ONLY the JSON array or object for '{section_name}'. NO other text.
 """
     response = await asyncio.to_thread(
-        model.generate_content, section_prompt,
-        generation_config={"temperature": 0.7, "max_output_tokens": 1500}
+        genai_client.models.generate_content, 
+        model="gemini-3.1-flash-image-preview",
+        contents=section_prompt,
+        config={
+            "system_instruction": system_prompt,
+            "temperature": 0.7, 
+            "max_output_tokens": 1500
+        }
     )
     text = response.text.strip()
     text = re.sub(r'^```[a-z]*\n?', '', text, flags=re.MULTILINE)
@@ -2076,8 +2077,7 @@ async def chat_edit():
             await insert_chat_message(website_id, 'user', instruction)
         except: pass
 
-        # ─── AI modifies the FULL HTML ───
-        edit_model = genai.GenerativeModel("gemini-3.1-flash-image-preview")
+        # ─── AI modifies the FULL HTML using new GenAI SDK ───
         edit_prompt = f"""You are an expert web developer AI. 
 Modify the following HTML based on the user's instruction.
 Return the COMPLETE, UPDATED HTML. No explanations. No markdown formatting.
@@ -2089,9 +2089,10 @@ CURRENT HTML:
 """
 
         response = await asyncio.to_thread(
-            edit_model.generate_content,
-            edit_prompt,
-            generation_config={"temperature": 0.2}
+            genai_client.models.generate_content,
+            model="gemini-3.1-flash-image-preview",
+            contents=edit_prompt,
+            config={"temperature": 0.2}
         )
         
         updated_html = response.text.strip()
