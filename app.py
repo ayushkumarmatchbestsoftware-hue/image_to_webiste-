@@ -918,8 +918,12 @@ def build_image_map(image_context: list, layout: list) -> dict:
 
 @app.route('/')
 async def index():
-    print(">>> [INDEX] Root page hit!", flush=True)
-    return render_template('index_local_test.html')
+    """Health check root route for staging and production."""
+    return jsonify({
+        "status": "online",
+        "service": "Pomeli Website Builder API",
+        "message": "Backend is running correctly."
+    }), 200
 
 
 @app.route('/generate', methods=['POST'])

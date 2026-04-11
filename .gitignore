@@ -14,7 +14,6 @@ static/generated/*
 # Local test UI — not for production; frontend team builds their own
 !/templates/**/*.html
 templates/index_local_test.html
-
 # Test scripts and test directories
 tests/
 test_*.py
