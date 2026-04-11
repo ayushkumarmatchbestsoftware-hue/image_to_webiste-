@@ -111,16 +111,28 @@ def _decode_jwt_token(token: str) -> AuthUser:
 def get_current_user_flask():
     """
     Flask helper for retrieving authenticated user from current request.
+    Supports both Authorization header and 'token' query parameter.
     """
     from flask import request
     
+    # 1. Try Authorization header (Standard API calls)
     auth_header = request.headers.get("Authorization")
-    try:
-        token = _extract_token_from_header(auth_header)
-        return _decode_jwt_token(token)
-    except ValueError as e:
-        # In a real app, you might want to log this
-        return None
+    if auth_header:
+        try:
+            token = _extract_token_from_header(auth_header)
+            return _decode_jwt_token(token)
+        except ValueError:
+            pass  # Fallback to query param
+
+    # 2. Try 'token' query parameter (Direct browser redirects/new tabs)
+    token = request.args.get("token")
+    if token:
+        try:
+            return _decode_jwt_token(token)
+        except ValueError:
+            pass
+
+    return None
 
 def get_request_user_id():
     from flask import g
