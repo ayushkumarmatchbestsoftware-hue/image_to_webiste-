@@ -101,8 +101,18 @@ def require_auth(f):
         return await f(*args, **kwargs)
     return decorated_function
 
-# Initialize the new Google GenAI client (supports Protobuf 5.x)
-genai_client = genai.Client(api_key=app.config['GEMINI_API_KEY'])
+# Initialize the new Google GenAI client with fail-safe handling
+try:
+    _api_key = app.config.get('GEMINI_API_KEY')
+    if not _api_key:
+        print(">>> [WARNING] GEMINI_API_KEY is missing! AI features will be disabled.", flush=True)
+        genai_client = None
+    else:
+        genai_client = genai.Client(api_key=_api_key)
+        print(">>> [INFO] Google GenAI client initialized successfully.", flush=True)
+except Exception as e:
+    print(f">>> [ERROR] GenAI Initialization failed: {e}", flush=True)
+    genai_client = None
 
 MAX_IMAGES = app.config["MAX_IMAGES"]
 
@@ -704,6 +714,9 @@ BANNED WORDS: cheap, discount, affordable, budget, scalable.""",
 
 
 async def generate_website_content(prompt, image_paths=None, image_count=0, industry=None):
+    if not genai_client:
+        print(">>> [ERROR] generate_website_content called but genai_client is None", flush=True)
+        return None
     try:
         # The new SDK uses the client.models.generate_content interface
         # We use gemini-1.5-flash for stable, production-grade generation.
@@ -2013,6 +2026,9 @@ async def re_render_website(website_id: str, ctx: dict) -> str:
 
 async def generate_section_content(ctx: dict, section_name: str) -> dict:
     """Calls AI to generate content for a single new section that wasn't in the original generation."""
+    if not genai_client:
+        print(">>> [ERROR] generate_section_content called but genai_client is None", flush=True)
+        return {}
     # The new SDK uses the Client interface
     industry_label = INDUSTRY_TEMPLATES.get(ctx.get("industry", ""), {}).get("label", "general")
     section_prompt = f"""
@@ -2063,6 +2079,8 @@ async def chat_edit():
         return jsonify({"error": "Feature disabled in Phase 1", "status": "disabled"}), 403
 
     try:
+        if not genai_client:
+            return jsonify({"error": "AI client not initialized (Key missing?)", "status": "error"}), 500
         payload      = request.get_json()
         website_id   = payload.get('website_id', '')
         instruction  = payload.get('instruction', '').strip()
