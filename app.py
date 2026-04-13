@@ -6,7 +6,7 @@ import asyncio
 import random
 import logging
 import traceback
-from flask import Flask, render_template, request, jsonify, send_file, g
+from flask import Flask, render_template, request, jsonify, send_file, g, make_response
 from werkzeug.utils import secure_filename
 from google import genai
 from PIL import Image
@@ -1249,10 +1249,17 @@ async def job_status(job_id: str):
 @app.route('/editor/<website_id>')
 @require_auth
 async def editor_page(website_id):
-    return render_template('editor.html', website_id=website_id, chat_enabled=ENABLE_CHAT_EDIT)
+    token = request.args.get('token')
+    response = make_response(render_template('editor.html', website_id=website_id, chat_enabled=ENABLE_CHAT_EDIT))
+    if token:
+        # Set session cookie for background API calls (/job-status, /preview)
+        response.set_cookie('auth_token', token, httponly=True, samesite='Lax')
+        print(f">>> [AUTH] Session cookie set for editor: {website_id}", flush=True)
+    return response
 
 @app.route('/preview/<website_id>/', defaults={'filename': 'home.html'})
 @app.route('/preview/<website_id>/<path:filename>')
+@require_auth
 async def preview_proxy(website_id, filename):
     """
     Serves HTML pages from R2 for in-browser preview.
