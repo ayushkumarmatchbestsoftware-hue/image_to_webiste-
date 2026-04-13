@@ -124,7 +124,15 @@ def get_current_user_flask():
         except ValueError:
             pass  # Fallback to query param
 
-    # 2. Try 'token' query parameter (Direct browser redirects/new tabs)
+    # 2. Try 'auth_token' cookie (Editor background requests)
+    token = request.cookies.get("auth_token")
+    if token:
+        try:
+            return _decode_jwt_token(token)
+        except ValueError:
+            pass
+
+    # 3. Try 'token' query parameter (Direct browser redirects/new tabs)
     token = request.args.get("token")
     if token:
         try:
