@@ -431,22 +431,32 @@
         let lastSavedHTML = null;
         let isAIGenerating = false;
 
-        const PREVIEW_URL = `/preview/${website_id}/home.html`;
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token'); 
+        const jobId = urlParams.get('job_id');
+
+        let PREVIEW_URL = `/preview/${website_id}/home.html`;
+        if (token) {
+            PREVIEW_URL += `?token=${token}`;
+        }
+
+        // Helper to get auth headers
+        function getHeaders(extraHeaders = {}) {
+            const h = { ...extraHeaders };
+            if (token) h['Authorization'] = `Bearer ${token}`;
+            return h;
+        }
 
         // --- AUTOMATIC GENERATION POLLING ---
-        // We run this immediately because the script is at the bottom of the body
-        const urlParams = new URLSearchParams(window.location.search);
-        const jobId = urlParams.get('job_id');
         const overlay = document.getElementById('generation-overlay');
         const statusLabel = document.getElementById('status-text');
 
         if (jobId) {
-            // SHOW THE OVERLAY INSTANTLY
             overlay.style.display = 'flex';
             
             async function startPolling() {
                 try {
-                    const res = await fetch(`/job-status/${jobId}`);
+                    const res = await fetch(`/job-status/${jobId}`, { headers: getHeaders() });
                     const data = await res.json();
                     
                     if (data.status === 'processing') {
@@ -575,6 +585,7 @@
             try {
                 const res = await fetch('/upload-image', {
                     method: 'POST',
+                    headers: getHeaders(),
                     body: formData
                 });
                 const data = await res.json();
@@ -616,7 +627,7 @@
             try {
                 const res = await fetch('/save', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify({ website_id, html, page_name })
                 });
                 if (res.ok) {
@@ -720,7 +731,10 @@
             addBubble('ai', "Provisioning project and deploying to Vercel... (this may take up to 30 seconds)");
             
             try {
-                const res = await fetch(`/deploy/${website_id}`, { method: 'POST' });
+                const res = await fetch(`/deploy/${website_id}`, { 
+                    method: 'POST',
+                    headers: getHeaders()
+                });
                 const data = await res.json();
                 
                 if (data.success && data.url) {
@@ -764,8 +778,9 @@
 
         async function triggerDownload() {
             const currentHTML = iframe.contentDocument.documentElement.outerHTML;
-            await performSave(currentHTML);
-            window.location.href = `/download/${website_id}`;
+            await performSave(currentHTML, getCurrentPageName());
+            const downloadUrl = `/download/${website_id}${token ? '?token='+token : ''}`;
+            window.location.href = downloadUrl;
         }
     </script>
 </body>
