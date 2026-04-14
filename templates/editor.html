@@ -414,7 +414,7 @@
             <div id="save-indicator" class="save-indicator">
                 <div class="dot"></div> Auto-saving...
             </div>
-            <iframe id="preview-iframe" src="/preview/{{ website_id }}/home.html"></iframe>
+            <iframe id="preview-iframe" src="about:blank"></iframe>
         </div>
     </div>
 
@@ -430,6 +430,8 @@
         let saveTimeout = null;
         let lastSavedHTML = null;
         let isAIGenerating = false;
+
+        const PREVIEW_URL = `/preview/${website_id}/home.html`;
 
         // --- AUTOMATIC GENERATION POLLING ---
         window.addEventListener('DOMContentLoaded', () => {
@@ -453,8 +455,8 @@
                             clearInterval(poll);
                             statusLabel.textContent = "Almost ready...";
                             
-                            // Refresh iframe to load the actual site
-                            iframe.src = iframe.src;
+                            // Load the actual site now that it exists
+                            iframe.src = PREVIEW_URL;
                             
                             // Fade out overlay
                             setTimeout(() => {
@@ -469,6 +471,9 @@
                         }
                     } catch (e) { console.error("Poll error", e); }
                 }, 2500);
+            } else {
+                // No job in progress, load existing site immediately
+                iframe.src = PREVIEW_URL;
             }
         });
 
