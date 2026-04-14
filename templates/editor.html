@@ -434,48 +434,61 @@
         const PREVIEW_URL = `/preview/${website_id}/home.html`;
 
         // --- AUTOMATIC GENERATION POLLING ---
-        window.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const jobId = urlParams.get('job_id');
-            const overlay = document.getElementById('generation-overlay');
-            const statusLabel = document.getElementById('status-text');
+        // We run this immediately because the script is at the bottom of the body
+        const urlParams = new URLSearchParams(window.location.search);
+        const jobId = urlParams.get('job_id');
+        const overlay = document.getElementById('generation-overlay');
+        const statusLabel = document.getElementById('status-text');
 
-            if (jobId) {
-                overlay.style.display = 'flex';
-                const poll = setInterval(async () => {
-                    try {
-                        const res = await fetch(`/job-status/${jobId}`);
-                        const data = await res.json();
+        if (jobId) {
+            // SHOW THE OVERLAY INSTANTLY
+            overlay.style.display = 'flex';
+            
+            async function startPolling() {
+                try {
+                    const res = await fetch(`/job-status/${jobId}`);
+                    const data = await res.json();
+                    
+                    if (data.status === 'processing') {
+                        statusLabel.textContent = "AI is writing your code and choosing styles...";
+                    }
+                    
+                    if (data.status === 'completed') {
+                        statusLabel.textContent = "Almost ready...";
+                        iframe.src = PREVIEW_URL;
                         
-                        if (data.status === 'processing') {
-                            statusLabel.textContent = "AI is writing your code and choosing styles...";
-                        }
-                        
-                        if (data.status === 'completed') {
-                            clearInterval(poll);
-                            statusLabel.textContent = "Almost ready...";
-                            
-                            // Load the actual site now that it exists
-                            iframe.src = PREVIEW_URL;
-                            
-                            // Fade out overlay
-                            setTimeout(() => {
-                                overlay.style.transition = 'opacity 0.8s ease';
-                                overlay.style.opacity = '0';
-                                setTimeout(() => overlay.style.display = 'none', 800);
-                            }, 1000);
-                        } else if (data.status === 'failed') {
-                            clearInterval(poll);
-                            statusLabel.textContent = "Generation failed. Redirecting...";
-                            setTimeout(() => window.location.href = '/', 3000);
-                        }
-                    } catch (e) { console.error("Poll error", e); }
-                }, 2500);
-            } else {
-                // No job in progress, load existing site immediately
-                iframe.src = PREVIEW_URL;
+                        setTimeout(() => {
+                            overlay.style.transition = 'opacity 0.8s ease';
+                            overlay.style.opacity = '0';
+                            setTimeout(() => overlay.style.display = 'none', 800);
+                        }, 1000);
+                        return true; // Stop
+                    } else if (data.status === 'failed') {
+                        statusLabel.textContent = "Generation failed. Redirecting...";
+                        setTimeout(() => window.location.href = '/', 3000);
+                        return true; // Stop
+                    }
+                } catch (e) { 
+                    console.error("Poll error", e); 
+                    // If we get an error (like 401), don't show blank screen forever
+                    // but don't stop yet, maybe network is just blipping
+                }
+                return false;
             }
-        });
+
+            // Start polling loop
+            const pollInterval = setInterval(async () => {
+                const shouldStop = await startPolling();
+                if (shouldStop) clearInterval(pollInterval);
+            }, 2500);
+            
+            // Initial call
+            startPolling();
+
+        } else {
+            // No job in progress, load existing site immediately
+            iframe.src = PREVIEW_URL;
+        }
 
         // --- Iframe DOM Management ---
         iframe.onload = () => {
