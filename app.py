@@ -1259,7 +1259,6 @@ async def editor_page(website_id):
 
 @app.route('/preview/<website_id>/', defaults={'filename': 'home.html'})
 @app.route('/preview/<website_id>/<path:filename>')
-@require_auth
 async def preview_proxy(website_id, filename):
     """
     Serves HTML pages from R2 for in-browser preview.
