@@ -7,6 +7,7 @@ import random
 import logging
 import traceback
 from flask import Flask, render_template, request, jsonify, send_file, g, make_response
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 from google import genai
 from PIL import Image
@@ -33,6 +34,10 @@ print(">>> [BOOT] App logging initializing...", flush=True)
 from flask_cors import CORS
 
 app = Flask(__name__)
+# Fix for reverse proxy (Nginx/Cloudflare): tells Flask to trust X-Forwarded-Proto
+# so all generated redirect URLs use https:// instead of http://
+# Without this, the iframe gets a http:// redirect which Chrome blocks as Mixed Content.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.config.from_object(Config)
 
 # --- CORS SECURITY ---
