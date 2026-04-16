@@ -1,8 +1,8 @@
 """
-worker.py — Pomeli Website Generation Worker
+worker.py — Website AI Generation Worker
 ═════════════════════════════════════════════════════════════════════════════
 Runs as a SEPARATE process alongside app.py.
-Pops jobs from the Redis queue (queue:pomeli) and executes the full
+Pops jobs from the Redis queue (queue:website_ai) and executes the full
 website generation pipeline: AI content → HTML rendering → R2 upload → DB save.
 
 How it works:
@@ -31,6 +31,12 @@ import uuid as pyuuid_module
 import uuid
 from datetime import datetime
 
+# Ensure worker logs can safely print Unicode on Windows consoles.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # ── Path setup so we can import from the same project ──
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -40,7 +46,8 @@ load_dotenv()
 # ── Project imports ──
 from core.redis import (
     redis,
-    POMELI_QUEUE,
+    async_redis,
+    WEBSITE_AI_QUEUE,
     mark_job_processing,
     mark_job_completed,
     mark_job_failed,
@@ -300,7 +307,7 @@ async def process_job(job: dict):
     if str(user_id) != '00000000-0000-0000-0000-000000000001':
         try:
             from handlers.credit_handler import website_credits_debits
-            cost = int(os.getenv("POMELI_CREDIT_COST", 1))
+            cost = int(os.getenv("WEBSITE_AI_CREDIT_COST", 1))
             credit_res = await website_credits_debits({
                 "userId": user_id,
                 "resourceType": "website_generation",
@@ -335,8 +342,8 @@ async def run_worker():
     Processes one job at a time (safe and predictable).
     """
     log_worker("=" * 60)
-    log_worker("Pomeli Generation Worker STARTED")
-    log_worker(f"Listening on queue: {POMELI_QUEUE}")
+    log_worker("Website AI Worker STARTED")
+    log_worker(f"Listening on queue: {WEBSITE_AI_QUEUE}")
     log_worker("=" * 60)
 
     # Ping Redis to confirm connection before entering loop
@@ -352,7 +359,7 @@ async def run_worker():
         try:
             # BRPOP blocks up to 5 seconds waiting for a job
             # Returns: (queue_name, json_payload) or None on timeout
-            result = await redis.brpop(POMELI_QUEUE, timeout=5)
+            result = await redis.brpop(WEBSITE_AI_QUEUE, timeout=5)
 
             if result is None:
                 # Timeout — no jobs in queue, loop again silently
@@ -377,15 +384,34 @@ async def run_worker():
 
             # ── Process the job ──
             try:
-                await process_job(job)
+                log("INFO", job_id, "Starting job processing...")
+                # Wrap with timeout to prevent hung jobs (25 min timeout)
+                try:
+                    await asyncio.wait_for(process_job(job), timeout=1500)
+                    log("INFO", job_id, "Job processing completed successfully")
+                except asyncio.TimeoutError:
+                    error_msg = "Worker timeout: Job processing took longer than 25 minutes"
+                    log("ERROR", job_id, error_msg)
+                    print(f">>> [WORKER TIMEOUT] {job_id}: {error_msg}\n", flush=True)
+                    try:
+                        await mark_job_failed(job_id, error_msg)
+                    except Exception as redis_err:
+                        log("ERROR", job_id, f"Could not mark timeout job as failed: {str(redis_err)}")
             except Exception as job_err:
                 error_msg = f"{type(job_err).__name__}: {str(job_err)}"
                 log("ERROR", job_id, "Job FAILED", error=error_msg)
+                print(f"\n>>> [WORKER ERR] Traceback for {job_id}:", flush=True)
                 traceback.print_exc()
+                print(f">>> [WORKER ERR] End traceback\n", flush=True)
                 try:
+                    log("INFO", job_id, "Attempting to mark job as failed in Redis...")
                     await mark_job_failed(job_id, error_msg)
+                    log("INFO", job_id, "Successfully marked job as failed")
                 except Exception as redis_err:
-                    log("ERROR", job_id, "Could not mark job failed in Redis", redis_error=str(redis_err))
+                    error_mark_msg = f"Failed to mark job failed: {type(redis_err).__name__}: {str(redis_err)}"
+                    log("ERROR", job_id, error_mark_msg)
+                    print(f">>> [WORKER CRITICAL] {error_mark_msg}", flush=True)
+                    traceback.print_exc()
 
         except KeyboardInterrupt:
             log_worker("Worker received shutdown signal (Ctrl+C) — exiting cleanly")
@@ -393,9 +419,16 @@ async def run_worker():
         except Exception as loop_err:
             # Catch any unexpected error in the loop itself to prevent crash
             log_worker("UNEXPECTED loop error — recovering", error=str(loop_err))
+            print(f"\n>>> [WORKER LOOP ERR] Unexpected error in main loop:\n", flush=True)
             traceback.print_exc()
+            print(f">>> [WORKER LOOP ERR] End traceback\n", flush=True)
             await asyncio.sleep(2)  # Brief pause before retrying
 
+    # Cleanup
+    try:
+        await async_redis.close()
+    except Exception:
+        pass
     log_worker("Worker STOPPED")
 
 

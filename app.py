@@ -6,19 +6,25 @@ import asyncio
 import random
 import logging
 import traceback
-from flask import Flask, render_template, request, jsonify, send_file, g, make_response
+import sys
+from datetime import datetime, timedelta
+from flask import Flask, render_template, request, jsonify, send_file, g, make_response, redirect
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 from google import genai
 from PIL import Image
+from bson import ObjectId
 from config import Config
 import uuid as pyuuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import insert, update, select
-from core.mongo import insert_website_data, get_website_layout, update_website_layout, insert_chat_message
+from sqlalchemy import insert, update, select, func
+from core.db import get_session_factory
+from core.mongo import insert_website_data, get_website_layout, update_website_layout, insert_chat_message, get_websites_collection
 from core.r2 import upload_media_to_r2, R2_PUBLIC_URL, fetch_media_from_r2
 from middleware.require_credits import require_credits
 from handlers.credit_handler import website_credits_debits
+from model.website_schema import WebsiteInfo, ChatMessage
+from model.img_info_schema import ImageInfo
 import os
 import io
 import shutil
@@ -26,7 +32,14 @@ import tempfile
 from dotenv import load_dotenv
 load_dotenv()
 
-POMELI_CREDIT_COST = os.getenv("POMELI_CREDIT_COST")
+WEBSITE_AI_CREDIT_COST = os.getenv("WEBSITE_AI_CREDIT_COST")
+
+# Ensure console logging does not crash on Windows when Unicode appears in log
+# messages. This keeps the existing logs intact while preventing encoding errors.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # --- LOGGING SETUP ---
 print(">>> [BOOT] App logging initializing...", flush=True)
@@ -35,10 +48,35 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 # Fix for reverse proxy (Nginx/Cloudflare): tells Flask to trust X-Forwarded-Proto
-# so all generated redirect URLs use https:// instead of http://
+# so all generated redirect URLs use https:// instead of http://.
 # Without this, the iframe gets a http:// redirect which Chrome blocks as Mixed Content.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.config.from_object(Config)
+# Force Flask to ALWAYS generate https:// URLs — critical for deployments behind
+# HTTPS-terminating proxies where X-Forwarded-Proto may not be set by Nginx.
+app.config['PREFERRED_URL_SCHEME'] = 'https'
+# Explicitly set max upload size (30MB) — Config class doesn't auto-apply to Flask
+app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024
+
+# Enable terminal logging for all Flask requests and internal app logs
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
+root_logger = logging.getLogger()
+app.logger.setLevel(logging.DEBUG)
+app.logger.propagate = False
+if not app.logger.handlers:
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.DEBUG)
+    stream_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+    app.logger.addHandler(stream_handler)
+
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.setLevel(logging.DEBUG)
+werkzeug_logger.propagate = False
+
+@app.after_request
+def log_response(response):
+    app.logger.info('%s %s %s -> %s', request.remote_addr, request.method, request.path, response.status)
+    return response
 
 # --- CORS SECURITY ---
 # Get allowed origins from .env (comma-separated if multiple)
@@ -58,52 +96,107 @@ WEBSITE_CONTEXTS: dict = {}
 # Feature flag to easily toggle chat-edit capabilities for Phase 2
 ENABLE_CHAT_EDIT = os.getenv("ENABLE_CHAT_EDIT", "False").lower() == "true"
 
-# --- AUTHENTICATION ---
+# --- DATABASE INITIALIZATION (Lazy, on first request only) ---
+_db_initialized = False
+
+def _ensure_db_initialized():
+    """Initialize database on first request (synchronously)"""
+    global _DB_READY, _db_initialized
+    
+    if _db_initialized:
+        return
+    
+    _db_initialized = True
+    
+    if _DB_READY:
+        return
+    
+    try:
+        # For lazy init: try to get or create event loop
+        import sys
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        if loop.is_running():
+            # If already running, schedule as task (shouldn't happen in before_request)
+            print(">>> [DB] Event loop already running, skipping init", flush=True)
+            return
+        
+        from core.db import init_db
+        loop.run_until_complete(init_db())
+        _DB_READY = True
+        print(">>> [DB] ✓ Database initialized on first request", flush=True)
+    except Exception as e:
+        print(f">>> [DB ERROR] Failed to initialize database: {e}", flush=True)
+        # Don't crash server - DB init may fail for valid reasons (dev/test mode)
+
+# --- AUTHENTICATION (Per-Request) ---
 @app.before_request
-async def authenticate_request():
+def authenticate_request():
+    """Authenticate user from token (query param, cookie, or header)"""
     global _DB_READY
     
-    # Lazy Database initialization within the current request's event loop
-    if not _DB_READY:
-        from core.db import init_db
+    try:
+        print(f"\n>>> [REQUEST] {request.method} {request.path}", flush=True)
+        
+        # Ensure DB is initialized on first request
+        _ensure_db_initialized()
+
+        # DEV_MODE: skip all auth, inject a fake user
+        if app.config.get('DEV_MODE'):
+            g.user_id = "00000000-0000-0000-0000-000000000001"
+            g.user = None
+            print(">>> [AUTH] DEV_MODE active — auth bypassed", flush=True)
+            return
+
+        # Try to extract and validate user from token
+        from core.auth import get_current_user_flask
         try:
-            await init_db()
-            print(">>> [DB] Database verified on current loop", flush=True)
-            _DB_READY = True
-        except Exception as e:
-            print(f">>> [DB ERR] Lazy init failed: {e}", flush=True)
-
-    print(f"\n>>> [REQUEST] {request.method} {request.path}", flush=True)
-
-    # DEV_MODE: skip all auth, inject a fake user
-    if app.config.get('DEV_MODE'):
-        g.user_id = "00000000-0000-0000-0000-000000000001"
-        g.user = None
-        print(">>> [AUTH] DEV_MODE active — auth bypassed", flush=True)
-        return
-
-    from core.auth import get_current_user_flask
-    user = get_current_user_flask()
-    if user:
-        g.user = user
-        g.user_id = str(user.user_id)
-        print(f">>> [AUTH] Success: {g.user_id}", flush=True)
-    else:
-        print(f">>> [AUTH] Unauthenticated request for {request.path}", flush=True)
+            user = get_current_user_flask()
+            if user:
+                g.user = user
+                g.user_id = str(user.user_id)
+                print(f">>> [AUTH] ✓ Authenticated: {g.user_id}", flush=True)
+            else:
+                print(f">>> [AUTH] ⚠ No auth token found for {request.path}", flush=True)
+        except Exception as auth_err:
+            print(f">>> [AUTH ERROR] Token parsing failed: {auth_err}", flush=True)
+            g.user_id = None
+            g.user = None
+    except Exception as e:
+        print(f">>> [REQUEST ERROR] Unexpected error in before_request: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
 
 def require_auth(f):
+    """Decorator: Require authentication for a route"""
     from functools import wraps
     @wraps(f)
     async def decorated_function(*args, **kwargs):
-        # DEV_MODE: bypass auth for local testing only
-        if app.config.get('DEV_MODE'):
-            if not getattr(g, 'user_id', None):
-                g.user_id = "00000000-0000-0000-0000-000000000001"
+        try:
+            # DEV_MODE: bypass auth for local testing only
+            if app.config.get('DEV_MODE'):
+                if not getattr(g, 'user_id', None):
+                    g.user_id = "00000000-0000-0000-0000-000000000001"
+                print(f">>> [ROUTE] DEV_MODE: executing {f.__name__}", flush=True)
+                return await f(*args, **kwargs)
+            
+            # Production: check for authenticated user
+            user_id = getattr(g, 'user_id', None)
+            if not user_id:
+                print(f">>> [DENIED] {request.path} - No user_id in g (require_auth failed)", flush=True)
+                return jsonify({"error": "Authentication required", "status": "error"}), 401
+            
+            print(f">>> [ROUTE] ✓ Auth passed for {f.__name__} by {user_id}", flush=True)
             return await f(*args, **kwargs)
-        if not getattr(g, 'user_id', None):
-            print(f">>> [DENIED] {request.path} - No user_id in g", flush=True)
-            return jsonify({"error": "Authentication required", "status": "error"}), 401
-        return await f(*args, **kwargs)
+        except Exception as e:
+            print(f">>> [ROUTE ERROR] {f.__name__} failed: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": "Internal server error", "status": "error"}), 500
     return decorated_function
 
 # Initialize the new Google GenAI client with fail-safe handling
@@ -926,14 +1019,14 @@ async def index():
     """Health check root route for staging and production."""
     return jsonify({
         "status": "online",
-        "service": "Pomeli Website Builder API",
+        "service": "Website AI API",
         "message": "Backend is running correctly."
     }), 200
 
 
 @app.route('/generate', methods=['POST'])
 @require_auth
-@require_credits(int(POMELI_CREDIT_COST) if POMELI_CREDIT_COST else 1)
+@require_credits(int(WEBSITE_AI_CREDIT_COST) if WEBSITE_AI_CREDIT_COST else 1)
 async def generate_website():
     """
     INTAKE ROUTE — Fast, non-blocking.
@@ -1048,7 +1141,7 @@ async def generate_website():
         # ── Enqueue job to Redis (with graceful fallback if Redis is unavailable) ──
         redis_available = False
         try:
-            from core.redis import enqueue_pomeli_job, redis as redis_client
+            from core.redis import enqueue_website_ai_job, redis as redis_client
             import redis.exceptions as redis_exc
             # Quick ping to check if Redis is reachable before attempting enqueue
             await redis_client.ping()
@@ -1061,7 +1154,7 @@ async def generate_website():
 
         if redis_available:
             # ── QUEUE MODE: Fast return, worker processes async ──
-            job_id = await enqueue_pomeli_job(
+            job_id = await enqueue_website_ai_job(
                 website_id=website_id,
                 user_id=str(user_id),
                 prompt=prompt,
@@ -1206,7 +1299,7 @@ async def generate_website():
 
             # ── CREDIT DEDUCTION ──
             if str(user_id) != '00000000-0000-0000-0000-000000000001':
-                cost = int(POMELI_CREDIT_COST) if POMELI_CREDIT_COST else 1
+                cost = int(WEBSITE_AI_CREDIT_COST) if WEBSITE_AI_CREDIT_COST else 1
                 credit_result = await website_credits_debits({
                     "userId": str(user_id),
                     "resourceType": "website_generation",
@@ -1241,13 +1334,28 @@ async def job_status(job_id: str):
     Possible statuses: queued | processing | completed | failed
     """
     try:
-        from core.redis import get_job_status
+        from core.redis import get_job_status, mark_job_failed
         data = await get_job_status(job_id)
         if not data:
             return jsonify({"error": "Job not found"}), 404
+
+        # If the job has been processing for too long, mark it as failed.
+        status = data.get("status")
+        timestamp = data.get("updated_at") or data.get("created_at")
+        if status in ("queued", "processing") and timestamp:
+            try:
+                ts = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                if datetime.utcnow() - ts > timedelta(minutes=8):
+                    await mark_job_failed(job_id, "Generation timed out waiting for the worker.")
+                    data["status"] = "failed"
+                    data["error"] = "Generation timed out after 8 minutes. Please try again."
+            except Exception:
+                pass
+
         return jsonify(data)
     except Exception as e:
         print(f">>> [JOB STATUS ERR] {job_id}: {e}", flush=True)
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
@@ -1255,25 +1363,110 @@ async def job_status(job_id: str):
 @require_auth
 async def editor_page(website_id):
     token = request.args.get('token')
+    job_id = request.args.get('job_id')
+
+    if not job_id:
+        try:
+            from core.redis import get_job_id_for_website
+            job_id = await get_job_id_for_website(website_id)
+            if job_id:
+                print(f">>> [EDITOR] Recovered job_id={job_id} for website_id={website_id}", flush=True)
+        except Exception as job_lookup_err:
+            print(f">>> [EDITOR] Could not recover job_id for {website_id}: {job_lookup_err}", flush=True)
+
     response = make_response(render_template('editor.html', website_id=website_id, chat_enabled=ENABLE_CHAT_EDIT))
     if token:
+        from urllib.parse import urlencode
+
+        clean_query = {}
+        if job_id:
+            clean_query["job_id"] = job_id
+        clean_url = f"/editor/{website_id}"
+        if clean_query:
+            clean_url = f"{clean_url}?{urlencode(clean_query)}"
+
+        response = make_response(redirect(clean_url))
         # Set session cookie for background API calls (/job-status, /preview)
-        response.set_cookie('auth_token', token, httponly=True, samesite='Lax')
-        print(f">>> [AUTH] Session cookie set for editor: {website_id}", flush=True)
+        # Use path='/' so the cookie is available across all routes on this site.
+        cookie_host = (request.host or "").split(":")[0]
+        is_local_cookie = cookie_host in {"127.0.0.1", "localhost"}
+        response.set_cookie(
+            'auth_token',
+            token,
+            httponly=True,
+            samesite='Lax' if is_local_cookie else 'None',
+            secure=not is_local_cookie,
+            path='/',
+        )
+        print(f">>> [AUTH] Session cookie set for editor: {website_id}; redirecting to clean URL", flush=True)
+    elif job_id and not request.args.get('job_id'):
+        return redirect(f"/editor/{website_id}?job_id={job_id}")
     return response
 
-@app.route('/preview/<website_id>/', defaults={'filename': 'home.html'})
-@app.route('/preview/<website_id>/<path:filename>')
-async def preview_proxy(website_id, filename):
-    """
-    Serves HTML pages from R2 for in-browser preview.
 
-    Critical fix: all relative page hrefs (home.html, about.html, etc.)
-    are rewritten to absolute /preview/<website_id>/... paths BEFORE the
-    HTML is sent to the browser. This means navigation works correctly from
-    ANY page — you can go from Contact → Home → Services and back without
-    getting a 404 or a broken relative-path resolution.
+@app.route('/history', methods=['GET'])
+@require_auth
+async def history():
     """
+    Returns the authenticated user's project history for the last 7 days.
+    """
+    try:
+        user_uuid = pyuuid.UUID(str(getattr(g, 'user_id', '')))
+    except Exception:
+        return jsonify({"error": "Invalid user ID format."}), 400
+
+    cutoff = datetime.utcnow() - timedelta(days=7)
+    collection = get_websites_collection()
+
+    query = {
+        "user_id": str(user_uuid),
+        "_id": {"$gte": ObjectId.from_datetime(cutoff)},
+    }
+    cursor = collection.find(query).sort("_id", -1)
+    websites = await cursor.to_list(length=None)
+
+    items = []
+    for website in websites:
+        website_id = str(website.get("website_id", website.get("_id")))
+        created_at = website.get("created_at")
+        if not created_at and website.get("_id"):
+            created_at = website["_id"].generation_time
+
+        updated_at = website.get("updated_at") or created_at
+        images = website.get("images") or []
+        chat_messages = website.get("chat_messages") or []
+
+        items.append({
+            "website_id": website_id,
+            "site_name": website.get("site_name"),
+            "industry": website.get("industry"),
+            "prompt": website.get("prompt"),
+            "status": website.get("status"),
+            "progress": website.get("progress"),
+            "final_url": website.get("final_url"),
+            "preview_url": f"/preview/{website_id}/home.html",
+            "download_url": f"/download/{website_id}",
+            "created_at": created_at.isoformat() if created_at else None,
+            "updated_at": updated_at.isoformat() if updated_at else None,
+            "layout": website.get("layout") or [],
+            "theme": website.get("theme") or {},
+            "footer": website.get("footer") or {},
+            "image_count": len(images),
+            "chat_count": len(chat_messages),
+        })
+
+    return jsonify({
+        "success": True,
+        "range_days": 7,
+        "count": len(items),
+        "items": items,
+    })
+
+@app.route('/preview/<website_id>')
+@app.route('/preview/<website_id>/')
+@app.route('/preview/<website_id>/<path:filename>')
+async def preview_proxy(website_id, filename='home.html'):
+    print(f">>> [PREVIEW DEBUG] Request for {website_id} / {filename}", flush=True)
     try:
         # 1. NORMALIZE PATH
         clean_filename = (filename or 'home.html').strip('/')
@@ -1305,9 +1498,32 @@ async def preview_proxy(website_id, filename):
             for key in search_keys:
                 html_bytes = await asyncio.to_thread(_try_fetch, key)
                 if html_bytes:
-                    if key != object_key or attempt > 0:
-                        print(f">>> [PREVIEW OK] Resolved on attempt {attempt+1}: {key}", flush=True)
-                    break
+                    try:
+                        html_text = html_bytes.decode('utf-8')
+                    except Exception:
+                        html_text = None
+
+                    if html_text:
+                        lower_text = html_text.lower()
+                        invalid_preview = any(
+                            marker in lower_text
+                            for marker in [
+                                '<title>404 not found',
+                                'still generating',
+                                'generation may have failed',
+                                'your site is being built',
+                            ]
+                        )
+                        if invalid_preview:
+                            print(f">>> [PREVIEW INVALID] Ignoring placeholder/404 HTML for {key}", flush=True)
+                            html_bytes = None
+                        else:
+                            if key != object_key or attempt > 0:
+                                print(f">>> [PREVIEW OK] Resolved on attempt {attempt+1}: {key}", flush=True)
+                            break
+                    else:
+                        print(f">>> [PREVIEW WARN] Unable to decode HTML bytes for {key}", flush=True)
+                        html_bytes = None
             if html_bytes:
                 break
             if attempt == 0:
@@ -1330,7 +1546,16 @@ async def preview_proxy(website_id, filename):
                         print(f">>> [PREVIEW RECOVERY] Found: {key}", flush=True)
                         html_bytes = await asyncio.to_thread(_try_fetch, key)
                         if html_bytes:
-                            break
+                            try:
+                                html_text = html_bytes.decode('utf-8')
+                                if '<title>404 not found' in html_text.lower() or 'still generating' in html_text.lower():
+                                    print(f">>> [PREVIEW RECOVERY INVALID] Ignoring placeholder/404 HTML for {key}", flush=True)
+                                    html_bytes = None
+                                else:
+                                    break
+                            except Exception:
+                                print(f">>> [PREVIEW RECOVERY WARN] Failed to decode {key}", flush=True)
+                                html_bytes = None
             except Exception as scan_err:
                 print(f">>> [PREVIEW RECOVERY ERR] {scan_err}", flush=True)
 
@@ -1415,17 +1640,78 @@ async def preview_proxy(website_id, filename):
         return "Internal Proxy Error", 500
 
 
+def clean_editor_artifacts(html: str) -> str:
+    """Remove editor-only markup before persisting or exporting a page."""
+    if not html:
+        return html
+
+    html = re.sub(r'<div\s+id=["\']edit-toolbar["\'][\s\S]*?</div>\s*</div>', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'<div\s+id=["\']save-bar["\'][\s\S]*?</div>', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'<div\s+id=["\']save-indicator["\'][\s\S]*?</div>', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'<div\s+id=["\']edit-hint-bar["\'][\s\S]*?</div>', '', html, flags=re.IGNORECASE)
+
+    # The editor injects a helper style tag into the iframe; it should never be
+    # saved back to R2 or included in downloads/deployments.
+    html = re.sub(
+        r'<style[^>]*>\s*/\*\s*Hide legacy editor UI[\s\S]*?\.eb-img-edit:hover[\s\S]*?</style>',
+        '',
+        html,
+        flags=re.IGNORECASE,
+    )
+
+    html = re.sub(r'\s*contenteditable=(["\'])?true\1?', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'\s*data-[a-zA-Z0-9_\-]+=(["\']).*?\1', '', html)
+
+    def _clean_eb(m):
+        sp = m.group(1)
+        kept = [c for c in m.group(2).split() if not c.startswith("eb-")]
+        return f'{sp}class="{" ".join(kept)}"' if kept else sp
+
+    html = re.sub(r'(\s*)class="([^"]*\beb-[^"]*)"', _clean_eb, html)
+    html = re.sub(r"(\s*)class='([^']*\beb-[^']*)'", _clean_eb, html)
+
+    html = re.sub(r'<script[^>]*sortablejs[^>]*>\s*</script>', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'new\s+Sortable\([^,]+,\s*\{[\s\S]*?\}\s*\)\s*;', '', html, flags=re.IGNORECASE)
+    html = html.replace('initImageDropZones();', '')
+    html = html.replace('showSaveIndicator();', '')
+    return html
+
+
 @app.route('/save', methods=['POST'])
 @require_auth
 async def save_html():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         website_id = data.get('website_id')
         html = data.get('html')
-        page_name = data.get('page_name', 'home.html')
+        page_name = os.path.basename(data.get('page_name') or 'home.html')
         
         if not website_id or not html:
             return jsonify({"error": "Missing data"}), 400
+
+        try:
+            pyuuid.UUID(str(website_id))
+        except Exception:
+            return jsonify({"error": "Invalid website ID format."}), 400
+
+        if not page_name or not page_name.lower().endswith(".html"):
+            return jsonify({"error": "Invalid page name."}), 400
+
+        def is_invalid_html(content: str) -> bool:
+            lowered = content.lower()
+            invalid_markers = [
+                '<title>404 not found',
+                'still generating',
+                'generation may have failed',
+                'your site is being built',
+            ]
+            return any(marker in lowered for marker in invalid_markers)
+
+        if is_invalid_html(html):
+            print(f">>> [SAVE REJECTED] Invalid HTML content for {website_id}/{page_name}", flush=True)
+            return jsonify({"error": "Invalid page content. Save aborted."}), 400
+
+        html = clean_editor_artifacts(html)
             
         # Overwrite the specific page in R2 instantly
         await asyncio.to_thread(
@@ -1443,17 +1729,34 @@ async def save_html():
 @app.route('/upload-image', methods=['POST'])
 @require_auth
 async def editor_upload_image():
+    app.logger.info('POST /upload-image triggered')
     try:
         file = request.files.get('image')
         website_id = request.form.get('website_id')
+        old_url = request.form.get('old_url', '')
+        app.logger.info('Upload request: file=%s website_id=%s', file.filename if file else 'None', website_id)
         if not file or not website_id:
             return jsonify({"error": "Missing file or website_id"}), 400
+
+        try:
+            pyuuid.UUID(str(website_id))
+        except Exception:
+            return jsonify({"error": "Invalid website ID format."}), 400
             
         file_bytes = file.read()
+        filename = None
+        base_url = (R2_PUBLIC_URL or "").rstrip("/")
+        if old_url and base_url and old_url.startswith(base_url):
+            old_key = old_url[len(base_url):].lstrip("/").split("?", 1)[0]
+            expected_prefix = f"websites/{website_id}/assets/"
+            if old_key.startswith(expected_prefix):
+                filename = os.path.basename(old_key)
+
         url = upload_media_to_r2(
             file_bytes,
             file.mimetype,
-            folder=f"websites/{website_id}/assets"
+            folder=f"websites/{website_id}/assets",
+            filename=filename,
         )
         return jsonify({"url": url})
     except Exception as e:
@@ -1540,23 +1843,54 @@ async def download_from_r2(website_id):
             return None
         url = url.strip()
         if url.startswith(base_url):
-            return url[len(base_url):].lstrip("/")
+            return url[len(base_url):].lstrip("/").split("?", 1)[0]
         # Handle URL-encoded variants
         decoded = urllib.parse.unquote(url)
         if decoded.startswith(base_url):
-            return decoded[len(base_url):].lstrip("/")
+            return decoded[len(base_url):].lstrip("/").split("?", 1)[0]
         return None
 
     try:
         # ── 1. Resolve page list from DB ──────────────────────────────
-        saved_layout = await get_website_layout(website_id)
+        try:
+            saved_layout = await get_website_layout(website_id)
+        except RuntimeError as e:
+            if "Event loop is closed" in str(e):
+                print(f">>> [DOWNLOAD] Event loop closed, using default layout for {website_id}", flush=True)
+                saved_layout = []
+            else:
+                raise
 
-        pages_to_zip = ["home", "about", "services", "portfolio", "contact"]
+        section_pages = {"about", "services", "portfolio", "contact"}
+        pages_to_zip = ["home"]
         if saved_layout:
-            pages_to_zip = list(dict.fromkeys(pages_to_zip + saved_layout))  # preserve order, deduplicate
+            generated_pages = [
+                str(section).strip().lower().removesuffix(".html")
+                for section in saved_layout
+            ]
+            pages_to_zip.extend(page for page in generated_pages if page in section_pages)
+        pages_to_zip = list(dict.fromkeys(pages_to_zip))  # preserve order, deduplicate
 
         # ── 2. Collect all HTML pages from R2 ─────────────────────────
         # Map:  page_slug  →  (zip_entry_name, raw_html_string)
+        # Keep the existing layout-driven flow, but fall back to real R2 files
+        # when the saved layout is stale and a page was generated anyway.
+        from core.r2 import r2_client, R2_BUCKET_NAME
+
+        section_order = ("about", "services", "portfolio", "contact")
+
+        def page_exists_in_r2(page_slug: str) -> bool:
+            object_key = f"websites/{website_id}/{page_slug}.html"
+            try:
+                r2_client.head_object(Bucket=R2_BUCKET_NAME, Key=object_key)
+                return True
+            except Exception:
+                return False
+
+        for page in section_order:
+            if page not in pages_to_zip and page_exists_in_r2(page):
+                pages_to_zip.append(page)
+
         page_htmls: dict[str, tuple[str, str]] = {}
         for page in pages_to_zip:
             filename   = f"{page}.html"
@@ -1651,6 +1985,7 @@ async def download_from_r2(website_id):
 
             # 5b. Process and write each HTML page
             for page, (zip_name, html) in page_htmls.items():
+                html = clean_editor_artifacts(html)
 
                 # ── CLEANING ──
                 # Remove editor UI components
@@ -1718,6 +2053,15 @@ async def download_from_r2(website_id):
                     flags=re.IGNORECASE,
                 )
 
+                # Also rewrite all other page links to match what's actually in the ZIP
+                # For pages NOT included, convert links to plain text to prevent 404s
+                for other_page in section_pages:
+                    if other_page not in page_htmls:
+                        # Remove the link tags but preserve text content
+                        # Match both single and double quoted hrefs to missing pages
+                        missing_link_pattern = '<a[^>]*?href=["\']?' + re.escape(other_page) + r'\.html[^>]*?>(.*?)</a>'
+                        html = re.sub(missing_link_pattern, r'\1', html, flags=re.IGNORECASE | re.DOTALL)
+
                 zf.writestr(zip_name, html)
                 print(f">>> [ZIP] Written: {zip_name}", flush=True)
 
@@ -1738,7 +2082,7 @@ async def download_from_r2(website_id):
         return jsonify({"error": "Failed to prepare download. Please try again."}), 500
 
 
-@app.route('/deploy/<website_id>', methods=['POST'])
+@app.route('/deploy/<website_id>', methods=['GET', 'POST'])
 @require_auth
 async def deploy_to_vercel(website_id):
     """
@@ -1758,9 +2102,15 @@ async def deploy_to_vercel(website_id):
     import uuid
     from sqlalchemy import select
 
+    # ── VALIDATION ──
+    try:
+        w_uuid = pyuuid.UUID(website_id)
+    except Exception:
+        return jsonify({"error": "Invalid website ID format."}), 400
+
     vercel_token = os.getenv("VERCEL_TOKEN")
     if not vercel_token:
-        return jsonify({"error": "VERCEL_TOKEN environment variable is not configured."}), 500
+        return jsonify({"error": "VERCEL_TOKEN is not configured on the server."}), 500
 
     base_url = (R2_PUBLIC_URL or "").rstrip("/")
 
@@ -1784,9 +2134,9 @@ async def deploy_to_vercel(website_id):
     def url_to_object_key(url: str) -> str | None:
         if not base_url: return None
         url = url.strip()
-        if url.startswith(base_url): return url[len(base_url):].lstrip("/")
+        if url.startswith(base_url): return url[len(base_url):].lstrip("/").split("?", 1)[0]
         decoded = urllib.parse.unquote(url)
-        if decoded.startswith(base_url): return decoded[len(base_url):].lstrip("/")
+        if decoded.startswith(base_url): return decoded[len(base_url):].lstrip("/").split("?", 1)[0]
         return None
 
     tmp_dir = tempfile.mkdtemp(prefix=f"deploy_{website_id[:8]}_")
@@ -1828,16 +2178,23 @@ async def deploy_to_vercel(website_id):
         for r2_url in all_r2_urls:
             object_key = url_to_object_key(r2_url)
             if not object_key: continue
-            local_name = f"assets/{object_key.split('/')[-1].split('?')[0]}"
-            if not local_name.lower().endswith('.webp'):
-                local_name = local_name.rsplit('.', 1)[0] + ".webp"
+            original_filename = object_key.split('/')[-1].split('?')[0]
+            lower_key = object_key.lower()
             
             try:
                 raw = await asyncio.to_thread(fetch_media_from_r2, object_key)
                 if not raw: continue
-                compressed = await asyncio.to_thread(compress_image, raw)
-                asset_map[r2_url] = local_name
-                asset_bytes_map[local_name] = compressed
+                if any(lower_key.endswith(ext) for ext in (".svg", ".woff", ".woff2", ".ttf", ".eot", ".otf", ".mp4", ".webm")):
+                    local_name = f"assets/{original_filename}"
+                    asset_map[r2_url] = local_name
+                    asset_bytes_map[local_name] = raw
+                else:
+                    local_name = f"assets/{original_filename}"
+                    if not local_name.lower().endswith('.webp'):
+                        local_name = local_name.rsplit('.', 1)[0] + ".webp"
+                    compressed = await asyncio.to_thread(compress_image, raw)
+                    asset_map[r2_url] = local_name
+                    asset_bytes_map[local_name] = compressed
             except Exception:
                 pass
 
@@ -1850,6 +2207,7 @@ async def deploy_to_vercel(website_id):
                 f.write(data)
 
         for page, (out_name, html) in page_htmls.items():
+            html = clean_editor_artifacts(html)
             # Clean HTML exactly like download route
             html = re.sub(r'<div\s+id="edit-toolbar"[\s\S]*?</div>\s*</div>', '', html)
             html = re.sub(r'<div\s+id="save-bar"[\s\S]*?</div>', '', html)
@@ -1909,7 +2267,7 @@ async def deploy_to_vercel(website_id):
 
         # Write vercel.json
         safe_id = website_id.replace('-', '')
-        vercel_json = { "name": f"pomeli-site-{safe_id[:12]}" }
+        vercel_json = { "name": f"website-ai-site-{safe_id[:12]}" }
         with open(os.path.join(tmp_dir, 'vercel.json'), 'w') as f:
             json.dump(vercel_json, f)
 

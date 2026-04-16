@@ -2,6 +2,7 @@ import os
 import asyncio
 import json
 import uuid
+from datetime import datetime
 from urllib.parse import urlparse
 from typing import Optional
 from redis import Redis as SyncRedis  # Standard sync client
@@ -69,10 +70,13 @@ redis = async_redis
 # Queue names
 # ─────────────────────────────────────────────
 
-POMELI_QUEUE = "queue:pomeli"
+WEBSITE_AI_QUEUE = "queue:website_ai"
 
 def _job_key(job_id: str) -> str:
     return f"job:{job_id}"
+
+def _website_job_key(website_id: str) -> str:
+    return f"website_job:{website_id}"
 
 # ─────────────────────────────────────────────
 # Robust Public API
@@ -80,7 +84,10 @@ def _job_key(job_id: str) -> str:
 
 def _set_job_status_internal(job_id: str, status: str, result: Optional[dict] = None, error: Optional[str] = None):
     """Sync internal operation for thread-safe state marking."""
-    payload = {"status": status}
+    payload = {
+        "status": status,
+        "updated_at": datetime.utcnow().isoformat() + "Z"
+    }
     if error:
         payload["error"] = error
     if result:
@@ -90,8 +97,9 @@ def _set_job_status_internal(job_id: str, status: str, result: Optional[dict] = 
     sync_redis.hset(key, mapping=payload)
     sync_redis.expire(key, JOB_TTL)
 
-async def enqueue_pomeli_job(*, website_id: str, user_id: str, prompt: str, image_urls: list, image_paths: list, logo_url: Optional[str], user_pages: str, user_palette: str, user_industry: str, db_image_records: list) -> str:
+async def enqueue_website_ai_job(*, website_id: str, user_id: str, prompt: str, image_urls: list, image_paths: list, logo_url: Optional[str], user_pages: str, user_palette: str, user_industry: str, db_image_records: list) -> str:
     job_id = str(uuid.uuid4())
+    created_at = datetime.utcnow().isoformat() + "Z"
     job_payload = {
         "job_id": job_id, "type": "WEBSITE_GENERATION", "website_id": website_id,
         "user_id": user_id, "prompt": prompt, "image_urls": image_urls,
@@ -101,8 +109,9 @@ async def enqueue_pomeli_job(*, website_id: str, user_id: str, prompt: str, imag
     }
     
     def _run():
-        sync_redis.lpush(POMELI_QUEUE, json.dumps(job_payload))
-        _set_job_status_internal(job_id, "queued")
+        sync_redis.lpush(WEBSITE_AI_QUEUE, json.dumps(job_payload))
+        _set_job_status_internal(job_id, "queued", result={"created_at": created_at})
+        sync_redis.set(_website_job_key(website_id), job_id, ex=JOB_TTL)
         
     await asyncio.to_thread(_run)
     return job_id
@@ -115,6 +124,13 @@ async def get_job_status(job_id: str) -> Optional[dict]:
     
     return await asyncio.to_thread(run_sync)
 
+async def get_job_id_for_website(website_id: str) -> Optional[str]:
+    """Return the latest queued job id for a website, if Redis still has it."""
+    def run_sync():
+        return sync_redis.get(_website_job_key(website_id))
+
+    return await asyncio.to_thread(run_sync)
+
 async def mark_job_processing(job_id: str):
     await asyncio.to_thread(_set_job_status_internal, job_id, "processing")
 
@@ -123,15 +139,21 @@ async def mark_job_completed(job_id: str, website_id: str, preview_url: str):
         payload = {
             "status": "completed",
             "website_id": website_id,
-            "preview_url": preview_url
+            "preview_url": preview_url,
+            "updated_at": datetime.utcnow().isoformat() + "Z"
         }
         sync_redis.hset(_job_key(job_id), mapping=payload)
         sync_redis.expire(_job_key(job_id), JOB_TTL)
+        sync_redis.set(_website_job_key(website_id), job_id, ex=JOB_TTL)
     await asyncio.to_thread(run_sync)
 
 async def mark_job_failed(job_id: str, error: str):
     def run_sync():
-        payload = {"status": "failed", "error": error}
+        payload = {
+            "status": "failed",
+            "error": error,
+            "updated_at": datetime.utcnow().isoformat() + "Z"
+        }
         sync_redis.hset(_job_key(job_id), mapping=payload)
         sync_redis.expire(_job_key(job_id), JOB_TTL)
     await asyncio.to_thread(run_sync)
