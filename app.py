@@ -13,14 +13,18 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 from google import genai
 from PIL import Image
+from bson import ObjectId
 from config import Config
 import uuid as pyuuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import insert, update, select
-from core.mongo import insert_website_data, get_website_layout, update_website_layout, insert_chat_message
+from sqlalchemy import insert, update, select, func
+from core.db import get_session_factory
+from core.mongo import insert_website_data, get_website_layout, update_website_layout, insert_chat_message, get_websites_collection
 from core.r2 import upload_media_to_r2, R2_PUBLIC_URL, fetch_media_from_r2
 from middleware.require_credits import require_credits
 from handlers.credit_handler import website_credits_debits
+from model.website_schema import WebsiteInfo, ChatMessage
+from model.img_info_schema import ImageInfo
 import os
 import io
 import shutil
@@ -1398,6 +1402,65 @@ async def editor_page(website_id):
     elif job_id and not request.args.get('job_id'):
         return redirect(f"/editor/{website_id}?job_id={job_id}")
     return response
+
+
+@app.route('/history', methods=['GET'])
+@require_auth
+async def history():
+    """
+    Returns the authenticated user's project history for the last 7 days.
+    """
+    try:
+        user_uuid = pyuuid.UUID(str(getattr(g, 'user_id', '')))
+    except Exception:
+        return jsonify({"error": "Invalid user ID format."}), 400
+
+    cutoff = datetime.utcnow() - timedelta(days=7)
+    collection = get_websites_collection()
+
+    query = {
+        "user_id": str(user_uuid),
+        "_id": {"$gte": ObjectId.from_datetime(cutoff)},
+    }
+    cursor = collection.find(query).sort("_id", -1)
+    websites = await cursor.to_list(length=None)
+
+    items = []
+    for website in websites:
+        website_id = str(website.get("website_id", website.get("_id")))
+        created_at = website.get("created_at")
+        if not created_at and website.get("_id"):
+            created_at = website["_id"].generation_time
+
+        updated_at = website.get("updated_at") or created_at
+        images = website.get("images") or []
+        chat_messages = website.get("chat_messages") or []
+
+        items.append({
+            "website_id": website_id,
+            "site_name": website.get("site_name"),
+            "industry": website.get("industry"),
+            "prompt": website.get("prompt"),
+            "status": website.get("status"),
+            "progress": website.get("progress"),
+            "final_url": website.get("final_url"),
+            "preview_url": f"/preview/{website_id}/home.html",
+            "download_url": f"/download/{website_id}",
+            "created_at": created_at.isoformat() if created_at else None,
+            "updated_at": updated_at.isoformat() if updated_at else None,
+            "layout": website.get("layout") or [],
+            "theme": website.get("theme") or {},
+            "footer": website.get("footer") or {},
+            "image_count": len(images),
+            "chat_count": len(chat_messages),
+        })
+
+    return jsonify({
+        "success": True,
+        "range_days": 7,
+        "count": len(items),
+        "items": items,
+    })
 
 @app.route('/preview/<website_id>')
 @app.route('/preview/<website_id>/')
