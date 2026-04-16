@@ -120,26 +120,36 @@ def get_current_user_flask():
     if auth_header:
         try:
             token = _extract_token_from_header(auth_header)
-            return _decode_jwt_token(token)
-        except ValueError:
-            pass  # Fallback to query param
+            user = _decode_jwt_token(token)
+            logger.info(f"✓ Auth via Authorization header: {user.user_id}")
+            return user
+        except ValueError as e:
+            logger.debug(f"Auth header failed: {e} - trying other methods...")
+            pass  # Fallback to other methods
 
     # 2. Try 'auth_token' cookie (Editor background requests)
     token = request.cookies.get("auth_token")
     if token:
         try:
-            return _decode_jwt_token(token)
-        except ValueError:
+            user = _decode_jwt_token(token)
+            logger.info(f"✓ Auth via auth_token cookie: {user.user_id}")
+            return user
+        except ValueError as e:
+            logger.debug(f"Cookie auth failed: {e} - trying other methods...")
             pass
 
     # 3. Try 'token' query parameter (Direct browser redirects/new tabs)
     token = request.args.get("token")
     if token:
         try:
-            return _decode_jwt_token(token)
-        except ValueError:
+            user = _decode_jwt_token(token)
+            logger.info(f"✓ Auth via query param token: {user.user_id}")
+            return user
+        except ValueError as e:
+            logger.warning(f"Query token parsing failed: {e}")
             pass
 
+    logger.debug(f"No valid auth token found in request to {request.path}")
     return None
 
 def get_request_user_id():
