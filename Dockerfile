@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install explicitly defined dependencies
+RUN pip install --upgrade pip==25.3 wheel==0.46.2
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install implicit dependencies missing from requirements.txt but used in the codebase

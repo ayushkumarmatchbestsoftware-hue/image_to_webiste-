@@ -111,16 +111,46 @@ def _decode_jwt_token(token: str) -> AuthUser:
 def get_current_user_flask():
     """
     Flask helper for retrieving authenticated user from current request.
+    Supports both Authorization header and 'token' query parameter.
     """
     from flask import request
     
+    # 1. Try Authorization header (Standard API calls)
     auth_header = request.headers.get("Authorization")
-    try:
-        token = _extract_token_from_header(auth_header)
-        return _decode_jwt_token(token)
-    except ValueError as e:
-        # In a real app, you might want to log this
-        return None
+    if auth_header:
+        try:
+            token = _extract_token_from_header(auth_header)
+            user = _decode_jwt_token(token)
+            logger.info(f"✓ Auth via Authorization header: {user.user_id}")
+            return user
+        except ValueError as e:
+            logger.debug(f"Auth header failed: {e} - trying other methods...")
+            pass  # Fallback to other methods
+
+    # 2. Try 'auth_token' cookie (Editor background requests)
+    token = request.cookies.get("auth_token")
+    if token:
+        try:
+            user = _decode_jwt_token(token)
+            logger.info(f"✓ Auth via auth_token cookie: {user.user_id}")
+            return user
+        except ValueError as e:
+            logger.debug(f"Cookie auth failed: {e} - trying other methods...")
+            pass
+
+    # 3. Try 'token' query parameter (Direct browser redirects/new tabs)
+    token = request.args.get("token")
+    if token:
+        try:
+            user = _decode_jwt_token(token)
+            logger.info(f"✓ Auth via query param token: {user.user_id}")
+            return user
+        except ValueError as e:
+            logger.warning(f"Query token parsing failed: {e}")
+            pass
+
+    logger.debug(f"No valid auth token found in request to {request.path}")
+    return None
 
 def get_request_user_id():
     from flask import g

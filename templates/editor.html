@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pomeli AI | Website Editor</title>
+    <title>Website AI | Website Editor</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -173,6 +173,35 @@
             width: 100%;
             height: 100%;
             border: none;
+        }
+
+        /* Iframe loading spinner — shown while iframe src is loading */
+        #iframe-loader {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+            gap: 16px;
+            z-index: 10;
+        }
+        #iframe-loader.hidden { display: none; }
+        .iframe-spinner {
+            width: 40px; height: 40px;
+            border: 3px solid rgba(99,102,241,0.15);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .iframe-loader-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            color: #94a3b8;
+            font-weight: 500;
+            letter-spacing: 0.04em;
         }
 
         /* Saving State */
@@ -414,7 +443,12 @@
             <div id="save-indicator" class="save-indicator">
                 <div class="dot"></div> Auto-saving...
             </div>
-            <iframe id="preview-iframe" src="/preview/{{ website_id }}/home.html"></iframe>
+            <!-- Loading spinner shown while iframe content loads -->
+            <div id="iframe-loader" class="hidden">
+                <div class="iframe-spinner"></div>
+                <span class="iframe-loader-text">Loading your website...</span>
+            </div>
+            <iframe id="preview-iframe" src="about:blank"></iframe>
         </div>
     </div>
 
@@ -427,55 +461,111 @@
         const saveIndicator = document.getElementById('save-indicator');
         const imageInput = document.getElementById('image-upload');
         let currentEditingImg = null;
+        let currentEditingTargetType = 'img';
         let saveTimeout = null;
         let lastSavedHTML = null;
         let isAIGenerating = false;
 
-        // --- AUTOMATIC GENERATION POLLING ---
-        window.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const jobId = urlParams.get('job_id');
-            const overlay = document.getElementById('generation-overlay');
-            const statusLabel = document.getElementById('status-text');
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token'); 
+        const jobId = urlParams.get('job_id');
 
-            if (jobId) {
-                overlay.style.display = 'flex';
-                const poll = setInterval(async () => {
-                    try {
-                        const res = await fetch(`/job-status/${jobId}`);
-                        const data = await res.json();
+        // Create a completely absolute URL starting with https:// to avoid proxy mixed-content redirects
+        const PREVIEW_URL = `${window.location.origin}/preview/${website_id}/home.html`;
+
+        // Helper to get auth headers
+        function getHeaders(extraHeaders = {}) {
+            const h = { ...extraHeaders };
+            if (token) h['Authorization'] = `Bearer ${token}`;
+            return h;
+        }
+
+        // --- AUTOMATIC GENERATION POLLING ---
+        const overlay = document.getElementById('generation-overlay');
+        const statusLabel = document.getElementById('status-text');
+
+        if (jobId) {
+            overlay.style.display = 'flex';
+            let pollAttempts = 0;
+            const maxPollAttempts = 240; // ~10 minutes
+            
+            async function startPolling() {
+                try {
+                    const res = await fetch(`/job-status/${jobId}`, { headers: getHeaders() });
+                    const data = await res.json();
+
+                    if (res.status === 404) {
+                        statusLabel.textContent = "Generation status is no longer available. Loading the site directly...";
+                        document.getElementById('iframe-loader').classList.remove('hidden');
+                        iframe.src = PREVIEW_URL;
+                        return true;
+                    }
+                    
+                    if (data.status === 'processing') {
+                        statusLabel.textContent = "AI is writing your code and choosing styles...";
+                    }
+                    
+                    if (data.status === 'completed') {
+                        statusLabel.textContent = "Almost ready...";
+                        // Show iframe loader BEFORE setting src so no white flash
+                        document.getElementById('iframe-loader').classList.remove('hidden');
+                        iframe.src = PREVIEW_URL;
                         
-                        if (data.status === 'processing') {
-                            statusLabel.textContent = "AI is writing your code and choosing styles...";
-                        }
-                        
-                        if (data.status === 'completed') {
-                            clearInterval(poll);
-                            statusLabel.textContent = "Almost ready...";
-                            
-                            // Refresh iframe to load the actual site
-                            iframe.src = iframe.src;
-                            
-                            // Fade out overlay
-                            setTimeout(() => {
-                                overlay.style.transition = 'opacity 0.8s ease';
-                                overlay.style.opacity = '0';
-                                setTimeout(() => overlay.style.display = 'none', 800);
-                            }, 1000);
-                        } else if (data.status === 'failed') {
-                            clearInterval(poll);
-                            statusLabel.textContent = "Generation failed. Redirecting...";
-                            setTimeout(() => window.location.href = '/', 3000);
-                        }
-                    } catch (e) { console.error("Poll error", e); }
-                }, 2500);
+                        setTimeout(() => {
+                            overlay.style.transition = 'opacity 0.8s ease';
+                            overlay.style.opacity = '0';
+                            setTimeout(() => overlay.style.display = 'none', 800);
+                        }, 1000);
+                        isAIGenerating = false; // Allow deploy and other actions
+                        return true; // Stop
+                    } else if (data.status === 'failed') {
+                        statusLabel.textContent = "Generation failed. Redirecting...";
+                        setTimeout(() => window.location.href = '/', 3000);
+                        return true; // Stop
+                    }
+                } catch (e) { 
+                    console.error("Poll error", e); 
+                    // If we get an error (like 401), don't show blank screen forever
+                    // but don't stop yet, maybe network is just blipping
+                }
+                return false;
             }
-        });
+
+            // Start polling loop
+            const pollInterval = setInterval(async () => {
+                pollAttempts += 1;
+                const shouldStop = await startPolling();
+                if (shouldStop) {
+                    clearInterval(pollInterval);
+                } else if (pollAttempts >= maxPollAttempts) {
+                    clearInterval(pollInterval);
+                    statusLabel.textContent = "Generation is taking longer than expected. Please wait or refresh the page.";
+                    console.warn('Job polling stopped after max attempts');
+                    addBubble('ai', "Generation is still processing. If this continues, please refresh or try again later.");
+                }
+            }, 2500);
+            
+            // Initial call
+            startPolling();
+
+        } else {
+            // No job in progress, load existing site immediately
+            document.getElementById('iframe-loader').classList.remove('hidden');
+            iframe.src = PREVIEW_URL;
+        }
 
         // --- Iframe DOM Management ---
         iframe.onload = () => {
+            // Hide the loading spinner — iframe has content now
+            document.getElementById('iframe-loader').classList.add('hidden');
+
             const doc = iframe.contentDocument;
             const win = iframe.contentWindow;
+            if (isPlaceholderPreview(doc)) {
+                addBubble('ai', "The site files are not ready yet. If you just generated this site, open the editor from the generation result so it includes the job status, or refresh in a moment.");
+                return;
+            }
+
             lastSavedHTML = doc.documentElement.outerHTML;
             
             // Check current path relative to the proxy
@@ -506,6 +596,7 @@
             doc.head.appendChild(style);
             
             setupEditableFields(doc);
+            setupImageReplacement(doc);
         };
 
         function setupEditableFields(doc) {
@@ -535,36 +626,210 @@
                 if (el.closest('nav') || el.closest('footer')) return;
 
                 el.classList.add('eb-img-edit');
-                el.addEventListener('click', (e) => {
-                    if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+            });
+        }
 
+        function hasBackgroundImage(el) {
+            if (!el || el.closest('nav') || el.closest('footer')) return false;
+            const inlineBg = el.style && el.style.backgroundImage;
+            const computedBg = iframe.contentWindow.getComputedStyle(el).backgroundImage;
+            return (inlineBg && inlineBg !== 'none') || (computedBg && computedBg !== 'none');
+        }
+
+        function setupImageReplacement(doc) {
+            doc.querySelectorAll('section, div').forEach(el => {
+                if (hasBackgroundImage(el)) {
+                    el.classList.add('eb-img-edit');
+                    el.style.cursor = 'pointer';
+                }
+            });
+
+            function findBackgroundTarget(start) {
+                let el = start;
+                while (el && el !== doc.body && el.nodeType === 1) {
+                    if (hasBackgroundImage(el)) return el;
+                    el = el.parentElement;
+                }
+                return null;
+            }
+
+            doc.addEventListener('click', (e) => {
+                console.log('Click detected on:', e.target.tagName, e.target.className);
+                if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+
+                const img = e.target.closest('img');
+                if (img && !img.closest('nav') && !img.closest('footer')) {
+                    console.log('Image clicked for replacement:', img.src);
                     e.preventDefault();
-                    currentEditingImg = el;
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    currentEditingImg = img;
+                    currentEditingTargetType = 'img';
                     imageInput.click();
+                    return;
+                }
+
+                const bgTarget = findBackgroundTarget(e.target);
+                if (bgTarget && hasBackgroundImage(bgTarget)) {
+                    console.log('Background image clicked for replacement');
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    currentEditingImg = bgTarget;
+                    currentEditingTargetType = 'background';
+                    imageInput.click();
+                }
+            }, true);
+        }
+
+        function setImageSource(img, url) {
+            if (!img || !url) return;
+            img.removeAttribute('srcset');
+            img.removeAttribute('data-src');
+            img.removeAttribute('data-srcset');
+            img.setAttribute('src', url);
+            img.src = url;
+
+            const picture = img.closest('picture');
+            if (picture) {
+                picture.querySelectorAll('source').forEach(source => {
+                    source.removeAttribute('srcset');
+                    source.removeAttribute('data-srcset');
                 });
+            }
+        }
+
+        function setBackgroundImage(el, url) {
+            if (!el || !url) return;
+            const current = el.style.backgroundImage || iframe.contentWindow.getComputedStyle(el).backgroundImage || '';
+            if (current.includes('linear-gradient')) {
+                const gradient = current.split(/,\s*url\(/i)[0];
+                el.style.backgroundImage = `${gradient}, url("${url}")`;
+            } else {
+                el.style.backgroundImage = `url("${url}")`;
+            }
+        }
+
+        function getReplacementSource(target, type) {
+            if (!target) return '';
+            if (type === 'background') {
+                return target.style.backgroundImage || iframe.contentWindow.getComputedStyle(target).backgroundImage || '';
+            }
+            return target.getAttribute('src') || target.src || '';
+        }
+
+        function getBackgroundImageUrl(el) {
+            if (!el) return '';
+            const bg = el.style.backgroundImage || iframe.contentWindow.getComputedStyle(el).backgroundImage || '';
+            const match = bg.match(/url\(["']?([^"')]+)["']?\)/i);
+            return match ? match[1] : '';
+        }
+
+        function addCacheBuster(url) {
+            if (!url || url.startsWith('blob:') || url.startsWith('data:')) return url;
+            const joiner = url.includes('?') ? '&' : '?';
+            return `${url}${joiner}v=${Date.now()}`;
+        }
+
+        function setReplacementSource(target, type, url) {
+            if (type === 'background') {
+                setBackgroundImage(target, url);
+            } else {
+                setImageSource(target, url);
+            }
+        }
+
+        function waitForImageLoad(img) {
+            return new Promise(resolve => {
+                if (!img) return resolve();
+                if (img.complete && img.naturalWidth > 0) return resolve();
+                const done = () => resolve();
+                img.addEventListener('load', done, { once: true });
+                img.addEventListener('error', done, { once: true });
+                setTimeout(done, 2500);
+            });
+        }
+
+        function fileToDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
             });
         }
 
         // Image Upload Logic
         imageInput.addEventListener('change', async (e) => {
+            console.log('Image input change event triggered');
             const file = e.target.files[0];
-            if (!file || !currentEditingImg) return;
+            console.log('Selected file:', file ? file.name : 'No file');
+            if (!file || !currentEditingImg) {
+                console.log('No file or no current editing image');
+                imageInput.value = '';
+                return;
+            }
 
             const formData = new FormData();
             formData.append('image', file);
             formData.append('website_id', website_id);
+            const targetImg = currentEditingImg;
+            const targetType = currentEditingTargetType;
+            const oldUrl = targetType === 'background' ? getBackgroundImageUrl(targetImg) : targetImg.getAttribute('src');
+            formData.append('old_url', oldUrl || '');
+            const previousSrc = getReplacementSource(targetImg, targetType);
+            const previewUrl = await fileToDataUrl(file);
+            setReplacementSource(targetImg, targetType, previewUrl);
+            addBubble('ai', "Uploading image...");
 
             try {
+                console.log('Sending upload request to /upload-image');
                 const res = await fetch('/upload-image', {
                     method: 'POST',
+                    headers: getHeaders(),
+                    credentials: 'same-origin',
                     body: formData
                 });
-                const data = await res.json();
-                if (data.url) {
-                    currentEditingImg.src = data.url;
-                    checkAndAutoSave();
+                console.log('Upload response status:', res.status);
+                
+                if (!res.ok) {
+                    const data = await res.json();
+                    console.log('Upload failed with data:', data);
+                    setReplacementSource(targetImg, targetType, previousSrc);
+                    addBubble('ai', `Image upload failed: ${data.error || 'HTTP ' + res.status}`);
+                    return;
                 }
-            } catch (err) { console.error("Image upload failed", err); }
+                
+                const data = await res.json();
+                console.log('Upload success data:', data);
+                if (!data.url) {
+                    setReplacementSource(targetImg, targetType, previousSrc);
+                    addBubble('ai', "Image upload returned no URL. Please try again.");
+                    return;
+                }
+                
+                const finalUrl = addCacheBuster(data.url);
+                setReplacementSource(targetImg, targetType, finalUrl);
+                
+                if (targetType !== 'background') {
+                    await waitForImageLoad(targetImg);
+                }
+                
+                const saved = await performSave(iframe.contentDocument.documentElement.outerHTML, getCurrentPageName());
+                if (!saved) {
+                    addBubble('ai', "Image was uploaded, but saving the page failed. Please try Save & Download after the preview updates.");
+                    return;
+                }
+                addBubble('ai', "Image replaced and saved.");
+            } catch (err) {
+                setReplacementSource(targetImg, targetType, previousSrc);
+                console.error("Image upload failed", err);
+                addBubble('ai', "Image upload failed: " + (err.message || "Please check your connection and try again."));
+            } finally {
+                imageInput.value = '';
+                currentEditingImg = null;
+                currentEditingTargetType = 'img';
+            }
         });
 
         function getCurrentPageName() {
@@ -573,6 +838,12 @@
                 const filename = url.split('/').pop() || 'home.html';
                 return filename.split('?')[0];
             } catch(e) { return 'home.html'; }
+        }
+
+        function isPlaceholderPreview(doc) {
+            if (!doc || !doc.body) return true;
+            const text = doc.body.innerText || '';
+            return text.includes('Still generating') || text.includes('Generation may have failed');
         }
 
         function checkAndAutoSave() {
@@ -593,19 +864,30 @@
         }
 
         async function performSave(html, page_name) {
-            if (!html || !page_name) return;
+            page_name = page_name || getCurrentPageName();
+            if (!html || !page_name) return false;
+            if (isPlaceholderPreview(iframe.contentDocument)) {
+                addBubble('ai', "Your website is still being prepared. Please wait for the preview to load before saving.");
+                return false;
+            }
             saveIndicator.style.display = 'flex';
             try {
                 const res = await fetch('/save', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify({ website_id, html, page_name })
                 });
                 if (res.ok) {
                     lastSavedHTML = html;
+                    return true;
                 }
+                const data = await res.json().catch(() => ({}));
+                addBubble('ai', "Save failed: " + (data.error || "Please try again."));
+                return false;
             } catch (err) { 
                 console.error("Save failed", err); 
+                addBubble('ai', "Save failed. Please check your connection and try again.");
+                return false;
             } finally {
                 setTimeout(() => saveIndicator.style.display = 'none', 800);
             }
@@ -697,15 +979,25 @@
 
             // Ensure any pending changes are saved
             const currentHTML = iframe.contentDocument.documentElement.outerHTML;
-            await performSave(currentHTML);
+            const saved = await performSave(currentHTML, getCurrentPageName());
+            if (!saved) {
+                btn.innerHTML = originalText;
+                btn.style.pointerEvents = 'auto';
+                btn.style.opacity = '1';
+                return;
+            }
             
             addBubble('ai', "Provisioning project and deploying to Vercel... (this may take up to 30 seconds)");
             
             try {
-                const res = await fetch(`/deploy/${website_id}`, { method: 'POST' });
-                const data = await res.json();
+                const res = await fetch(`/deploy/${website_id}`, { 
+                    method: 'POST',
+                    headers: getHeaders()
+                });
+                const data = await res.json().catch(() => ({}));
+                console.log('Deploy response', res.status, data);
                 
-                if (data.success && data.url) {
+                if (res.ok && data.success && data.url) {
                     btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Deployed!`;
                     btn.style.background = '#10b981';
                     btn.style.color = '#fff';
@@ -730,13 +1022,15 @@
                         btn.style.opacity = '1';
                     }, 5000);
                 } else {
-                    addBubble('ai', "Deployment failed: " + (data.error || "Unknown error"));
+                    const message = data.error || `Server returned ${res.status}`;
+                    const details = data.details ? ` (${data.details})` : '';
+                    addBubble('ai', "Deployment failed: " + message + details);
                     btn.innerHTML = originalText;
                     btn.style.pointerEvents = 'auto';
                     btn.style.opacity = '1';
                 }
             } catch (err) {
-                console.error(err);
+                console.error('Deploy fetch error', err);
                 addBubble('ai', "Could not connect to deployment server.");
                 btn.innerHTML = originalText;
                 btn.style.pointerEvents = 'auto';
@@ -746,8 +1040,10 @@
 
         async function triggerDownload() {
             const currentHTML = iframe.contentDocument.documentElement.outerHTML;
-            await performSave(currentHTML);
-            window.location.href = `/download/${website_id}`;
+            const saved = await performSave(currentHTML, getCurrentPageName());
+            if (!saved) return;
+            const downloadUrl = `/download/${website_id}${token ? '?token='+token : ''}`;
+            window.location.href = downloadUrl;
         }
     </script>
 </body>

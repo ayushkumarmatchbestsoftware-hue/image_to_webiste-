@@ -3,6 +3,7 @@ import uuid
 import boto3
 from typing import Optional
 from dotenv import load_dotenv
+from botocore.config import Config
 load_dotenv()
 
 
@@ -36,6 +37,7 @@ r2_client = boto3.client(
     aws_access_key_id=R2_ACCESS_KEY_ID,
     aws_secret_access_key=R2_SECRET_ACCESS_KEY,
     region_name="auto",  # REQUIRED for Cloudflare R2
+    config=Config(proxies={}),
 )
 
 
@@ -77,4 +79,4 @@ def fetch_media_from_r2(object_key: str) -> bytes:
         Bucket=R2_BUCKET_NAME,
         Key=object_key,
     )
-    return response["Body"].read()
+    return response["Body"].read()
