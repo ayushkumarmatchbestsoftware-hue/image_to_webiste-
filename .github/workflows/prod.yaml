@@ -108,6 +108,7 @@ jobs:
           host: ${{ secrets[matrix.host_secret] }}
           username: ubuntu
           key: ${{ secrets[matrix.key_secret] }}
+          envs: WEB_NEW_IMAGE,WORKER_NEW_IMAGE,WEB_IMAGE_ARCHIVE,WORKER_IMAGE_ARCHIVE
           script: |
             set -euo pipefail
             APP_DIRECTORY="/home/ubuntu/website-generator"
@@ -141,7 +142,7 @@ jobs:
             done
             
             if [ "$HEALTH_OK" != "true" ]; then
-              sudo docker logs --tail 50 flask-app-web-prod || true
+              sudo docker logs --tail 50 flask-app-web-staging || true
               exit 1
             fi
             
