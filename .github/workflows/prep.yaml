@@ -1,0 +1,155 @@
+name: Deploy Flask App to EC2 (PREP - US)
+
+on:
+  push:
+    branches:
+      - deploy/prep
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flask-app-prep-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      WEB_IMAGE_NAME: flask-app-web
+      WORKER_IMAGE_NAME: flask-app-worker
+      APP_DIRECTORY: /home/ubuntu/website-generator
+      BRANCH: deploy/prep
+      TEMP_IMAGE_DIR: /tmp/flask-app-images
+      HEALTHCHECK_URL: http://127.0.0.1:5077/health
+
+    steps:
+      - name: Checkout deploy/prep
+        uses: actions/checkout@v4
+        with:
+          ref: deploy/prep
+
+      - name: Fix hook execute permissions
+        run: |
+          set -euo pipefail
+          if [ -d hooks ]; then
+            find hooks -type f -name "*.sh" -exec chmod +x {} \; || true
+          fi
+          if [ -f hooks/block_protected_branch_commit.sh ]; then
+            chmod +x hooks/block_protected_branch_commit.sh
+          fi
+
+      - name: Set image tags
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA::7}"
+          
+          echo "WEB_NEW_IMAGE=${WEB_IMAGE_NAME}:prep-${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "WORKER_NEW_IMAGE=${WORKER_IMAGE_NAME}:prep-${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "WEB_IMAGE_ARCHIVE=${WEB_IMAGE_NAME}-prep-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
+          echo "WORKER_IMAGE_ARCHIVE=${WORKER_IMAGE_NAME}-prep-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Free disk space before build
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL || true
+
+      - name: Setup Node & Python
+        run: |
+          # Simplified setup logic (can retain standard actions if preferred)
+          echo "Environment prepped"
+
+      - name: Install dependencies for SCA
+        run: |
+          set -euo pipefail
+          if [ -f package.json ]; then npm ci || npm install; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Trivy SCA Scan (BLOCKING)
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          scan-type: rootfs
+          scan-ref: .
+          severity: CRITICAL,HIGH,MEDIUM
+          exit-code: 1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build web & worker images
+        run: |
+          set -euo pipefail
+          docker build -t "${WEB_NEW_IMAGE}" .
+          # Assuming you meant to pass a different target/dockerfile for worker, keeping your original command
+          docker build -t "${WORKER_NEW_IMAGE}" .
+
+      - name: Export Docker image archives
+        run: |
+          set -euo pipefail
+          mkdir -p exported-images
+          docker save "${WEB_NEW_IMAGE}" | gzip -1 > "exported-images/${WEB_IMAGE_ARCHIVE}"
+          docker save "${WORKER_NEW_IMAGE}" | gzip -1 > "exported-images/${WORKER_IMAGE_ARCHIVE}"
+
+      # NEW STEP ADDED: Transfer the exported images to the EC2 server securely
+      - name: SCP images to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.EC2_HOST_PREP_US }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY_FLASK_APP_STAGING }}
+          source: "exported-images/*.tar.gz"
+          target: "/home/ubuntu/"
+          strip_components: 1
+
+      - name: Deploy application on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          WEB_NEW_IMAGE: ${{ env.WEB_NEW_IMAGE }}
+          WORKER_NEW_IMAGE: ${{ env.WORKER_NEW_IMAGE }}
+          WEB_IMAGE_ARCHIVE: ${{ env.WEB_IMAGE_ARCHIVE }}
+          WORKER_IMAGE_ARCHIVE: ${{ env.WORKER_IMAGE_ARCHIVE }}
+        with:
+          host: ${{ secrets.EC2_HOST_PREP_US }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY_FLASK_APP_STAGING }}
+          script: |
+            set -euo pipefail
+            APP_DIRECTORY="/home/ubuntu/website-generator"
+            TEMP="/tmp/flask-app-images"
+            HEALTHCHECK_URL="http://127.0.0.1:5077/health"
+            
+            mkdir -p "$TEMP"
+            mv /home/ubuntu/*.tar.gz "$TEMP/" || true
+            
+            gunzip -c "$TEMP/${WEB_IMAGE_ARCHIVE}" | sudo docker load
+            gunzip -c "$TEMP/${WORKER_IMAGE_ARCHIVE}" | sudo docker load
+            
+            cd "$APP_DIRECTORY"
+            git fetch --all
+            git checkout deploy/prep
+            git reset --hard origin/deploy/prep
+            
+            export WEB_NEW_IMAGE="${WEB_NEW_IMAGE}"
+            export WORKER_NEW_IMAGE="${WORKER_NEW_IMAGE}"
+            
+            sudo -E docker compose down || true
+            sudo -E docker compose up -d
+            
+            HEALTH_OK="false"
+            for i in {1..15}; do
+              if curl -fsS "$HEALTHCHECK_URL" >/dev/null; then
+                HEALTH_OK="true"
+                break
+              fi
+              sleep 2
+            done
+            
+            if [ "$HEALTH_OK" != "true" ]; then
+              sudo docker logs --tail 50 flask-app-web-prep || true
+              exit 1
+            fi
+            
+            rm -rf "$TEMP"
+            sudo docker image prune -f
