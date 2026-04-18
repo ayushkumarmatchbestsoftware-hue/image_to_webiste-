@@ -1,0 +1,149 @@
+name: Deploy Flask App to EC2 (PROD - Multi-Region)
+
+on:
+  push:
+    branches:
+      - deploy/prod
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flask-app-prod-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  WEB_IMAGE_NAME: flask-app-web
+  WORKER_IMAGE_NAME: flask-app-worker
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout deploy/prod
+        uses: actions/checkout@v4
+        with:
+          ref: deploy/prod
+
+      - name: Set dynamic tags
+        id: tags
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "WEB_NEW_IMAGE=${WEB_IMAGE_NAME}:prod-${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "WORKER_NEW_IMAGE=${WORKER_IMAGE_NAME}:prod-${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "WEB_IMAGE_ARCHIVE=${WEB_IMAGE_NAME}-prod-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
+          echo "WORKER_IMAGE_ARCHIVE=${WORKER_IMAGE_NAME}-prod-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Build web & worker images
+        run: |
+          docker build -t "${WEB_NEW_IMAGE}" .
+          docker build -t "${WORKER_NEW_IMAGE}" .
+
+      - name: Export Docker image archives
+        run: |
+          mkdir -p exported-images
+          docker save "${WEB_NEW_IMAGE}" | gzip -1 > "exported-images/${WEB_IMAGE_ARCHIVE}"
+          docker save "${WORKER_NEW_IMAGE}" | gzip -1 > "exported-images/${WORKER_IMAGE_ARCHIVE}"
+          
+          # Save variables for the next job
+          echo "WEB_NEW_IMAGE=${WEB_NEW_IMAGE}" > exported-images/env_vars.txt
+          echo "WORKER_NEW_IMAGE=${WORKER_NEW_IMAGE}" >> exported-images/env_vars.txt
+          echo "WEB_IMAGE_ARCHIVE=${WEB_IMAGE_ARCHIVE}" >> exported-images/env_vars.txt
+          echo "WORKER_IMAGE_ARCHIVE=${WORKER_IMAGE_ARCHIVE}" >> exported-images/env_vars.txt
+
+      - name: Upload Artifacts for Deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-images
+          path: exported-images/
+          retention-days: 1
+
+  deploy-to-regions:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false # Allows other regions to finish deploying even if one fails
+      matrix:
+        include:
+          - region: us
+            host_secret: EC2_HOST_PREP_US
+            key_secret: EC2_SSH_KEY_FLASK_APP_STAGING
+          - region: eu
+            host_secret: EC2_HOST_PROD_EU
+            key_secret: EC2_SSH_KEY_FLASK_APP_STAGING
+          - region: ap
+            host_secret: EC2_HOST_PROD_AP
+            key_secret: EC2_SSH_KEY_FLASK_APP_STAGING
+
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: prod-images
+          path: exported-images
+
+      - name: Load Environment Variables
+        run: cat exported-images/env_vars.txt >> "$GITHUB_ENV"
+
+      - name: SCP images to EC2 (${{ matrix.region }})
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: ubuntu
+          key: ${{ secrets[matrix.key_secret] }}
+          source: "exported-images/*.tar.gz"
+          target: "/home/ubuntu/"
+          strip_components: 1
+
+      - name: Deploy application on EC2 (${{ matrix.region }})
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          WEB_NEW_IMAGE: ${{ env.WEB_NEW_IMAGE }}
+          WORKER_NEW_IMAGE: ${{ env.WORKER_NEW_IMAGE }}
+          WEB_IMAGE_ARCHIVE: ${{ env.WEB_IMAGE_ARCHIVE }}
+          WORKER_IMAGE_ARCHIVE: ${{ env.WORKER_IMAGE_ARCHIVE }}
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: ubuntu
+          key: ${{ secrets[matrix.key_secret] }}
+          script: |
+            set -euo pipefail
+            APP_DIRECTORY="/home/ubuntu/website-generator"
+            TEMP="/tmp/flask-app-images"
+            HEALTHCHECK_URL="http://127.0.0.1:5077/health"
+            
+            mkdir -p "$TEMP"
+            mv /home/ubuntu/*.tar.gz "$TEMP/" || true
+            
+            gunzip -c "$TEMP/${WEB_IMAGE_ARCHIVE}" | sudo docker load
+            gunzip -c "$TEMP/${WORKER_IMAGE_ARCHIVE}" | sudo docker load
+            
+            cd "$APP_DIRECTORY"
+            git fetch --all
+            git checkout deploy/prod
+            git reset --hard origin/deploy/prod
+            
+            export WEB_NEW_IMAGE="${WEB_NEW_IMAGE}"
+            export WORKER_NEW_IMAGE="${WORKER_NEW_IMAGE}"
+            
+            sudo -E docker compose down || true
+            sudo -E docker compose up -d
+            
+            HEALTH_OK="false"
+            for i in {1..15}; do
+              if curl -fsS "$HEALTHCHECK_URL" >/dev/null; then
+                HEALTH_OK="true"
+                break
+              fi
+              sleep 2
+            done
+            
+            if [ "$HEALTH_OK" != "true" ]; then
+              sudo docker logs --tail 50 flask-app-web-prod || true
+              exit 1
+            fi
+            
+            rm -rf "$TEMP"
+            sudo docker image prune -f
