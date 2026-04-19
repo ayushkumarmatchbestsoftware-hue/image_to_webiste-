@@ -19,18 +19,15 @@ COPY requirements.txt .
 RUN pip install --upgrade pip==25.3 wheel==0.46.2
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install implicit dependencies missing from requirements.txt but used in the codebase
-RUN pip install --no-cache-dir redis sqlalchemy boto3 asgiref
-
 # Copy the rest of the application
 COPY . .
 
 # Expose port (as seen in app.py main block)
-EXPOSE 5000
+EXPOSE 5077
 
-# Set environment variables for Flask
-ENV FLASK_APP=app.py
+# Set environment variables
+ENV ENVIRONMENT=production
 ENV PYTHONUNBUFFERED=1
 
-# Default command for the web service
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5077"]
+# Default command for the web service (Industry Standard Gunicorn)
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5077", "app:app"]
