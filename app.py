@@ -2532,5 +2532,8 @@ CURRENT HTML:
 
 
 if __name__ == "__main__":
-    print("--- SERVER STARTING ON PORT 5077 ---", flush=True)
-    app.run(debug=True, port=5077, use_reloader=False)
+    # Local development entry point
+    env  = app.config.get("ENVIRONMENT", "development")
+    port = int(os.environ.get("PORT", 5077))
+    print(f"--- SERVER STARTING ON PORT {port} [{env}] ---", flush=True)
+    app.run(host="127.0.0.1", port=port, debug=(env == "development"))
