@@ -24,7 +24,8 @@ import os
 
 # Fix for Windows IOCP Error 22 on forceful restart
 if os.name == 'nt':
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    # ProactorEventLoop is required for subprocesses on Windows
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 import sys
 import traceback
 import uuid as pyuuid_module
@@ -55,24 +56,24 @@ from core.redis import (
 from core.r2 import upload_media_to_r2, R2_PUBLIC_URL
 from core.db import get_engine
 
+# ── Project configuration ──
+ENABLE_CHAT_EDIT = os.getenv("ENABLE_CHAT_EDIT", "False").lower() == "true"
+WEBSITE_CONTEXTS = {} # Local in-memory context (not used if chat is disabled)
+
 # Deployment service
 from services.vercel_service import run_vercel_deployment
 
-# Flask rendering
-from flask import render_template
-from app import (
-    app,
-    generate_website_content,
-    build_image_map,
-    PALETTE_MAP,
-    WEBSITE_CONTEXTS,
-    ENABLE_CHAT_EDIT,
+# Jinja2 rendering (Standalone, no Flask)
+import jinja2
+
+from core.utils import (
+    generate_website_content_logic,
+    build_image_map_logic,
 )
-from sqlalchemy import insert
-import uuid as pyuuid
+from core.constants import PALETTE_MAP, INDUSTRY_TEMPLATES, system_prompt_text
 
 # ── DB models ──
-from core.mongo import insert_website_data
+from core.mongo import insert_website_data, update_website_final_url
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -111,6 +112,19 @@ def log_worker(msg: str, **extra):
 # Core generation pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 
+# AI Client for Worker
+from google import genai
+from config import Config
+try:
+    _api_key = Config.GEMINI_API_KEY
+    genai_client = genai.Client(api_key=_api_key) if _api_key else None
+except Exception:
+    genai_client = None
+
+# Setup standalone Jinja2 environment
+template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+jinja_env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
+
 async def process_job(job: dict):
     """
     Runs the full website generation pipeline for a single queued job.
@@ -139,8 +153,26 @@ async def process_job(job: dict):
     log("INFO", job_id, "Calling Gemini AI for content generation",
         model="gemini-flash", image_count=len(image_paths))
     
-    data = await generate_website_content(
-        prompt, image_paths, len(image_paths),
+    from core.constants import NICHE_DESIGN, LAYOUT_POOLS
+    from core.utils import (
+        get_fallback_tokens_logic, 
+        get_layout_blueprint_logic, 
+        validate_and_fix_theme
+    )
+    
+    def get_fallback_tokens(p): return get_fallback_tokens_logic(p, NICHE_DESIGN)
+    def get_layout_blueprint(p): return get_layout_blueprint_logic(p, LAYOUT_POOLS)
+
+    data = await generate_website_content_logic(
+        genai_client,
+        prompt, 
+        system_prompt_text,
+        get_fallback_tokens,
+        get_layout_blueprint,
+        INDUSTRY_TEMPLATES,
+        validate_and_fix_theme,
+        image_paths, 
+        len(image_paths), 
         industry=user_industry or None
     )
 
@@ -178,51 +210,55 @@ async def process_job(job: dict):
 
     # ── Step 5: Build image map ──
     clean_image_urls = [u for u in image_urls if u]
-    image_map = build_image_map(clean_image_urls, layout)
-    log("INFO", job_id, "Image map built",
-        hero=bool(image_map.get("hero")),
-        about=bool(image_map.get("about")),
-        portfolio=len(image_map.get("portfolio", [])),
-        overflow=len(image_map.get("overflow", [])))
+    image_map = build_image_map_logic(clean_image_urls, layout)
 
-    # ── Step 6: Prepare template context ──
+    # ── Step 6: Filter Layout & Prepare final context ──
     site_name  = data.get("site_info", {}).get("display_name", "My Business")
     site_title = data.get("site_info", {}).get("site_title", site_name)
     tagline    = data.get("site_info", {}).get("tagline", "")
     footer     = data.get("footer", {})
 
+    # Only keep sections that were actually returned by the AI (key exists in data)
+    # IMPORTANT: use 'section in data' NOT 'data.get(section)' because {} and [] are falsy
+    # IMPORTANT: read from 'layout' (resolved in Step 3), NOT from job.get('user_layout')
+    # because 'user_layout' is not stored in the Redis job payload.
+    original_layout = list(layout)
+    active_layout = []
+    for section in original_layout:
+        if section == 'hero' or section in data:
+            active_layout.append(section)
+    
+    log("INFO", job_id, f"Pruned layout from {len(original_layout)} to {len(active_layout)} active sections")
+
+    # Define base context ONCE after pruning
     base_ctx = dict(
         site_name=site_name, site_title=site_title,
         tagline=tagline, theme=theme, footer=footer,
-        layout=layout, image_map=image_map,
+        layout=active_layout, image_map=image_map,
         image_count=len(clean_image_urls),
         has_images=(len(clean_image_urls) > 0),
         logo=logo_url,
         services_img=image_map.get("services"),
         testimonials_img=image_map.get("testimonials"),
         overflow_imgs=image_map.get("overflow", []),
+        images=clean_image_urls
     )
 
     # ── Step 7: Render + upload home.html ──
-    log("INFO", job_id, "Rendering home.html")
-    def sync_render_home():
-        with app.app_context():
-            return render_template(
-                "home.html", **base_ctx,
-                home=data.get("home", {}),
-                about=data.get("about", {}),
-                services=data.get("services", []),
-                portfolio=data.get("portfolio", []),
-                testimonials=data.get("testimonials", []),
-                faq=data.get("faq", []),
-                pricing=data.get("pricing", []),
-                stats=data.get("stats", []),
-                contact=data.get("contact", {}),
-                images=clean_image_urls,
-            )
-    
-    home_html = await asyncio.to_thread(sync_render_home)
+    home_html = jinja_env.get_template("home.html").render(
+        **base_ctx,
+        home=data.get("home", {}),
+        about=data.get("about", {}),
+        services=data.get("services", []),
+        portfolio=data.get("portfolio", []),
+        testimonials=data.get("testimonials", []),
+        faq=data.get("faq", []),
+        pricing=data.get("pricing", []),
+        stats=data.get("stats", []),
+        contact=data.get("contact", {}),
+    )
 
+    print(f"[WORKER IO] -> Starting R2 Upload for website_id={website_id}")
     await asyncio.to_thread(
         upload_media_to_r2,
         home_html.encode("utf-8"), "text/html",
@@ -231,28 +267,34 @@ async def process_job(job: dict):
     log("INFO", job_id, "home.html uploaded to R2")
 
     # ── Step 8: Render + upload sub-pages ──
-    page_templates = {
-        "about.html":     ("about.html",     dict(**base_ctx, about=data.get("about", {}), services=data.get("services", []), images=clean_image_urls)),
-        "services.html":  ("services.html",  dict(**base_ctx, services=data.get("services", []), images=clean_image_urls)),
-        "portfolio.html": ("portfolio.html", dict(**base_ctx, portfolio=data.get("portfolio", []), images=clean_image_urls)),
-        "contact.html":   ("contact.html",   dict(**base_ctx, contact=data.get("contact", {}), images=clean_image_urls)),
+    # Only generate pages if they are in the active layout AND have AI data
+    page_templates_config = {
+        "about.html":     ("about.html",     "about"),
+        "services.html":  ("services.html",  "services"),
+        "portfolio.html": ("portfolio.html", "portfolio"),
+        "contact.html":   ("contact.html",   "contact"),
     }
-
-    def sync_render_page(tmpl, ctx):
-        with app.app_context():
-            return render_template(tmpl, **ctx)
-
-    for out_name, (tmpl, ctx) in page_templates.items():
-        try:
-            html = await asyncio.to_thread(sync_render_page, tmpl, ctx)
-            await asyncio.to_thread(
-                upload_media_to_r2,
-                html.encode("utf-8"), "text/html",
-                folder=f"websites/{website_id}", filename=out_name
-            )
-            log("INFO", job_id, f"{out_name} uploaded to R2")
-        except Exception as page_err:
-            log("WARN", job_id, f"Failed to render/upload {out_name}", error=str(page_err))
+    
+    for out_name, (tmpl, section_key) in page_templates_config.items():
+        if section_key in active_layout:
+            try:
+                # Always pass services alongside its own section to prevent Jinja2 UndefinedError
+                extra_ctx = {section_key: data.get(section_key, {})}
+                if section_key == 'about':
+                    extra_ctx['services'] = data.get('services', [])
+                
+                html = jinja_env.get_template(tmpl).render(
+                    **base_ctx,
+                    **extra_ctx
+                )
+                await asyncio.to_thread(
+                    upload_media_to_r2,
+                    html.encode("utf-8"), "text/html",
+                    folder=f"websites/{website_id}", filename=out_name
+                )
+                log("INFO", job_id, f"{out_name} uploaded to R2")
+            except Exception as page_err:
+                log("WARN", job_id, f"Failed to render/upload {out_name}", error=str(page_err))
 
     # ── Step 9: Backup home.html ──
     try:
@@ -272,19 +314,22 @@ async def process_job(job: dict):
             "website_id": website_id,
             "user_id": str(user_id),
             "prompt": prompt,
+            "logo": logo_url,
             "status": "completed",
             "progress": "100",
             "final_url": f"{R2_PUBLIC_URL}/websites/{website_id}/home.html",
             "industry": user_industry,
             "site_name": site_name,
             "tagline": tagline,
-            "layout": list(layout),
+            "layout": active_layout,
             "theme": dict(theme),
             "footer": dict(footer) if isinstance(footer, dict) else footer,
             "ai_data": data,
             "chat_messages": []
         }
+        print(f"[WORKER IO]    Persisting to Mongo | website_id={website_id}")
         await insert_website_data(website_doc, db_image_records)
+        print(f"[WORKER IO] <- Generation Pipeline | SUCCESS")
         log("INFO", job_id, "Database persisted to MongoDB successfully")
     except Exception as db_err:
         log("ERROR", job_id, "MongoDB persistence failed — generation still succeeded", error=str(db_err))
@@ -294,7 +339,7 @@ async def process_job(job: dict):
         WEBSITE_CONTEXTS[website_id] = {
             "prompt":        prompt,
             "industry":      user_industry,
-            "layout":        list(layout),
+            "layout":        list(active_layout),
             "theme":         dict(theme),
             "data":          data,
             "image_context": clean_image_urls,
@@ -387,13 +432,27 @@ async def run_worker():
                 
                 async def _task():
                     if job_type == "WEBSITE_GENERATION":
+                        print(f"[WORKER IO] -> Processing WEBSITE_GENERATION | job={job_id}")
                         await process_job(job)
+                        print(f"[WORKER IO] <- WEBSITE_GENERATION COMPLETE")
                     elif job_type == "VERCEL_DEPLOYMENT":
                         website_id = job.get("website_id")
                         try:
+                            print(f"[WORKER IO] -> Processing VERCEL_DEPLOYMENT | website_id={website_id}")
                             log("INFO", job_id, f"[DEPLOY START] for {website_id}")
+                            await mark_job_processing(job_id)
                             vercel_url = await run_vercel_deployment(website_id)
+                            print(f"[WORKER IO]    Vercel URL captured: {vercel_url}")
+                            
+                            # Update the persistent database (History) with the real Vercel URL
+                            try:
+                                await update_website_final_url(website_id, vercel_url)
+                                log("INFO", job_id, f"Database updated with Vercel URL for {website_id}")
+                            except Exception as db_err:
+                                log("ERROR", job_id, f"Failed to update final_url in DB", error=str(db_err))
+
                             await mark_job_completed(job_id, website_id, vercel_url)
+                            print(f"[WORKER IO] <- VERCEL_DEPLOYMENT SUCCESS")
                             log("INFO", job_id, f"[DEPLOY SUCCESS]: {vercel_url}")
                         finally:
                             # SAFE DELETE: Only remove the lock if we are the ones who own it.
@@ -444,4 +503,7 @@ async def run_worker():
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    import sys
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     asyncio.run(run_worker())
