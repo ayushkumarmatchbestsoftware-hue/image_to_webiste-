@@ -23,11 +23,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Expose port (as seen in app.py main block)
-EXPOSE 5077
-
+EXPOSE 5000
 # Set environment variables
 ENV ENVIRONMENT=production
 ENV PYTHONUNBUFFERED=1
 
 # Default command for the web service (Industry Standard Gunicorn)
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5077", "app:app"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
