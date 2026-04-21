@@ -194,6 +194,10 @@ def allowed_file(filename):
 # ROUTES
 # ---------------------------------------------------------------------------
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "service": "Website AI API"}
+
 @app.get("/")
 async def index():
     return {"status": "online", "service": "Website AI API", "message": "Backend is running correctly."}

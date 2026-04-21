@@ -73,7 +73,7 @@ jobs:
         if: ${{ hashFiles('requirements.txt') != '' }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.10"
 
       - name: Install dependencies for SCA
         run: |
@@ -177,7 +177,7 @@ jobs:
               echo "Health check failed"
               sudo docker logs --tail 50 flask-app-web-staging || true
               sudo docker logs --tail 50 flask-app-worker-staging || true
-              exit 0
+              exit 1
             fi
       
             rm -rf "$TEMP"
