@@ -148,7 +148,7 @@ jobs:
             done
             
             if [ "$HEALTH_OK" != "true" ]; then
-              sudo docker logs --tail 50 flask-app-web-prep || true
+              sudo docker logs --tail 50 flask-app-web-stage || true
               exit 1
             fi
             
