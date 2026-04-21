@@ -12,6 +12,7 @@ from PIL import Image
 
 from core.r2 import upload_media_to_r2, fetch_media_from_r2, R2_PUBLIC_URL
 from core.mongo import get_website_layout
+from core.utils import clean_editor_artifacts
 
 async def run_vercel_deployment(website_id: str):
     """
@@ -48,22 +49,6 @@ async def run_vercel_deployment(website_id: str):
         if decoded.startswith(base_url): return decoded[len(base_url):].lstrip("/").split("?", 1)[0]
         return None
 
-    def clean_editor_artifacts(html: str) -> str:
-        # Standard cleaning logic
-        html = re.sub(r'<div\s+id="edit-toolbar"[\s\S]*?</div>\s*</div>', '', html)
-        html = re.sub(r'<div\s+id="save-bar"[\s\S]*?</div>', '', html)
-        html = re.sub(r'<div\s+id="save-indicator"[\s\S]*?</div>', '', html)
-        html = re.sub(r'<div\s+id="edit-hint-bar"[\s\S]*?</div>', '', html)
-        html = re.sub(r'\s*contenteditable="true"', '', html)
-        html = re.sub(r'\s*data-[a-zA-Z0-9_\-]+="[^"]*"', '', html)
-        
-        def _clean_eb(m):
-            sp = m.group(1)
-            kept = [c for c in m.group(2).split() if not c.startswith("eb-")]
-            return f'{sp}class="{" ".join(kept)}"' if kept else sp
-        
-        html = re.sub(r'(\s*)class="([^"]*\beb-[^"]*)"', _clean_eb, html)
-        return html
 
     tmp_dir = tempfile.mkdtemp(prefix=f"deploy_{website_id[:8]}_")
     try:
@@ -135,11 +120,6 @@ async def run_vercel_deployment(website_id: str):
             html = clean_editor_artifacts(html)
             for missing in missing_pages:
                 html = re.sub(rf'<a[^>]*href=["\']{missing}(#[^"\']*)?["\'][^>]*>.*?</a>', '', html, flags=re.IGNORECASE)
-            
-            html = re.sub(r'<script[^>]*sortablejs[^>]*>\s*</script>', '', html, flags=re.IGNORECASE)
-            html = re.sub(r'new\s+Sortable\([^,]+,\s*\{[\s\S]*?\}\s*\)\s*;', '', html, flags=re.IGNORECASE)
-            html = html.replace('initImageDropZones();', '')
-            html = html.replace('showSaveIndicator();', '')
 
             for r2_url, local_rel in asset_map.items():
                 html = html.replace(r2_url, local_rel)
@@ -158,12 +138,15 @@ async def run_vercel_deployment(website_id: str):
             json.dump(vercel_json, f)
 
         # 6. Run Vercel Deploy
-        cmd = 'npx.cmd' if os.name == 'nt' else 'npx'
-        process = await asyncio.create_subprocess_exec(
-            cmd, '--yes', 'vercel', 'deploy', '--prod', '--yes', '--token', vercel_token,
+        # On Windows, using shell=True with move-cmd is more robust for npx
+        # We also pass the current environment to ensure Node is in PATH
+        cmd = f'npx --yes vercel deploy --prod --yes --token {vercel_token}'
+        process = await asyncio.create_subprocess_shell(
+            cmd,
             cwd=tmp_dir,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
+            env=os.environ.copy()
         )
         stdout_bytes, stderr_bytes = await process.communicate()
         out_str = stdout_bytes.decode('utf-8')

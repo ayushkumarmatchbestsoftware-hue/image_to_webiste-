@@ -295,29 +295,6 @@
         }
         .edit-img-indicator svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.5; }
 
-        /* ── IMAGE DROP ZONE ── */
-        .image-drop-zone {
-            position: relative; cursor: pointer; display: block; overflow: hidden;
-            transition: all 0.3s ease;
-            height: 100%; width: 100%;
-        }
-        .image-drop-zone.drag-hover::after {
-            content: "Drop image here";
-            position: absolute; inset: 0;
-            background: rgba(99,102,241,0.8);
-            color: #fff; font-size: 0.9rem; font-weight: 800;
-            display: flex; align-items: center; justify-content: center;
-            z-index: 100; backdrop-filter: blur(4px);
-            text-transform: uppercase; letter-spacing: 0.1em;
-        }
-        .image-drop-zone:hover::before {
-            content: "Replace Image";
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8); color: #fff; font-size: 0.8rem; font-weight: 700;
-            padding: 8px 16px; border-radius: 100px; pointer-events: none; z-index: 10;
-            backdrop-filter: blur(8px); opacity: 0; transition: all 0.3s;
-        }
-        .image-drop-zone:hover::before { opacity: 1; margin-top: 40px; }
 
         /* ── RESPONSIVE ── */
         @media (max-width: 1024px) { 
@@ -483,6 +460,10 @@ document.querySelectorAll('.nav-links a').forEach(link => {
         });
     }
 });
+</script>
+
+{% if is_editor %}
+<script>
 // ── IMAGE DRAG & DROP + SWAP ──
 let draggedSource = null;
 
@@ -605,7 +586,9 @@ function setupDropEvents(zone, target) {
     });
 
     zone.addEventListener('click', (e) => {
-        if (e.target !== zone && e.target !== target && !e.target.closest('.edit-img-indicator')) return;
+        // If clicking a link or button, don't trigger image upload
+        if (e.target.closest('a') || e.target.closest('button')) return;
+
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
@@ -632,6 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 </script>
+{% endif %}
 
 {% block extra_scripts %}{% endblock %}
 
