@@ -4,12 +4,10 @@ services:
     container_name: flask-app-web-staging
     restart: always
     ports:
-      - "5077:5000"
+      - "5077:5077"
     env_file:
       - .env
-    command: ["flask", "run", "--host=0.0.0.0", "--port=5000"]
-    volumes:
-      - .:/app
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5077", "--workers", "4"]
     networks:
       - cloudflare_net
 
@@ -20,8 +18,6 @@ services:
     env_file:
       - .env
     command: ["python", "worker.py"]
-    volumes:
-      - .:/app
     networks:
       - cloudflare_net
 
