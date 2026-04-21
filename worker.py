@@ -55,6 +55,9 @@ from core.redis import (
 from core.r2 import upload_media_to_r2, R2_PUBLIC_URL
 from core.db import get_engine
 
+# Deployment service
+from services.vercel_service import run_vercel_deployment
+
 # Flask rendering
 from flask import render_template
 from app import (
@@ -378,40 +381,44 @@ async def run_worker():
             job_type  = job.get("type", "unknown")
             log("INFO", job_id, f"Job type={job_type}")
 
-            if job_type != "WEBSITE_GENERATION":
-                log("WARN", job_id, f"Unknown job type '{job_type}' — skipping")
-                continue
-
             # ── Process the job ──
             try:
-                log("INFO", job_id, "Starting job processing...")
-                # Wrap with timeout to prevent hung jobs (25 min timeout)
+                log("INFO", job_id, f"Processing {job_type}...")
+                
+                async def _task():
+                    if job_type == "WEBSITE_GENERATION":
+                        await process_job(job)
+                    elif job_type == "VERCEL_DEPLOYMENT":
+                        website_id = job.get("website_id")
+                        try:
+                            log("INFO", job_id, f"[DEPLOY START] for {website_id}")
+                            vercel_url = await run_vercel_deployment(website_id)
+                            await mark_job_completed(job_id, website_id, vercel_url)
+                            log("INFO", job_id, f"[DEPLOY SUCCESS]: {vercel_url}")
+                        finally:
+                            # SAFE DELETE: Only remove the lock if we are the ones who own it.
+                            # Prevents 'Late Job A' from deleting 'New Job B's lock.
+                            lock_key = f"deploy_lock:{website_id}"
+                            current_lock = await async_redis.get(lock_key)
+                            if current_lock and current_lock.decode() == job_id:
+                                await async_redis.delete(lock_key)
+                
+                # Wrap with timeout to prevent hung jobs
                 try:
-                    await asyncio.wait_for(process_job(job), timeout=1500)
-                    log("INFO", job_id, "Job processing completed successfully")
+                    await asyncio.wait_for(_task(), timeout=1500)
+                    log("INFO", job_id, "Job completed")
                 except asyncio.TimeoutError:
                     error_msg = "Worker timeout: Job processing took longer than 25 minutes"
-                    log("ERROR", job_id, error_msg)
-                    print(f">>> [WORKER TIMEOUT] {job_id}: {error_msg}\n", flush=True)
-                    try:
-                        await mark_job_failed(job_id, error_msg)
-                    except Exception as redis_err:
-                        log("ERROR", job_id, f"Could not mark timeout job as failed: {str(redis_err)}")
+                    log("ERROR", job_id, f"[DEPLOY FAILED] {error_msg}")
+                    await mark_job_failed(job_id, error_msg)
             except Exception as job_err:
                 error_msg = f"{type(job_err).__name__}: {str(job_err)}"
-                log("ERROR", job_id, "Job FAILED", error=error_msg)
-                print(f"\n>>> [WORKER ERR] Traceback for {job_id}:", flush=True)
+                log("ERROR", job_id, f"[DEPLOY FAILED]", error=error_msg)
                 traceback.print_exc()
-                print(f">>> [WORKER ERR] End traceback\n", flush=True)
                 try:
-                    log("INFO", job_id, "Attempting to mark job as failed in Redis...")
                     await mark_job_failed(job_id, error_msg)
-                    log("INFO", job_id, "Successfully marked job as failed")
-                except Exception as redis_err:
-                    error_mark_msg = f"Failed to mark job failed: {type(redis_err).__name__}: {str(redis_err)}"
-                    log("ERROR", job_id, error_mark_msg)
-                    print(f">>> [WORKER CRITICAL] {error_mark_msg}", flush=True)
-                    traceback.print_exc()
+                except Exception:
+                    pass
 
         except KeyboardInterrupt:
             log_worker("Worker received shutdown signal (Ctrl+C) — exiting cleanly")

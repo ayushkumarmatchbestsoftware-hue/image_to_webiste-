@@ -8,6 +8,16 @@ import logging
 import traceback
 import sys
 from datetime import datetime, timedelta
+
+# Fix for "Event loop is closed" error during asyncio subprocess calls on Windows.
+# create_subprocess_exec REQUIRES the ProactorEventLoop on Windows.
+if os.name == 'nt':
+    import asyncio
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except AttributeError:
+        # Fallback for older Python versions
+        pass
 from flask import Flask, render_template, request, jsonify, send_file, g, make_response, redirect
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
@@ -2086,238 +2096,36 @@ async def download_from_r2(website_id):
 @require_auth
 async def deploy_to_vercel(website_id):
     """
-    Deploys the generated site directly to Vercel via CLI.
-    Creates a temporary folder, writes all HTML and assets,
-    injects vercel.json, then runs the Vercel CLI to deploy automatically.
+    Enqueues a Vercel deployment job to be handled by the background worker.
+    This prevents 'Event loop is closed' errors and long-running request timeouts.
     """
-    import io
-    import os
-    import re
-    import json
-    import tempfile
-    import shutil
-    import asyncio
-    import traceback
-    import urllib.parse
-    import uuid
-    from sqlalchemy import select
-
-    # ── VALIDATION ──
+    from core.redis import enqueue_deployment_job, redis as sync_redis
+    user_id = getattr(g, 'user_id', '00000000-0000-0000-0000-000000000001')
+    lock_key = f"deploy_lock:{website_id}"
+    
     try:
-        w_uuid = pyuuid.UUID(website_id)
-    except Exception:
-        return jsonify({"error": "Invalid website ID format."}), 400
-
-    vercel_token = os.getenv("VERCEL_TOKEN")
-    if not vercel_token:
-        return jsonify({"error": "VERCEL_TOKEN is not configured on the server."}), 500
-
-    base_url = (R2_PUBLIC_URL or "").rstrip("/")
-
-    # Compress helper
-    def compress_image(raw_bytes: bytes, max_width: int = 1920, quality: int = 82) -> bytes:
-        try:
-            img = Image.open(io.BytesIO(raw_bytes))
-            if img.mode in ("RGBA", "P"):
-                img = img.convert("RGBA")
-            else:
-                img = img.convert("RGB")
-            if img.width > max_width:
-                ratio = max_width / img.width
-                img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
-            out = io.BytesIO()
-            img.save(out, format="WEBP", quality=quality, method=4)
-            return out.getvalue()
-        except Exception:
-            return raw_bytes
-
-    def url_to_object_key(url: str) -> str | None:
-        if not base_url: return None
-        url = url.strip()
-        if url.startswith(base_url): return url[len(base_url):].lstrip("/").split("?", 1)[0]
-        decoded = urllib.parse.unquote(url)
-        if decoded.startswith(base_url): return decoded[len(base_url):].lstrip("/").split("?", 1)[0]
-        return None
-
-    tmp_dir = tempfile.mkdtemp(prefix=f"deploy_{website_id[:8]}_")
-    try:
-        # 1. Resolve page list
-        saved_layout = await get_website_layout(website_id)
-
-        pages_to_build = ["home", "about", "services", "portfolio", "contact"]
-        if saved_layout:
-            pages_to_build = list(dict.fromkeys(pages_to_build + saved_layout))
-
-        # 2. Collect HTML
-        page_htmls = {}
-        for page in pages_to_build:
-            filename   = f"{page}.html"
-            object_key = f"websites/{website_id}/{filename}"
-            try:
-                html_bytes = await asyncio.to_thread(fetch_media_from_r2, object_key)
-                if not html_bytes: continue
-                out_name = "index.html" if page == "home" else filename
-                page_htmls[page] = (out_name, html_bytes.decode("utf-8"))
-            except Exception:
-                pass
-
-        if not page_htmls:
-            raise Exception("No website pages found for deployment.")
-
-        missing_pages = [f"{p}.html" for p in pages_to_build if p not in page_htmls]
-
-        # 3. Discover Images
-        IMG_SRC_PATTERN = re.compile(r'(?:src=["\']|url\(["\']?)(' + re.escape(base_url) + r'/[^"\')\s>]+)', re.IGNORECASE)
-        all_r2_urls = set()
-        for _, (_, html) in page_htmls.items():
-            matches = IMG_SRC_PATTERN.findall(html)
-            all_r2_urls.update(matches)
-
-        # 4. Fetch & Compress Images
-        asset_map, asset_bytes_map = {}, {}
-        for r2_url in all_r2_urls:
-            object_key = url_to_object_key(r2_url)
-            if not object_key: continue
-            original_filename = object_key.split('/')[-1].split('?')[0]
-            lower_key = object_key.lower()
-            
-            try:
-                raw = await asyncio.to_thread(fetch_media_from_r2, object_key)
-                if not raw: continue
-                if any(lower_key.endswith(ext) for ext in (".svg", ".woff", ".woff2", ".ttf", ".eot", ".otf", ".mp4", ".webm")):
-                    local_name = f"assets/{original_filename}"
-                    asset_map[r2_url] = local_name
-                    asset_bytes_map[local_name] = raw
-                else:
-                    local_name = f"assets/{original_filename}"
-                    if not local_name.lower().endswith('.webp'):
-                        local_name = local_name.rsplit('.', 1)[0] + ".webp"
-                    compressed = await asyncio.to_thread(compress_image, raw)
-                    asset_map[r2_url] = local_name
-                    asset_bytes_map[local_name] = compressed
-            except Exception:
-                pass
-
-        # 5. Build into Temp Folder
-        assets_dir = os.path.join(tmp_dir, "assets")
-        os.makedirs(assets_dir, exist_ok=True)
+        job_id = str(uuid.uuid4())
         
-        for local_path, data in asset_bytes_map.items():
-            with open(os.path.join(tmp_dir, local_path), 'wb') as f:
-                f.write(data)
-
-        for page, (out_name, html) in page_htmls.items():
-            html = clean_editor_artifacts(html)
-            # Clean HTML exactly like download route
-            html = re.sub(r'<div\s+id="edit-toolbar"[\s\S]*?</div>\s*</div>', '', html)
-            html = re.sub(r'<div\s+id="save-bar"[\s\S]*?</div>', '', html)
-
-            # --- Dead Link Auto-Scrubber ---
-            for missing in missing_pages:
-                html = re.sub(rf'<a[^>]*href=["\']{missing}(#[^"\']*)?["\'][^>]*>.*?</a>', '', html, flags=re.IGNORECASE)
-            # -------------------------------
-            html = re.sub(r'<div\s+id="save-indicator"[\s\S]*?</div>', '', html)
-            html = re.sub(r'<div\s+id="edit-hint-bar"[\s\S]*?</div>', '', html)
-            html = re.sub(r'\s*contenteditable="true"', '', html)
-            html = re.sub(r'\s*data-[a-zA-Z0-9_\-]+="[^"]*"', '', html)
-
-            def _clean_eb(m):
-                sp = m.group(1)
-                kept = [c for c in m.group(2).split() if not c.startswith("eb-")]
-                return f'{sp}class="{" ".join(kept)}"' if kept else sp
-
-            html = re.sub(r'(\s*)class="([^"]*\beb-[^"]*)"', _clean_eb, html)
-            
-            # --- BACKWARDS COMPATIBILITY FIXES FOR OLD SITES ---
-            # Remove legacy white-wash gradient
-            html = html.replace('linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.92)), ', '')
-            html = html.replace('linear-gradient(var(--nav-bg), var(--nav-bg)), ', '')
-            
-            # Dynamically inject the new cinematic overlay style to old about-landing / about-sections
-            if '<style' in html:
-                html = html.replace('</style>', 
-                '''    .about-landing, .about-section { position: relative; overflow: hidden; }
-    .about-landing::before, .about-section::before {
-        content: ''; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(135deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.72) 100%);
-        z-index: 1;
-    }
-    .about-landing, .about-landing *, .about-section, .about-section * { color: #fff !important; }
-    .about-grid { position: relative; z-index: 2; }
-</style>''')
-            # ---------------------------------------------------
-
-            html = re.sub(r'<script[^>]*sortablejs[^>]*>\s*</script>', '', html, flags=re.IGNORECASE)
-            html = re.sub(r'new\s+Sortable\([^,]+,\s*\{[\s\S]*?\}\s*\)\s*;', '', html, flags=re.IGNORECASE)
-            html = html.replace('initImageDropZones();', '')
-            html = html.replace('showSaveIndicator();', '')
-
-            for r2_url, local_rel in asset_map.items():
-                html = html.replace(r2_url, local_rel)
-
-            html = re.sub(fr'/preview/{re.escape(website_id)}/', '', html)
-            html = re.sub(
-                r'href=(["\'])home\.html(#[^"\']*)?(["\'])',
-                lambda m: f'href={m.group(1)}index.html{m.group(2) or ""}{m.group(1)}',
-                html, flags=re.IGNORECASE
-            )
-
-            with open(os.path.join(tmp_dir, out_name), 'w', encoding='utf-8') as f:
-                f.write(html)
-
-        # Write vercel.json
-        safe_id = website_id.replace('-', '')
-        vercel_json = { "name": f"website-ai-site-{safe_id[:12]}" }
-        with open(os.path.join(tmp_dir, 'vercel.json'), 'w') as f:
-            json.dump(vercel_json, f)
-
-        # 6. Run Vercel Deploy via Subprocess
-        print(f">>> [DEPLOY] Running Vercel CLI in {tmp_dir}", flush=True)
-        cmd = 'npx.cmd' if os.name == 'nt' else 'npx'
-        
-        process = await asyncio.create_subprocess_exec(
-            cmd, '--yes', 'vercel', 'deploy', '--prod', '--yes', '--token', vercel_token,
-            cwd=tmp_dir,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout_bytes, stderr_bytes = await process.communicate()
-        out_str = stdout_bytes.decode('utf-8')
-        err_str = stderr_bytes.decode('utf-8')
-        
-        if process.returncode != 0:
-            print(f">>> [DEPLOY FAIL] {err_str}", flush=True)
-            return jsonify({"error": "Vercel CLI failed", "details": err_str}), 500
-            
-        print(f">>> [DEPLOY OK] stdout: {out_str}", flush=True)
-        
-        # 7. EXTRACT URL (Robust multi-pattern regex)
-        # We search for the standard .vercel.app link, including potential hyphens/underscores
-        deploy_pattern = re.compile(r'https://[a-zA-Z0-9\-\._]+\.vercel\.app', re.IGNORECASE)
-        urls = deploy_pattern.findall(out_str + err_str)
-        
-        if urls:
-            # Vercel often outputs multiple URLs (preview, inspect, etc.)
-            # We want the last actual deployment URL found in the stream.
-            final_url = urls[-1]
-            print(f">>> [DEPLOY DISCOVERY] Captured URL: {final_url}", flush=True)
-            return jsonify({"success": True, "url": final_url})
-        else:
-            # Fallback: Log everything for debugging but attempt a generic failure message
-            print(f">>> [DEPLOY PARSE FAIL] Full Output Context:\n{out_str}\n{err_str}", flush=True)
+        # Atomic lock: Only proceed if we can set this key (nx=True)
+        # We store the job_id so the worker can verify it owns the lock before deleting.
+        if not sync_redis.set(lock_key, job_id, nx=True, ex=1800):
             return jsonify({
-                "error": "Site successfully deployed to Vercel, but the automatic link-capture failed. Please check your Vercel Dashboard.", 
-                "details": "Regex failed to find .vercel.app in CLI output"
-            }), 500
+                "error": "A deployment is already in progress for this website.",
+                "status": "locked"
+            }), 409
 
+        # Enqueue with the PRE-GENERATED job_id
+        await enqueue_deployment_job(website_id=website_id, user_id=user_id, job_id=job_id)
+        return jsonify({
+            "success": True,
+            "status": "queued",
+            "job_id": job_id,
+            "website_id": website_id,
+            "message": "Deployment initiated in the background."
+        })
     except Exception as e:
-        print(f">>> [DEPLOY CRITICAL] {e}", flush=True)
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-    finally:
-        # 8. Cleanup temp folder (always executes)
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-        print(f">>> [DEPLOY CLEANUP] Removed {tmp_dir}", flush=True)
+        app.logger.error(f"> [DEPLOY ENQUEUE ERR] {e}")
+        return jsonify({"error": "Failed to initiate deployment."}), 500
 
 @require_auth
 async def list_websites():
@@ -2532,5 +2340,8 @@ CURRENT HTML:
 
 
 if __name__ == "__main__":
-    print("--- SERVER STARTING ON PORT 5077 ---", flush=True)
-    app.run(debug=True, port=5077, use_reloader=False)
+    # Local development entry point
+    env  = app.config.get("ENVIRONMENT", "development")
+    port = int(os.environ.get("PORT", 5077))
+    print(f"--- SERVER STARTING ON PORT {port} [{env}] ---", flush=True)
+    app.run(host="127.0.0.1", port=port, debug=(env == "development"))
