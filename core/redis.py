@@ -157,3 +157,22 @@ async def mark_job_failed(job_id: str, error: str):
         sync_redis.hset(_job_key(job_id), mapping=payload)
         sync_redis.expire(_job_key(job_id), JOB_TTL)
     await asyncio.to_thread(run_sync)
+
+async def enqueue_deployment_job(*, website_id: str, user_id: str, job_id: str = None) -> str:
+    if not job_id:
+        job_id = str(uuid.uuid4())
+    created_at = datetime.utcnow().isoformat() + "Z"
+    job_payload = {
+        "job_id": job_id,
+        "type": "VERCEL_DEPLOYMENT",
+        "website_id": website_id,
+        "user_id": user_id
+    }
+    
+    def _run():
+        sync_redis.lpush(WEBSITE_AI_QUEUE, json.dumps(job_payload))
+        _set_job_status_internal(job_id, "queued", result={"created_at": created_at})
+        sync_redis.set(_website_job_key(website_id), job_id, ex=JOB_TTL)
+        
+    await asyncio.to_thread(_run)
+    return job_id
