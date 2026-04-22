@@ -190,9 +190,12 @@ The response MUST be a single, valid JSON object following this schema exactly:
   "testimonials": [ { "content": "...", "author": "...", "role": "..." } ],
   "faq": [ { "q": "...", "a": "..." } ],
   "stats": [ { "label": "...", "value": "..." } ],
+  "pricing": [ { "name": "...", "price": "...", "period": "/mo", "description": "...", "features": ["...", "..."], "highlighted": false } ],
+  "contact": { "title": "...", "description": "...", "email": "...", "phone": "...", "address": "..." },
   "footer": { "copyright": "...", "address": "..." },
   "theme": { "primary": "#...", "bg": "#...", "accent": "#...", "font_heading": "...", "font_body": "...", "hero_style": "...", "card_style": "...", "divider_style": "..." },
   "layout": ["hero", "about", ...]
 }
-IMPORTANT: BAN AI-ISMS. Sound human. Use specific, niche-relevant terminology. Use Roboto/Inter only.
+IMPORTANT: Always include "contact" and "pricing" keys in the response even if they are not in the layout — the system uses them when needed.
+BAN AI-ISMS. Sound human. Use specific, niche-relevant terminology. Use Roboto/Inter only.
 If images are provided, derive the 'theme' colors from the images to ensure brand harmony."""

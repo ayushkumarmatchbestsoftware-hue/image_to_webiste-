@@ -1,18 +1,24 @@
 services:
   web:
     image: ${WEB_NEW_IMAGE}
-    container_name: flask-app-web-staging
+    container_name: fastapi-app-web-staging
     restart: always
     ports:
-      - "5077:5077"
+      - "5077:5000"
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5077/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     networks:
       - cloudflare_net
 
   worker:
     image: ${WORKER_NEW_IMAGE}
-    container_name: flask-app-worker-staging
+    container_name: fastapi-app-worker-staging
     restart: always
     env_file:
       - .env
