@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
@@ -10,23 +10,27 @@ RUN apt-get update && apt-get install -y \
     curl \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
+    && npm install -g vercel \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker layer caching
 COPY requirements.txt .
 
-# Install explicitly defined dependencies
-RUN pip install --upgrade pip==25.3 wheel==0.46.2
+# Install Python dependencies
+RUN pip install --upgrade pip wheel
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
 COPY . .
 
-# Expose port (as seen in app.py main block)
+# Internal port used by DevOps production infra
 EXPOSE 5000
+
 # Set environment variables
 ENV ENVIRONMENT=production
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
-# Default command for the web service (Industry Standard Gunicorn)
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
+# Run FastAPI app with Uvicorn on internal port 5000
+# IMPORTANT: Must use uvicorn — FastAPI is ASGI, gunicorn default workers are WSGI and will crash
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "4"]
