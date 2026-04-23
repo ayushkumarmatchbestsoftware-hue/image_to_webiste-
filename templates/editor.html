@@ -427,6 +427,15 @@
                 <svg width="16" height="16" viewBox="0 0 256 222" fill="currentColor"><path d="M128 0l128 221.7H0z"/></svg>
                 Deploy to Vercel
             </button>
+            <div id="deploy-success-info" style="display:none; margin-top:12px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.2); padding:12px; border-radius:12px;">
+                <div style="font-size:10px; color:#10b981; font-weight:800; text-transform:uppercase; margin-bottom:8px; letter-spacing:0.05em;">Live URL</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                     <input type="text" id="deployment-url-box" readonly style="flex:1; background:transparent; border:none; color:#fff; font-size:12px; font-family:monospace; outline:none; text-overflow:ellipsis;" value="">
+                     <button id="copy-url-btn" onclick="copyDeploymentUrl()" style="background:none; border:none; color:#10b981; cursor:pointer; padding:4px; display:flex; align-items:center; transition:transform 0.2s;" title="Copy to clipboard">
+                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                     </button>
+                </div>
+            </div>
             <button class="primary-btn" id="save-btn" onclick="triggerDownload()" style="background: rgba(255,255,255,0.05); color: var(--text);">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Download ZIP
@@ -566,34 +575,48 @@
                 return;
             }
 
-            lastSavedHTML = doc.documentElement.outerHTML;
-            
-            // Check current path relative to the proxy
+            // 1. Capture current filename for saving
             const path = win.location.pathname;
             const filename = path.split('/').pop() || 'home.html';
             console.log(">>> [EDITOR] Loaded page:", filename);
 
-            // FORCE SAVE ON NAVIGATE: If user clicks a link, save current changes immediately
-            win.addEventListener('beforeunload', () => {
-                const currentHTML = doc.documentElement.outerHTML;
-                if (currentHTML !== lastSavedHTML) {
-                    // Use a synchronous-ish fetch or just fire and forget
-                    performSave(currentHTML, filename);
-                }
-            });
+            lastSavedHTML = doc.documentElement.outerHTML;
 
-            // Inject helper styles into the iframe for editor UI
+            // 2. Inject help styles 
             const style = doc.createElement('style');
             style.textContent = `
                 /* Hide legacy editor UI (if any remains) */
-                #save-bar, #edit-toolbar, #edit-hint-bar { 
-                    display: none !important; 
-                }
-                
+                #save-bar, #edit-toolbar, #edit-hint-bar { display: none !important; }
                 .eb-editable:hover { outline: 2px dashed #6366f1 !important; cursor: pointer; }
-                .eb-img-edit:hover { outline: 4px solid #6366f1 !important; cursor: pointer; position: relative; }
+                .eb-img-edit:hover { outline: 3px solid #6366f1 !important; cursor: pointer; position: relative; }
+                .eb-img-edit:hover::before {
+                    content: "Click to Swap Image";
+                    position: absolute; top: 12px; right: 12px;
+                    background: rgba(99,102,241,0.95); color: #fff; font-size: 11px; font-weight: 700;
+                    padding: 4px 12px; border-radius: 6px; pointer-events: none; z-index: 1000;
+                    opacity: 1; text-transform: uppercase; letter-spacing: 0.05em;
+                }
             `;
             doc.head.appendChild(style);
+
+            // 3. Navigation Interceptor
+            doc.addEventListener('click', async (e) => {
+                const link = e.target.closest('a');
+                if (!link) return;
+
+                const href = link.getAttribute('href');
+                if (href && (href.startsWith('/preview/') || href.endsWith('.html'))) {
+                    e.preventDefault();
+                    addBubble('ai', `Saving before navigation...`);
+                    const success = await performSave(doc.documentElement.outerHTML, filename);
+                    if (success) {
+                        iframe.src = href;
+                    } else {
+                        addBubble('ai', "Save failed. Navigating anyway...");
+                        iframe.src = href;
+                    }
+                }
+            }, true);
             
             setupEditableFields(doc);
             setupImageReplacement(doc);
@@ -663,9 +686,7 @@
                     e.preventDefault();
                     e.stopPropagation();
                     e.stopImmediatePropagation();
-                    currentEditingImg = img;
-                    currentEditingTargetType = 'img';
-                    imageInput.click();
+                    handleImageReplacement(img, 'img');
                     return;
                 }
 
@@ -675,9 +696,7 @@
                     e.preventDefault();
                     e.stopPropagation();
                     e.stopImmediatePropagation();
-                    currentEditingImg = bgTarget;
-                    currentEditingTargetType = 'background';
-                    imageInput.click();
+                    handleImageReplacement(bgTarget, 'background');
                 }
             }, true);
         }
@@ -759,78 +778,57 @@
             });
         }
 
-        // Image Upload Logic
-        imageInput.addEventListener('change', async (e) => {
-            console.log('Image input change event triggered');
-            const file = e.target.files[0];
-            console.log('Selected file:', file ? file.name : 'No file');
-            if (!file || !currentEditingImg) {
-                console.log('No file or no current editing image');
-                imageInput.value = '';
-                return;
-            }
+        // Image replacement event delegate
+        async function handleImageReplacement(targetImg, targetType) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
 
-            const formData = new FormData();
-            formData.append('image', file);
-            formData.append('website_id', website_id);
-            const targetImg = currentEditingImg;
-            const targetType = currentEditingTargetType;
-            const oldUrl = targetType === 'background' ? getBackgroundImageUrl(targetImg) : targetImg.getAttribute('src');
-            formData.append('old_url', oldUrl || '');
-            const previousSrc = getReplacementSource(targetImg, targetType);
-            const previewUrl = await fileToDataUrl(file);
-            setReplacementSource(targetImg, targetType, previewUrl);
-            addBubble('ai', "Uploading image...");
-
-            try {
-                console.log('Sending upload request to /upload-image');
-                const res = await fetch('/upload-image', {
-                    method: 'POST',
-                    headers: getHeaders(),
-                    credentials: 'same-origin',
-                    body: formData
-                });
-                console.log('Upload response status:', res.status);
+                addBubble('ai', "Uploading image...");
                 
-                if (!res.ok) {
+                try {
+                    // Local preview for instant feedback
+                    const previewUrl = await fileToDataUrl(file);
+                    setReplacementSource(targetImg, targetType, previewUrl);
+                    
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    formData.append('website_id', website_id);
+                    const oldUrl = targetType === 'background' ? getBackgroundImageUrl(targetImg) : targetImg.getAttribute('src');
+                    formData.append('old_url', oldUrl || '');
+
+                    const res = await fetch('/upload-image', {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: formData
+                    });
+
+                    if (!res.ok) throw new Error(`Server returned ${res.status}`);
                     const data = await res.json();
-                    console.log('Upload failed with data:', data);
-                    setReplacementSource(targetImg, targetType, previousSrc);
-                    addBubble('ai', `Image upload failed: ${data.error || 'HTTP ' + res.status}`);
-                    return;
+                    
+                    if (data.success && data.url) {
+                        const finalUrl = addCacheBuster(data.url);
+                        setReplacementSource(targetImg, targetType, finalUrl);
+                        
+                        if (targetType !== 'background') await waitForImageLoad(targetImg);
+                        
+                        await performSave(iframe.contentDocument.documentElement.outerHTML, getCurrentPageName());
+                        addBubble('ai', "Image replaced and saved!");
+                    } else {
+                        throw new Error(data.error || "Upload failed");
+                    }
+                } catch (err) {
+                    console.error("Upload error:", err);
+                    addBubble('ai', "Image upload failed: " + err.message);
                 }
-                
-                const data = await res.json();
-                console.log('Upload success data:', data);
-                if (!data.url) {
-                    setReplacementSource(targetImg, targetType, previousSrc);
-                    addBubble('ai', "Image upload returned no URL. Please try again.");
-                    return;
-                }
-                
-                const finalUrl = addCacheBuster(data.url);
-                setReplacementSource(targetImg, targetType, finalUrl);
-                
-                if (targetType !== 'background') {
-                    await waitForImageLoad(targetImg);
-                }
-                
-                const saved = await performSave(iframe.contentDocument.documentElement.outerHTML, getCurrentPageName());
-                if (!saved) {
-                    addBubble('ai', "Image was uploaded, but saving the page failed. Please try Save & Download after the preview updates.");
-                    return;
-                }
-                addBubble('ai', "Image replaced and saved.");
-            } catch (err) {
-                setReplacementSource(targetImg, targetType, previousSrc);
-                console.error("Image upload failed", err);
-                addBubble('ai', "Image upload failed: " + (err.message || "Please check your connection and try again."));
-            } finally {
-                imageInput.value = '';
-                currentEditingImg = null;
-                currentEditingTargetType = 'img';
-            }
-        });
+            };
+            
+            input.click();
+        }
 
         function getCurrentPageName() {
             try {
@@ -866,27 +864,44 @@
         async function performSave(html, page_name) {
             page_name = page_name || getCurrentPageName();
             if (!html || !page_name) return false;
+            
             if (isPlaceholderPreview(iframe.contentDocument)) {
-                addBubble('ai', "Your website is still being prepared. Please wait for the preview to load before saving.");
                 return false;
             }
+
+            // --- CLIENT-SIDE CLEANING ---
+            // Create a temporary DOM to clean before saving
+            const parser = new DOMParser();
+            const cleanDoc = parser.parseFromString(html, 'text/html');
+            
+            // Remove editor-specific tags & styles
+            cleanDoc.querySelectorAll('style').forEach(s => {
+                if (s.textContent.includes('.eb-editable')) s.remove();
+            });
+            cleanDoc.querySelectorAll('.eb-editable, .eb-img-edit').forEach(el => {
+                el.classList.remove('eb-editable', 'eb-img-edit');
+                if (!el.classList.length) el.removeAttribute('class');
+            });
+            cleanDoc.querySelectorAll('[contenteditable]').forEach(el => {
+                el.removeAttribute('contenteditable');
+            });
+
+            const cleanHTML = cleanDoc.documentElement.outerHTML;
+
             saveIndicator.style.display = 'flex';
             try {
                 const res = await fetch('/save', {
                     method: 'POST',
                     headers: getHeaders({ 'Content-Type': 'application/json' }),
-                    body: JSON.stringify({ website_id, html, page_name })
+                    body: JSON.stringify({ website_id, html: cleanHTML, page_name })
                 });
                 if (res.ok) {
-                    lastSavedHTML = html;
+                    lastSavedHTML = html; // Track vs original if needed, but cleanHTML is what's in R2
                     return true;
                 }
-                const data = await res.json().catch(() => ({}));
-                addBubble('ai', "Save failed: " + (data.error || "Please try again."));
                 return false;
             } catch (err) { 
                 console.error("Save failed", err); 
-                addBubble('ai', "Save failed. Please check your connection and try again.");
                 return false;
             } finally {
                 setTimeout(() => saveIndicator.style.display = 'none', 800);
@@ -967,6 +982,25 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        async function copyDeploymentUrl() {
+            const urlBox = document.getElementById('deployment-url-box');
+            const btn = document.getElementById('copy-url-btn');
+            if (urlBox && urlBox.value) {
+                try {
+                    await navigator.clipboard.writeText(urlBox.value);
+                    const originalSVG = btn.innerHTML;
+                    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                    btn.style.transform = "scale(1.2)";
+                    setTimeout(() => {
+                        btn.innerHTML = originalSVG;
+                        btn.style.transform = "scale(1)";
+                    }, 2000);
+                } catch (err) {
+                    console.error("Copy failed", err);
+                }
+            }
+        }
+
         async function triggerDeploy() {
             if (isAIGenerating) return;
             const btn = document.getElementById('deploy-btn');
@@ -1006,6 +1040,14 @@
                         btn.style.color = '#fff';
                         btn.style.borderColor = '#10b981';
                         
+                        // Show the URL info on the sidebar
+                        const successInfo = document.getElementById('deploy-success-info');
+                        const urlBox = document.getElementById('deployment-url-box');
+                        if (successInfo && urlBox) {
+                            urlBox.value = finalUrl;
+                            successInfo.style.display = 'block';
+                        }
+                        
                         const toast = document.getElementById('deploy-toast');
                         const toastLink = document.getElementById('toast-link');
                         if (toast && toastLink) {
@@ -1036,9 +1078,10 @@
             }
 
             try {
-                const res = await fetch(`/deploy/${website_id}`, { 
+                const res = await fetch(`/deploy`, { 
                     method: 'POST',
-                    headers: getHeaders()
+                    headers: getHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ website_id })
                 });
                 const data = await res.json().catch(() => ({}));
                 

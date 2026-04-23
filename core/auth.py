@@ -105,53 +105,35 @@ def _decode_jwt_token(token: str) -> AuthUser:
 
 
 # ===================================
-# Public Auth Helper (Flask)
+# Public Auth Helper (FastAPI)
 # ===================================
+# Note: The main app uses a Dependency (get_current_user_id), 
+# but these helpers are kept for logic reuse.
 
-def get_current_user_flask():
+def get_current_user_fastapi(request):
     """
-    Flask helper for retrieving authenticated user from current request.
-    Supports both Authorization header and 'token' query parameter.
+    FastAPI helper for retrieving authenticated user from current request.
     """
-    from flask import request
-    
-    # 1. Try Authorization header (Standard API calls)
+    # 1. Try Authorization header
     auth_header = request.headers.get("Authorization")
     if auth_header:
         try:
             token = _extract_token_from_header(auth_header)
-            user = _decode_jwt_token(token)
-            logger.info(f"✓ Auth via Authorization header: {user.user_id}")
-            return user
-        except ValueError as e:
-            logger.debug(f"Auth header failed: {e} - trying other methods...")
-            pass  # Fallback to other methods
+            return _decode_jwt_token(token)
+        except: pass
 
-    # 2. Try 'auth_token' cookie (Editor background requests)
+    # 2. Try 'auth_token' cookie
     token = request.cookies.get("auth_token")
     if token:
         try:
-            user = _decode_jwt_token(token)
-            logger.info(f"✓ Auth via auth_token cookie: {user.user_id}")
-            return user
-        except ValueError as e:
-            logger.debug(f"Cookie auth failed: {e} - trying other methods...")
-            pass
+            return _decode_jwt_token(token)
+        except: pass
 
-    # 3. Try 'token' query parameter (Direct browser redirects/new tabs)
-    token = request.args.get("token")
+    # 3. Try 'token' query parameter
+    token = request.query_params.get("token")
     if token:
         try:
-            user = _decode_jwt_token(token)
-            logger.info(f"✓ Auth via query param token: {user.user_id}")
-            return user
-        except ValueError as e:
-            logger.warning(f"Query token parsing failed: {e}")
-            pass
+            return _decode_jwt_token(token)
+        except: pass
 
-    logger.debug(f"No valid auth token found in request to {request.path}")
     return None
-
-def get_request_user_id():
-    from flask import g
-    return getattr(g, "user_id", None)

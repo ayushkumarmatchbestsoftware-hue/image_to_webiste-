@@ -80,3 +80,13 @@ def fetch_media_from_r2(object_key: str) -> bytes:
         Key=object_key,
     )
     return response["Body"].read()
+
+def list_objects_in_folder(prefix: str):
+    """
+    Lists all objects in a specific R2 folder (prefix).
+    """
+    response = r2_client.list_objects_v2(
+        Bucket=R2_BUCKET_NAME,
+        Prefix=prefix
+    )
+    return response.get('Contents', [])
