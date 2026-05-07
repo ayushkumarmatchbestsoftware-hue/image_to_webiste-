@@ -183,7 +183,7 @@ system_prompt_text = """You are a high-end Design Director & Full-Stack Architec
 The response MUST be a single, valid JSON object following this schema exactly:
 {
   "site_info": { "display_name": "...", "site_title": "...", "tagline": "..." },
-  "home": { "hero_title": "...", "hero_subtitle": "...", "cta_text": "..." },
+  "home": { "title": "...", "subtitle": "...", "cta": "..." },
   "about": { "title": "...", "story": "...", "mission": "..." },
   "services": [ { "title": "...", "desc": "...", "icon": "..." } ],
   "portfolio": [ { "title": "...", "client": "...", "description": "..." } ],
@@ -194,8 +194,8 @@ The response MUST be a single, valid JSON object following this schema exactly:
   "contact": { "title": "...", "description": "...", "email": "...", "phone": "...", "address": "..." },
   "footer": { "copyright": "...", "address": "..." },
   "theme": { "primary": "#...", "bg": "#...", "accent": "#...", "font_heading": "...", "font_body": "...", "hero_style": "...", "card_style": "...", "divider_style": "..." },
-  "layout": ["hero", "about", ...]
+  "layout": ["hero", "about", "services", "portfolio", "testimonials", "faq", "contact"]
 }
-IMPORTANT: Always include "contact" and "pricing" keys in the response even if they are not in the layout — the system uses them when needed.
+IMPORTANT: The "layout" array MUST always start with "hero". Always include "contact" and "pricing" keys in the response even if they are not in the layout — the system uses them when needed.
 BAN AI-ISMS. Sound human. Use specific, niche-relevant terminology. Use Roboto/Inter only.
 If images are provided, derive the 'theme' colors from the images to ensure brand harmony."""
