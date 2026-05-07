@@ -188,7 +188,7 @@ The response MUST be a single, valid JSON object following this schema exactly:
   "services": [ { "title": "...", "desc": "...", "icon": "..." } ],
   "portfolio": [ { "title": "...", "client": "...", "description": "..." } ],
   "testimonials": [ { "content": "...", "author": "...", "role": "..." } ],
-  "faq": [ { "q": "...", "a": "..." } ],
+  "faq": [ { "question": "...", "answer": "..." } ],
   "stats": [ { "label": "...", "value": "..." } ],
   "pricing": [ { "name": "...", "price": "...", "period": "/mo", "description": "...", "features": ["...", "..."], "highlighted": false } ],
   "contact": { "title": "...", "description": "...", "email": "...", "phone": "...", "address": "..." },
