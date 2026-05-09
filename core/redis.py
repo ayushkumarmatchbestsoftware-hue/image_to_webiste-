@@ -2,6 +2,7 @@ import os
 import asyncio
 import json
 import uuid
+import time
 from datetime import datetime
 from urllib.parse import urlparse
 from typing import Optional
@@ -67,10 +68,24 @@ async_redis = AsyncRedis(
 redis = async_redis
 
 # ─────────────────────────────────────────────
+# Notification Redis (dedicated client for DB 1)
+# ─────────────────────────────────────────────
+
+notif_redis = SyncRedis(
+    host=os.getenv("NOTIF_REDIS_HOST", "51.44.144.71"),
+    port=int(os.getenv("NOTIF_REDIS_PORT", 6380)),
+    password=os.getenv("NOTIF_REDIS_PASSWORD", "vcUHF8jfdfGGF016FGVG7jKF86HGC"),
+    db=int(os.getenv("NOTIF_REDIS_DB", 1)),
+    decode_responses=True,
+    ssl=os.getenv("NOTIF_REDIS_TLS", "false").lower() == "true"
+)
+
+# ─────────────────────────────────────────────
 # Queue names
 # ─────────────────────────────────────────────
 
 WEBSITE_AI_QUEUE = "queue:website_ai"
+NOTIFICATION_QUEUE = "notification-queue:wait" # BullMQ 'wait' list with empty prefix
 
 def _job_key(job_id: str) -> str:
     return f"job:{job_id}"
@@ -134,7 +149,64 @@ async def get_job_id_for_website(website_id: str) -> Optional[str]:
 async def mark_job_processing(job_id: str):
     await asyncio.to_thread(_set_job_status_internal, job_id, "processing")
 
-async def mark_job_completed(job_id: str, website_id: str, preview_url: str):
+async def enqueue_notification(payload: dict):
+    """Enqueue a notification to the dedicated notification-queue (BullMQ v5 compatible)."""
+    
+    def _run():
+        try:
+            QUEUE = "notification-queue"
+            QKEY  = f":{QUEUE}"
+            
+            # Step 1: Unique job ID
+            job_id = notif_redis.incr(f"{QKEY}:id")
+            job_id_str = str(job_id)
+            
+            # Step 2: Store job hash (matches BullMQ v5 storeJob.lua)
+            hash_key = f"{QKEY}:{job_id_str}"
+            timestamp = int(time.time() * 1000)
+            
+            opts = {
+                "attempts": 3,
+                "backoff": {"type": "exponential", "delay": 2000},
+                "removeOnComplete": {"count": 100},
+                "removeOnFail": {"count": 1000},
+                "delay": 0
+            }
+            
+            notif_redis.hset(hash_key, mapping={
+                "id":        job_id_str,
+                "name":      "SEND_NOTIFICATION",
+                "data":      json.dumps(payload),
+                "opts":      json.dumps(opts),
+                "timestamp": timestamp,
+                "delay":     0,
+                "priority":  0
+            })
+            
+            # Step 3: LPUSH to wait list (BullMQ uses LPUSH for FIFO)
+            notif_redis.lpush(f"{QKEY}:wait", job_id_str)
+            
+            # Step 4: XADD to events Redis Stream
+            max_len = int(notif_redis.hget(f"{QKEY}:meta", "opts.maxLenEvents") or 10000)
+            notif_redis.xadd(f"{QKEY}:events",
+                   {"event": "added", "jobId": job_id_str, "name": "SEND_NOTIFICATION"},
+                   maxlen=max_len, approximate=True)
+            notif_redis.xadd(f"{QKEY}:events",
+                   {"event": "waiting", "jobId": job_id_str},
+                   maxlen=max_len, approximate=True)
+                   
+            # Step 5: ZADD marker (sorted set)
+            notif_redis.zadd(f"{QKEY}:marker", {"0": 0})
+            
+            print(f"[NotificationQueue] Job enqueued manually — id={job_id_str}")
+            return job_id
+        except Exception as e:
+            print(f"[Notification] Non-fatal: {e}")
+            return None
+        
+    return await asyncio.to_thread(_run)
+
+async def mark_job_completed(job_id: str, website_id: str, preview_url: str, notification_payload: dict = None):
     def run_sync():
         payload = {
             "status": "completed",
@@ -142,6 +214,9 @@ async def mark_job_completed(job_id: str, website_id: str, preview_url: str):
             "preview_url": preview_url,
             "updated_at": datetime.utcnow().isoformat() + "Z"
         }
+        if notification_payload:
+            payload["notification"] = json.dumps(notification_payload)
+            
         sync_redis.hset(_job_key(job_id), mapping=payload)
         sync_redis.expire(_job_key(job_id), JOB_TTL)
         sync_redis.set(_website_job_key(website_id), job_id, ex=JOB_TTL)
