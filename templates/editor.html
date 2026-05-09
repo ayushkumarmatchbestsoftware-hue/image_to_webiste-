@@ -624,7 +624,7 @@
 
         function setupEditableFields(doc) {
             // Text Editing
-            doc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span').forEach(el => {
+            doc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, .c-value').forEach(el => {
                 // EXCLUDE NAVIGATION & FOOTER: Do not make structural links/text editable
                 if (el.closest('nav') || el.closest('footer')) return;
 

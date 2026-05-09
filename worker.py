@@ -52,6 +52,7 @@ from core.redis import (
     mark_job_processing,
     mark_job_completed,
     mark_job_failed,
+    enqueue_notification,
 )
 from core.r2 import upload_media_to_r2, R2_PUBLIC_URL
 from core.db import get_engine
@@ -371,9 +372,32 @@ async def process_job(job: dict):
         except Exception as credit_err:
             log("ERROR", job_id, "Credit deduction threw exception", error=str(credit_err))
 
-    # ── Step 13: Mark job completed ──
+    # ── Step 13: Mark job completed + Send Notification ──
     preview_url = f"/preview/{website_id}/home.html"
-    await mark_job_completed(job_id, website_id, preview_url)
+    full_preview_url = f"{R2_PUBLIC_URL}/websites/{website_id}/home.html"
+    
+    notification_payload = {
+        "type": "SEND_NOTIFICATION",
+        "userId": str(user_id),
+        "title": "Website Builder: Your Site is Ready! 🎨",
+        "body": "Your new AI website has been generated. Tap to preview and edit.",
+        "mediaUrl": job.get("logo_url"),
+        "mediaType": "image",
+        "data": {
+            "action": "open_deep_link",
+            "route": "/website_preview",
+            "generationId": job_id,
+            "toolType": "website_builder",
+            "mediaType": "image",
+            "imageUrl": job.get("logo_url"),
+            "deep_link": full_preview_url,
+            "websiteId": website_id
+        },
+        "priority": "high"
+    }
+    await enqueue_notification(notification_payload)
+    
+    await mark_job_completed(job_id, website_id, preview_url, notification_payload)
     log("INFO", job_id, "✓ Job COMPLETED", preview_url=preview_url)
 
     return website_id, preview_url
@@ -451,7 +475,29 @@ async def run_worker():
                             except Exception as db_err:
                                 log("ERROR", job_id, f"Failed to update final_url in DB", error=str(db_err))
 
-                            await mark_job_completed(job_id, website_id, vercel_url)
+                            # Send Notification for Deployment Complete
+                            notification_payload = {
+                                "type": "SEND_NOTIFICATION",
+                                "userId": job.get("user_id"),
+                                "title": "Website Builder: Your Site is Live! 🚀",
+                                "body": "Successfully deployed to Vercel production.",
+                                "mediaUrl": job.get("logo_url"),
+                                "mediaType": "image",
+                                "data": {
+                                    "action": "open_deep_link",
+                                    "route": "/website_preview",
+                                    "generationId": job_id,
+                                    "toolType": "website_builder",
+                                    "mediaType": "image",
+                                    "imageUrl": job.get("logo_url"),
+                                    "deep_link": vercel_url,
+                                    "websiteId": website_id
+                                },
+                                "priority": "high"
+                            }
+                            await enqueue_notification(notification_payload)
+
+                            await mark_job_completed(job_id, website_id, vercel_url, notification_payload)
                             print(f"[WORKER IO] <- VERCEL_DEPLOYMENT SUCCESS")
                             log("INFO", job_id, f"[DEPLOY SUCCESS]: {vercel_url}")
                         finally:

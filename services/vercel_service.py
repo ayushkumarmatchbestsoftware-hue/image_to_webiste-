@@ -133,14 +133,18 @@ async def run_vercel_deployment(website_id: str):
             with open(os.path.join(tmp_dir, out_name), 'w', encoding='utf-8') as f:
                 f.write(html)
 
-        vercel_json = { "name": f"website-ai-site-{website_id.replace('-', '')[:12]}" }
+        project_name = os.getenv("VERCEL_PROJECT_NAME", "website-builder-portal")
+        vercel_json = { "name": project_name }
         with open(os.path.join(tmp_dir, 'vercel.json'), 'w') as f:
             json.dump(vercel_json, f)
 
         # 6. Run Vercel Deploy
-        # On Windows, using shell=True with move-cmd is more robust for npx
-        # We also pass the current environment to ensure Node is in PATH
-        cmd = f'npx --yes vercel deploy --prod --yes --token {vercel_token}'
+        # We use --json to get a clean machine-readable URL
+        scope = os.getenv("VERCEL_SCOPE")
+        cmd = f'npx --yes vercel deploy --prod --yes --token {vercel_token} --json'
+        if scope:
+            cmd += f' --scope {scope}'
+
         process = await asyncio.create_subprocess_shell(
             cmd,
             cwd=tmp_dir,
@@ -155,6 +159,23 @@ async def run_vercel_deployment(website_id: str):
         if process.returncode != 0:
             raise Exception(f"Vercel CLI failed: {err_str}")
             
+        # Parse JSON output to get the deployment URL
+        try:
+            # Find the JSON part in the output
+            start = out_str.find('{')
+            end = out_str.rfind('}') + 1
+            data = json.loads(out_str[start:end])
+            
+            # Get the unique deployment URL
+            final_url = data.get("url")
+            if final_url:
+                if not final_url.startswith("http"):
+                    final_url = f"https://{final_url}"
+                return final_url
+        except Exception:
+            pass
+
+        # Fallback to regex if JSON parsing fails
         deploy_pattern = re.compile(r'https://[a-zA-Z0-9\-\._]+\.vercel\.app', re.IGNORECASE)
         urls = deploy_pattern.findall(out_str + err_str)
         
