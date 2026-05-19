@@ -25,8 +25,7 @@ jobs:
       contains(fromJson('[
         "dakshyashreeMatchbest",
         "kirmadaa",
-        "Salil-MB",
-        "harshitmishra-matchbest"
+        "Salil-MB"
       ]'), github.actor)
 
     runs-on: ubuntu-latest
