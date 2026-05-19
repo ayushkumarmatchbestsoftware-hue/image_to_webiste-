@@ -1,56 +1,114 @@
 name: Deploy Flask App to EC2 (PROD - Multi-Region)
 
 on:
-  push:
-    branches:
-      - deploy/prod
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: flask-app-prod-${{ github.ref }}
-  cancel-in-progress: true
+  group: flask-app-prod-deploy
+  cancel-in-progress: false
 
 env:
   WEB_IMAGE_NAME: flask-app-web
   WORKER_IMAGE_NAME: flask-app-worker
+  APP_DIRECTORY: /home/ubuntu/website-generator
+  BRANCH: deploy/prod
+  TEMP_IMAGE_DIR: /tmp/flask-app-images
+  HEALTHCHECK_URL: http://127.0.0.1:5077/health
 
 jobs:
   build-and-test:
+    if: |
+      github.ref == 'refs/heads/deploy/prod' &&
+      contains(fromJson('[
+        "dakshyashreeMatchbest",
+        "kirmadaa",
+        "Salil-MB",
+        "harshitmishra-matchbest"
+      ]'), github.actor)
+
     runs-on: ubuntu-latest
     timeout-minutes: 60
+
+    environment:
+      name: prod
+
+    env:
+      DEPLOY_ACTOR: ${{ github.actor }}
+      TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+
     steps:
       - name: Checkout deploy/prod
         uses: actions/checkout@v4
         with:
           ref: deploy/prod
 
+      - name: Display Deployment Information
+        run: |
+          echo "============================================================"
+          echo "FLASK-APP :: PROD BUILD"
+          echo "============================================================"
+          echo "Triggered By        : $DEPLOY_ACTOR"
+          echo "Re-run Triggered By : $TRIGGERING_ACTOR"
+          echo "Branch              : ${{ github.ref }}"
+          echo "Commit SHA          : ${{ github.sha }}"
+          echo "============================================================"
+
       - name: Set dynamic tags
         id: tags
         run: |
+          set -euo pipefail
+
           SHORT_SHA="${GITHUB_SHA::7}"
+
           echo "WEB_NEW_IMAGE=${WEB_IMAGE_NAME}:prod-${SHORT_SHA}" >> "$GITHUB_ENV"
           echo "WORKER_NEW_IMAGE=${WORKER_IMAGE_NAME}:prod-${SHORT_SHA}" >> "$GITHUB_ENV"
           echo "WEB_IMAGE_ARCHIVE=${WEB_IMAGE_NAME}-prod-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
           echo "WORKER_IMAGE_ARCHIVE=${WORKER_IMAGE_NAME}-prod-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
 
+      - name: Free disk space before build
+        run: |
+          set -euo pipefail
+
+          df -h
+
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build web & worker images
         run: |
+          set -euo pipefail
+
           docker build -t "${WEB_NEW_IMAGE}" .
           docker build -t "${WORKER_NEW_IMAGE}" .
 
       - name: Export Docker image archives
         run: |
+          set -euo pipefail
+
           mkdir -p exported-images
-          docker save "${WEB_NEW_IMAGE}" | gzip -1 > "exported-images/${WEB_IMAGE_ARCHIVE}"
-          docker save "${WORKER_NEW_IMAGE}" | gzip -1 > "exported-images/${WORKER_IMAGE_ARCHIVE}"
-          
-          # Save variables for the next job
+
+          docker save "${WEB_NEW_IMAGE}" \
+            | gzip -1 > "exported-images/${WEB_IMAGE_ARCHIVE}"
+
+          docker save "${WORKER_NEW_IMAGE}" \
+            | gzip -1 > "exported-images/${WORKER_IMAGE_ARCHIVE}"
+
           echo "WEB_NEW_IMAGE=${WEB_NEW_IMAGE}" > exported-images/env_vars.txt
           echo "WORKER_NEW_IMAGE=${WORKER_NEW_IMAGE}" >> exported-images/env_vars.txt
           echo "WEB_IMAGE_ARCHIVE=${WEB_IMAGE_ARCHIVE}" >> exported-images/env_vars.txt
           echo "WORKER_IMAGE_ARCHIVE=${WORKER_IMAGE_ARCHIVE}" >> exported-images/env_vars.txt
+
+          ls -lh exported-images
 
       - name: Upload Artifacts for Deployment
         uses: actions/upload-artifact@v4
@@ -63,19 +121,27 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     timeout-minutes: 60
+
+    environment:
+      name: prod
+
     strategy:
-      fail-fast: false # Allows other regions to finish deploying even if one fails
+      fail-fast: false
       matrix:
         include:
           - region: us
-            host_secret: EC2_HOST_PREP_US
-            key_secret: EC2_SSH_KEY_FLASK_APP_STAGING
+            host_secret: EC2_HOST_PROD_US
+            key_secret: EC2_SSH_KEY_FLASK_APP_PROD
           - region: eu
             host_secret: EC2_HOST_PROD_EU
-            key_secret: EC2_SSH_KEY_FLASK_APP_STAGING
+            key_secret: EC2_SSH_KEY_FLASK_APP_PROD
           - region: ap
             host_secret: EC2_HOST_PROD_AP
-            key_secret: EC2_SSH_KEY_FLASK_APP_STAGING
+            key_secret: EC2_SSH_KEY_FLASK_APP_PROD
+
+    env:
+      DEPLOY_ACTOR: ${{ github.actor }}
+      TRIGGERING_ACTOR: ${{ github.triggering_actor }}
 
     steps:
       - name: Download Artifacts
@@ -85,7 +151,21 @@ jobs:
           path: exported-images
 
       - name: Load Environment Variables
-        run: cat exported-images/env_vars.txt >> "$GITHUB_ENV"
+        run: |
+          set -euo pipefail
+          cat exported-images/env_vars.txt >> "$GITHUB_ENV"
+
+      - name: Display Region Deployment Information
+        run: |
+          echo "============================================================"
+          echo "FLASK-APP :: PROD DEPLOYMENT"
+          echo "============================================================"
+          echo "Region              : ${{ matrix.region }}"
+          echo "Triggered By        : $DEPLOY_ACTOR"
+          echo "Re-run Triggered By : $TRIGGERING_ACTOR"
+          echo "Branch              : ${{ github.ref }}"
+          echo "Commit SHA          : ${{ github.sha }}"
+          echo "============================================================"
 
       - name: SCP images to EC2 (${{ matrix.region }})
         uses: appleboy/scp-action@v0.1.4
@@ -100,6 +180,9 @@ jobs:
       - name: Deploy application on EC2 (${{ matrix.region }})
         uses: appleboy/ssh-action@v1.0.3
         env:
+          DEPLOY_ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+
           WEB_NEW_IMAGE: ${{ env.WEB_NEW_IMAGE }}
           WORKER_NEW_IMAGE: ${{ env.WORKER_NEW_IMAGE }}
           WEB_IMAGE_ARCHIVE: ${{ env.WEB_IMAGE_ARCHIVE }}
@@ -108,42 +191,84 @@ jobs:
           host: ${{ secrets[matrix.host_secret] }}
           username: ubuntu
           key: ${{ secrets[matrix.key_secret] }}
+          script_stop: true
+          command_timeout: 60m
+          envs: DEPLOY_ACTOR,TRIGGERING_ACTOR,WEB_NEW_IMAGE,WORKER_NEW_IMAGE,WEB_IMAGE_ARCHIVE,WORKER_IMAGE_ARCHIVE
           script: |
             set -euo pipefail
+
             APP_DIRECTORY="/home/ubuntu/website-generator"
             TEMP="/tmp/flask-app-images"
             HEALTHCHECK_URL="http://127.0.0.1:5077/health"
-            
+
+            echo "============================================================"
+            echo "FLASK-APP :: STARTING PROD DEPLOYMENT"
+            echo "============================================================"
+            echo "Region              : ${{ matrix.region }}"
+            echo "Triggered By        : $DEPLOY_ACTOR"
+            echo "Re-run Triggered By : $TRIGGERING_ACTOR"
+            echo "Web Image           : ${WEB_NEW_IMAGE}"
+            echo "Worker Image        : ${WORKER_NEW_IMAGE}"
+            echo "============================================================"
+
             mkdir -p "$TEMP"
+
             mv /home/ubuntu/*.tar.gz "$TEMP/" || true
-            
+
+            echo "Loading web image"
             gunzip -c "$TEMP/${WEB_IMAGE_ARCHIVE}" | sudo docker load
+
+            echo "Loading worker image"
             gunzip -c "$TEMP/${WORKER_IMAGE_ARCHIVE}" | sudo docker load
-            
+
             cd "$APP_DIRECTORY"
-            git fetch --all
+
+            echo "Syncing latest repository state"
+            git fetch --all --prune
             git checkout deploy/prod
             git reset --hard origin/deploy/prod
-            
+
             export WEB_NEW_IMAGE="${WEB_NEW_IMAGE}"
             export WORKER_NEW_IMAGE="${WORKER_NEW_IMAGE}"
-            
-            sudo -E docker compose down || true
+
+            echo "Stopping existing compose stack"
+            sudo -E docker compose down --remove-orphans || true
+
+            echo "Starting updated compose stack"
             sudo -E docker compose up -d
-            
+
+            echo "Compose status"
+            sudo docker compose ps
+
+            echo "Running health check"
+
             HEALTH_OK="false"
+
             for i in {1..15}; do
-              if curl -fsS "$HEALTHCHECK_URL" >/dev/null; then
+              if curl -fsS "$HEALTHCHECK_URL" >/dev/null 2>&1; then
                 HEALTH_OK="true"
+                echo "Health check passed"
                 break
               fi
+
+              echo "Waiting for service... (${i}/15)"
               sleep 2
             done
-            
+
             if [ "$HEALTH_OK" != "true" ]; then
+              echo "Health check failed. Printing logs."
+
               sudo docker logs --tail 50 flask-app-web-prod || true
+
               exit 1
             fi
-            
+
+            echo "Cleaning temporary files"
             rm -rf "$TEMP"
-            sudo docker image prune -f
+
+            echo "Cleaning dangling Docker images"
+            sudo docker image prune -f || true
+
+            echo "============================================================"
+            echo "FLASK-APP :: PROD DEPLOYMENT COMPLETED"
+            echo "============================================================"
