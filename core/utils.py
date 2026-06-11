@@ -156,26 +156,40 @@ CRITICAL RULES for Copy:
 4. NO "Welcome to", "Experience the", "Discover the", "Our journey"."""
 
         content_parts = [full_prompt]
+        # Keep track of opened PIL images so we can close them after the API call
+        _opened_images = []
         if image_paths:
             for i, path in enumerate(image_paths):
                 try:
                     img = Image.open(path)
+                    _opened_images.append(img)
                     label = "Hero Image" if i == 0 else "About Background" if i == 1 else f"Portfolio Project Image {i-1}"
                     content_parts.append(f"--- ATTACHED IMAGE {i+1} ({label}) ---")
                     content_parts.append(img)
                 except Exception as e:
                     print(f">>> [IMG ERR] {path}: {str(e)}")
 
-        response = await asyncio.to_thread(
-            genai_client.models.generate_content,
-            model="gemini-3.1-flash-image-preview",
-            contents=content_parts,
-            config={
-                "system_instruction": system_prompt,
-                "temperature": 0.85, 
-                "max_output_tokens": 4000
-            }
-        )
+        try:
+            response = await asyncio.to_thread(
+                genai_client.models.generate_content,
+                model="gemini-3.1-flash-image-preview",
+                contents=content_parts,
+                config={
+                    "system_instruction": system_prompt,
+                    "temperature": 0.85, 
+                    "max_output_tokens": 4000
+                }
+            )
+        finally:
+            # ── Leak Fix #2: Always close PIL image objects to free file handles
+            # and decoded bitmap memory. Done AFTER the API call so Gemini can
+            # read the pixels, but immediately after to avoid holding RAM longer.
+            for _img in _opened_images:
+                try:
+                    _img.close()
+                except Exception:
+                    pass
+            _opened_images.clear()
 
         if not response: return None
 
