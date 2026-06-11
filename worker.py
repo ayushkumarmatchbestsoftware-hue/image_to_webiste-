@@ -448,7 +448,7 @@ async def run_worker():
         try:
             # BRPOP blocks up to 5 seconds waiting for a job
             # Returns: (queue_name, json_payload) or None on timeout
-            result = await redis.brpop(WEBSITE_AI_QUEUE, timeout=5)
+            result = await redis.brpop(WEBSITE_AI_QUEUE, timeout=5)  # type: ignore
 
             if result is None:
                 # Timeout — no jobs in queue, loop again silently
