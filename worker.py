@@ -59,7 +59,24 @@ from core.db import get_engine
 
 # ── Project configuration ──
 ENABLE_CHAT_EDIT = os.getenv("ENABLE_CHAT_EDIT", "False").lower() == "true"
-WEBSITE_CONTEXTS = {} # Local in-memory context (not used if chat is disabled)
+
+# Leak Fix #1: Use a size-capped OrderedDict instead of a plain dict so that
+# in-memory website contexts never grow beyond MAX_CONTEXTS entries. When the
+# limit is reached the oldest entry is automatically evicted (LRU-eviction).
+from collections import OrderedDict
+_WEBSITE_CONTEXTS_MAX = int(os.getenv("WEBSITE_CONTEXTS_MAX", 200))
+
+class _BoundedDict(OrderedDict):
+    """OrderedDict that evicts the oldest entry when the size cap is hit."""
+    def __setitem__(self, key, value):
+        if key in self:
+            self.move_to_end(key)
+        super().__setitem__(key, value)
+        if len(self) > _WEBSITE_CONTEXTS_MAX:
+            oldest = next(iter(self))
+            del self[oldest]
+
+WEBSITE_CONTEXTS = _BoundedDict()  # Local in-memory context (not used if chat is disabled)
 
 # Deployment service
 from services.vercel_service import run_vercel_deployment
@@ -431,7 +448,7 @@ async def run_worker():
         try:
             # BRPOP blocks up to 5 seconds waiting for a job
             # Returns: (queue_name, json_payload) or None on timeout
-            result = await redis.brpop(WEBSITE_AI_QUEUE, timeout=5)
+            result = await redis.brpop(WEBSITE_AI_QUEUE, timeout=5)  # type: ignore
 
             if result is None:
                 # Timeout — no jobs in queue, loop again silently
@@ -539,6 +556,14 @@ async def run_worker():
     # Cleanup
     try:
         await async_redis.close()
+    except Exception:
+        pass
+    # Leak Fix #3: Also close the two sync Redis connection pools so all TCP
+    # sockets are released promptly on shutdown instead of waiting for OS timeout.
+    try:
+        from core.redis import sync_redis as _sr, notif_redis as _nr
+        _sr.close()
+        _nr.close()
     except Exception:
         pass
     log_worker("Worker STOPPED")
