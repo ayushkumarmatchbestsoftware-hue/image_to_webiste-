@@ -33,4 +33,4 @@ ENV PYTHONPATH=/app
 
 # Run FastAPI app with Uvicorn on internal port 5000
 # IMPORTANT: Must use uvicorn — FastAPI is ASGI, gunicorn default workers are WSGI and will crash
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "4"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "1"]
