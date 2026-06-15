@@ -13,6 +13,20 @@ import shutil
 import tempfile
 from datetime import datetime, timedelta
 from typing import Optional, List, Union, Dict
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from core.telemetry import (
+    configure_logging,
+    instrument_fastapi_app,
+    setup_telemetry,
+    shutdown_telemetry,
+)
+
+configure_logging()
+setup_telemetry()
+
 import aiofiles
 
 # Fix for "Event loop is closed" error during asyncio subprocess calls on Windows.
@@ -44,9 +58,6 @@ from services.credit_query_service import get_user_real_credit
 from handlers.credit_handler import website_credits_debits
 from model.website_schema import WebsiteInfo, ChatMessage
 from model.img_info_schema import ImageInfo
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # --- CONFIGURATION ---
 WEBSITE_AI_CREDIT_COST = os.getenv("WEBSITE_AI_CREDIT_COST", "1")
@@ -55,7 +66,6 @@ ENABLE_CHAT_EDIT = False  # Disabled as requested
 MAX_IMAGES = Config.MAX_IMAGES
 
 # --- LOGGING SETUP ---
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger("fastapi")
 
 # --- APP INITIALIZATION ---
@@ -79,10 +89,13 @@ async def lifespan(app: FastAPI):
         logger.info(">>> [SHUTDOWN] Redis sync pools closed")
     except Exception as _re:
         logger.warning(f">>> [SHUTDOWN] Redis close warning: {_re}")
+    shutdown_telemetry()
 
 app = FastAPI(title="Pomeli Website Builder API", lifespan=lifespan)
+instrument_fastapi_app(app)
 
 # CORS Setup
+TRACE_CONTEXT_HEADERS = ["traceparent", "tracestate", "baggage"]
 raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 allowed_origins = [orig.strip() for orig in raw_origins.split(",") if orig.strip()]
 app.add_middleware(
@@ -90,7 +103,7 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", *TRACE_CONTEXT_HEADERS],
 )
 
 # Static & Templates

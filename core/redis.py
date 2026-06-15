@@ -9,6 +9,7 @@ from typing import Optional
 from redis import Redis as SyncRedis  # Standard sync client
 from redis.asyncio import Redis as AsyncRedis  # Async client for worker
 from dotenv import load_dotenv
+from core.telemetry import inject_trace_context
 
 load_dotenv()
 
@@ -136,7 +137,8 @@ async def enqueue_website_ai_job(*, website_id: str, user_id: str, prompt: str, 
         "user_id": user_id, "prompt": prompt, "image_urls": image_urls,
         "image_paths": image_paths, "logo_url": logo_url, "user_pages": user_pages,
         "user_palette": user_palette, "user_industry": user_industry,
-        "db_image_records": db_image_records
+        "db_image_records": db_image_records,
+        "trace_context": inject_trace_context(),
     }
     
     def _run():
@@ -257,7 +259,8 @@ async def enqueue_deployment_job(*, website_id: str, user_id: str, job_id: str =
         "job_id": job_id,
         "type": "VERCEL_DEPLOYMENT",
         "website_id": website_id,
-        "user_id": user_id
+        "user_id": user_id,
+        "trace_context": inject_trace_context(),
     }
     
     def _run():
