@@ -3,7 +3,7 @@ name: Deploy Flask App to EC2 (STAGING)
 on:
   push:
     branches:
-      - observability/otel
+      - deploy/staging
 
 permissions:
   contents: read
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build-and-deploy:
-    if: github.ref == 'refs/heads/observability/otel'
+    if: github.ref == 'refs/heads/deploy/staging'
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -22,15 +22,15 @@ jobs:
       WEB_IMAGE_NAME: flask-app-web
       WORKER_IMAGE_NAME: flask-app-worker
       APP_DIRECTORY:  /home/ubuntu/website-generator
-      BRANCH: observability/otel
+      BRANCH: deploy/staging
       TEMP_IMAGE_DIR: /tmp/flask-app-images
       HEALTHCHECK_URL: http://127.0.0.1:5077/health
 
     steps:
-      - name: Checkout observability/otel
+      - name: Checkout deploy/staging
         uses: actions/checkout@v4
         with:
-          ref: observability/otel
+          ref: deploy/staging
 
       - name: Fix hook execute permissions
         run: |
@@ -154,8 +154,8 @@ jobs:
       
             cd "$APP_DIRECTORY"
             git fetch --all
-            git checkout observability/otel
-            git reset --hard origin/observability/otel
+            git checkout deploy/staging
+            git reset --hard origin/deploy/staging
       
             export WEB_NEW_IMAGE="${WEB_NEW_IMAGE}"
             export WORKER_NEW_IMAGE="${WORKER_NEW_IMAGE}"
