@@ -21,6 +21,7 @@ Run alongside app.py:
 import asyncio
 import json
 import os
+from contextlib import nullcontext
 
 # Fix for Windows IOCP Error 22 on forceful restart
 if os.name == 'nt':
@@ -43,6 +44,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from dotenv import load_dotenv
 load_dotenv()
+
+from core.telemetry import (
+    configure_logging,
+    extract_trace_context,
+    get_log_correlation_fields,
+    get_tracer,
+    json_logs_enabled,
+    setup_telemetry,
+    shutdown_telemetry,
+)
+
+configure_logging()
+setup_telemetry()
+tracer = get_tracer(__name__)
 
 # ── Project imports ──
 from core.redis import (
@@ -109,6 +124,24 @@ def log(level: str, job_id: str, msg: str, **extra):
     Example: [2026-04-04T09:00:00.000Z] [INFO ] [job:abc123] AI generation started | images=2
     """
     tag = f"[{_ts()}] [{level:<5}] [job:{job_id[:8]}]"
+    extra = {**extra, **get_log_correlation_fields()}
+    if json_logs_enabled():
+        print(
+            json.dumps(
+                {
+                    "timestamp": _ts(),
+                    "level": level.lower(),
+                    "logger": "worker",
+                    "job_id": job_id,
+                    "message": msg,
+                    **extra,
+                },
+                default=str,
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+        return
     extra_str = " | ".join(f"{k}={v}" for k, v in extra.items())
     line = f"{tag} {msg}"
     if extra_str:
@@ -119,6 +152,23 @@ def log(level: str, job_id: str, msg: str, **extra):
 def log_worker(msg: str, **extra):
     """Log a worker-level (not job-specific) message."""
     tag = f"[{_ts()}] [WORKER]"
+    extra = {**extra, **get_log_correlation_fields()}
+    if json_logs_enabled():
+        print(
+            json.dumps(
+                {
+                    "timestamp": _ts(),
+                    "level": "info",
+                    "logger": "worker",
+                    "message": msg,
+                    **extra,
+                },
+                default=str,
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+        return
     extra_str = " | ".join(f"{k}={v}" for k, v in extra.items())
     line = f"{tag} {msg}"
     if extra_str:
@@ -463,8 +513,23 @@ async def run_worker():
                 log_worker("ERROR: Failed to deserialize job payload — skipping", error=str(je))
                 continue
 
-            job_id    = job.get("job_id", "unknown")
-            job_type  = job.get("type", "unknown")
+            job_id    = str(job.get("job_id", "unknown"))
+            job_type  = str(job.get("type", "unknown"))
+            parent_context = extract_trace_context(job.get("trace_context"))
+            job_span = (
+                tracer.start_as_current_span(
+                    "website_generator.worker.job",
+                    context=parent_context,
+                    attributes={
+                        "job.id": str(job_id),
+                        "job.type": str(job_type),
+                        "website.id": str(job.get("website_id") or ""),
+                    },
+                )
+                if tracer
+                else nullcontext()
+            )
+            job_span.__enter__()
             log("INFO", job_id, f"Job type={job_type}")
 
             # ── Process the job ──
@@ -541,6 +606,8 @@ async def run_worker():
                     await mark_job_failed(job_id, error_msg)
                 except Exception:
                     pass
+            finally:
+                job_span.__exit__(None, None, None)
 
         except KeyboardInterrupt:
             log_worker("Worker received shutdown signal (Ctrl+C) — exiting cleanly")
@@ -566,6 +633,7 @@ async def run_worker():
         _nr.close()
     except Exception:
         pass
+    shutdown_telemetry()
     log_worker("Worker STOPPED")
 
 
