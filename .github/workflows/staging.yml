@@ -225,7 +225,7 @@ jobs:
 
             echo "Starting updated compose stack"
 
-            sudo docker compose --env-file .env.deploy up -d --force-recreate --remove-orphans
+            sudo docker compose --env-file .env up -d --force-recreate --remove-orphans
 
             echo "Compose status"
 
