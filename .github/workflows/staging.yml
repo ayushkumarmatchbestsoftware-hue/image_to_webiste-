@@ -164,9 +164,9 @@ jobs:
             git reset --hard origin/deploy/staging
 
             cat > .env.deploy <<EOF
-WEB_NEW_IMAGE=${WEB_NEW_IMAGE}
-WORKER_NEW_IMAGE=${WORKER_NEW_IMAGE}
-EOF
+            WEB_NEW_IMAGE=${WEB_NEW_IMAGE}
+            WORKER_NEW_IMAGE=${WORKER_NEW_IMAGE}
+            EOF
 
             echo "Generated .env.deploy"
             cat .env.deploy
