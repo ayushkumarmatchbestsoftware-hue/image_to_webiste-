@@ -1,36 +1,26 @@
-FROM python:3.10-slim
-
-# Set working directory
+FROM python:3.10-slim-bookworm
 WORKDIR /app
-
-# Install system dependencies (required for Postgres drivers, image processing, and Vercel CLI)
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpq-dev \
-    curl \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g vercel \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements first to leverage Docker layer caching
+ENV ENVIRONMENT=production \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PIP_NO_CACHE_DIR=1
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+      build-essential \
+      libpq-dev \
+      curl \
+      ca-certificates \
+      gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    npm install -g vercel && \
+    apt-get purge -y --auto-remove gnupg && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /root/.cache /root/.npm
 COPY requirements.txt .
-
-# Install Python dependencies
-RUN pip install --upgrade pip wheel
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the application
+RUN pip install --upgrade pip wheel setuptools && \
+    pip install --no-cache-dir -r requirements.txt
 COPY . .
-
-# Internal port used by DevOps production infra
 EXPOSE 5000
-
-# Set environment variables
-ENV ENVIRONMENT=production
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
-
-# Run FastAPI app with Uvicorn on internal port 5000
-# IMPORTANT: Must use uvicorn — FastAPI is ASGI, gunicorn default workers are WSGI and will crash
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "1"]
