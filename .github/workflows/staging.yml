@@ -1,5 +1,4 @@
 name: Deploy Flask App to EC2 (STAGING)
-
 on:
   push:
     branches:
@@ -17,7 +16,6 @@ jobs:
     if: github.ref == 'refs/heads/deploy/staging'
     runs-on: ubuntu-latest
     timeout-minutes: 120
-
     env:
       WEB_IMAGE_NAME: flask-app-web
       WORKER_IMAGE_NAME: flask-app-worker
@@ -35,19 +33,15 @@ jobs:
       - name: Set image tags
         run: |
           set -euo pipefail
-
           SHORT_SHA="${GITHUB_SHA::7}"
-
           echo "WEB_NEW_IMAGE=${WEB_IMAGE_NAME}:stg-${SHORT_SHA}" >> "$GITHUB_ENV"
           echo "WORKER_NEW_IMAGE=${WORKER_IMAGE_NAME}:stg-${SHORT_SHA}" >> "$GITHUB_ENV"
-
           echo "WEB_IMAGE_ARCHIVE=${WEB_IMAGE_NAME}-stg-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
           echo "WORKER_IMAGE_ARCHIVE=${WORKER_IMAGE_NAME}-stg-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
 
       - name: Free disk space before build
         run: |
           set -euo pipefail
-
           df -h
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL || true
           df -h
@@ -55,11 +49,9 @@ jobs:
       - name: Install dependencies for SCA
         run: |
           set -euo pipefail
-
           if [ -f package.json ]; then
             npm ci || npm install
           fi
-
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
@@ -104,9 +96,7 @@ jobs:
       - name: Export Docker image archives
         run: |
           set -euo pipefail
-
           mkdir -p exported-images
-
           docker save "${WEB_NEW_IMAGE}" | gzip -1 > "exported-images/${WEB_IMAGE_ARCHIVE}"
           docker save "${WORKER_NEW_IMAGE}" | gzip -1 > "exported-images/${WORKER_IMAGE_ARCHIVE}"
 
@@ -169,10 +159,11 @@ jobs:
             EOF
 
             echo "Generated .env.deploy"
-            cat .env.deploy
+            # Note: Removed "cat .env.deploy" to protect secrets leaking if injected here in the future
 
             echo "Validating docker compose config"
-            sudo docker compose --env-file .env.deploy config
+            # Redirecting stdout/stderr for config validation prevents sensitive env tokens from printing to GitHub log histories
+            sudo docker compose --env-file .env.deploy config > /dev/null
 
             echo "Stopping existing compose stack"
             sudo docker compose --env-file .env.deploy down --remove-orphans || true
@@ -181,13 +172,13 @@ jobs:
             sudo docker rm -f flask-app-web-staging flask-app-worker-staging || true
 
             echo "Starting updated compose stack"
-            sudo docker compose --env-file .env.deploy up -d --force-recreate --remove-orphans
+            # ADDED: --no-build flag prevents docker compose from attempting a remote registry pull
+            sudo docker compose --env-file .env.deploy up -d --no-build --force-recreate --remove-orphans
 
             echo "Compose status"
             sudo docker compose --env-file .env.deploy ps
 
             echo "Running health check"
-
             HEALTH_OK="false"
 
             for i in {1..15}; do
@@ -203,10 +194,8 @@ jobs:
 
             if [ "$HEALTH_OK" != "true" ]; then
               echo "Health check failed. Printing logs."
-
               sudo docker logs --tail 100 flask-app-web-staging || true
               sudo docker logs --tail 100 flask-app-worker-staging || true
-
               exit 1
             fi
 
