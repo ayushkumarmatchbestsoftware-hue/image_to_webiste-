@@ -150,14 +150,30 @@ async def run_vercel_deployment(website_id: str):
             cwd=tmp_dir,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=os.environ.copy()
+            env=os.environ,   # Leak Fix #5: pass the live env dict directly; the OS
+                               # creates its own copy for the child process, so we
+                               # avoid allocating a large dict copy per deployment call.
         )
-        stdout_bytes, stderr_bytes = await process.communicate()
+        # Leak Fix #5: timeout communicate() so that if the Vercel CLI hangs the
+        # PIPE buffer cannot grow unboundedly and the subprocess is not left as a
+        # zombie. 1200s = 20 minutes (matches the worker's 25-minute job timeout).
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                process.communicate(), timeout=1200
+            )
+        except asyncio.TimeoutError:
+            try:
+                process.kill()
+                await process.wait()
+            except Exception:
+                pass
+            raise Exception("Vercel CLI timed out after 20 minutes")
         out_str = stdout_bytes.decode('utf-8')
         err_str = stderr_bytes.decode('utf-8')
-        
+
         if process.returncode != 0:
             raise Exception(f"Vercel CLI failed: {err_str}")
+
             
         # Parse JSON output to get the deployment URL
         try:

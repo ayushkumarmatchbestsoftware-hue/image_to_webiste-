@@ -21,6 +21,7 @@ Run alongside app.py:
 import asyncio
 import json
 import os
+from contextlib import nullcontext
 
 # Fix for Windows IOCP Error 22 on forceful restart
 if os.name == 'nt':
@@ -44,6 +45,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 
+from core.telemetry import (
+    configure_logging,
+    extract_trace_context,
+    get_log_correlation_fields,
+    get_tracer,
+    json_logs_enabled,
+    setup_telemetry,
+    shutdown_telemetry,
+)
+
+configure_logging()
+setup_telemetry()
+tracer = get_tracer(__name__)
+
 # ── Project imports ──
 from core.redis import (
     redis,
@@ -59,7 +74,24 @@ from core.db import get_engine
 
 # ── Project configuration ──
 ENABLE_CHAT_EDIT = os.getenv("ENABLE_CHAT_EDIT", "False").lower() == "true"
-WEBSITE_CONTEXTS = {} # Local in-memory context (not used if chat is disabled)
+
+# Leak Fix #1: Use a size-capped OrderedDict instead of a plain dict so that
+# in-memory website contexts never grow beyond MAX_CONTEXTS entries. When the
+# limit is reached the oldest entry is automatically evicted (LRU-eviction).
+from collections import OrderedDict
+_WEBSITE_CONTEXTS_MAX = int(os.getenv("WEBSITE_CONTEXTS_MAX", 200))
+
+class _BoundedDict(OrderedDict):
+    """OrderedDict that evicts the oldest entry when the size cap is hit."""
+    def __setitem__(self, key, value):
+        if key in self:
+            self.move_to_end(key)
+        super().__setitem__(key, value)
+        if len(self) > _WEBSITE_CONTEXTS_MAX:
+            oldest = next(iter(self))
+            del self[oldest]
+
+WEBSITE_CONTEXTS = _BoundedDict()  # Local in-memory context (not used if chat is disabled)
 
 # Deployment service
 from services.vercel_service import run_vercel_deployment
@@ -92,6 +124,24 @@ def log(level: str, job_id: str, msg: str, **extra):
     Example: [2026-04-04T09:00:00.000Z] [INFO ] [job:abc123] AI generation started | images=2
     """
     tag = f"[{_ts()}] [{level:<5}] [job:{job_id[:8]}]"
+    extra = {**extra, **get_log_correlation_fields()}
+    if json_logs_enabled():
+        print(
+            json.dumps(
+                {
+                    "timestamp": _ts(),
+                    "level": level.lower(),
+                    "logger": "worker",
+                    "job_id": job_id,
+                    "message": msg,
+                    **extra,
+                },
+                default=str,
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+        return
     extra_str = " | ".join(f"{k}={v}" for k, v in extra.items())
     line = f"{tag} {msg}"
     if extra_str:
@@ -102,6 +152,23 @@ def log(level: str, job_id: str, msg: str, **extra):
 def log_worker(msg: str, **extra):
     """Log a worker-level (not job-specific) message."""
     tag = f"[{_ts()}] [WORKER]"
+    extra = {**extra, **get_log_correlation_fields()}
+    if json_logs_enabled():
+        print(
+            json.dumps(
+                {
+                    "timestamp": _ts(),
+                    "level": "info",
+                    "logger": "worker",
+                    "message": msg,
+                    **extra,
+                },
+                default=str,
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+        return
     extra_str = " | ".join(f"{k}={v}" for k, v in extra.items())
     line = f"{tag} {msg}"
     if extra_str:
@@ -431,7 +498,7 @@ async def run_worker():
         try:
             # BRPOP blocks up to 5 seconds waiting for a job
             # Returns: (queue_name, json_payload) or None on timeout
-            result = await redis.brpop(WEBSITE_AI_QUEUE, timeout=5)
+            result = await redis.brpop(WEBSITE_AI_QUEUE, timeout=5)  # type: ignore
 
             if result is None:
                 # Timeout — no jobs in queue, loop again silently
@@ -446,8 +513,23 @@ async def run_worker():
                 log_worker("ERROR: Failed to deserialize job payload — skipping", error=str(je))
                 continue
 
-            job_id    = job.get("job_id", "unknown")
-            job_type  = job.get("type", "unknown")
+            job_id    = str(job.get("job_id", "unknown"))
+            job_type  = str(job.get("type", "unknown"))
+            parent_context = extract_trace_context(job.get("trace_context"))
+            job_span = (
+                tracer.start_as_current_span(
+                    "website_generator.worker.job",
+                    context=parent_context,
+                    attributes={
+                        "job.id": str(job_id),
+                        "job.type": str(job_type),
+                        "website.id": str(job.get("website_id") or ""),
+                    },
+                )
+                if tracer
+                else nullcontext()
+            )
+            job_span.__enter__()
             log("INFO", job_id, f"Job type={job_type}")
 
             # ── Process the job ──
@@ -524,6 +606,8 @@ async def run_worker():
                     await mark_job_failed(job_id, error_msg)
                 except Exception:
                     pass
+            finally:
+                job_span.__exit__(None, None, None)
 
         except KeyboardInterrupt:
             log_worker("Worker received shutdown signal (Ctrl+C) — exiting cleanly")
@@ -541,6 +625,15 @@ async def run_worker():
         await async_redis.close()
     except Exception:
         pass
+    # Leak Fix #3: Also close the two sync Redis connection pools so all TCP
+    # sockets are released promptly on shutdown instead of waiting for OS timeout.
+    try:
+        from core.redis import sync_redis as _sr, notif_redis as _nr
+        _sr.close()
+        _nr.close()
+    except Exception:
+        pass
+    shutdown_telemetry()
     log_worker("Worker STOPPED")
 
 

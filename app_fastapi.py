@@ -9,6 +9,19 @@ import traceback
 import sys
 from datetime import datetime, timedelta
 from typing import Optional, List, Union
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from core.telemetry import (
+    configure_logging,
+    instrument_fastapi_app,
+    setup_telemetry,
+    shutdown_telemetry,
+)
+
+configure_logging()
+setup_telemetry()
 
 # Fix for "Event loop is closed" error during asyncio subprocess calls on Windows.
 if os.name == 'nt':
@@ -41,9 +54,6 @@ from model.img_info_schema import ImageInfo
 import io
 import shutil
 import tempfile
-from dotenv import load_dotenv
-
-load_dotenv()
 
 WEBSITE_AI_CREDIT_COST = os.getenv("WEBSITE_AI_CREDIT_COST", "1")
 ENABLE_CREDIT_SYSTEM = os.getenv("ENABLE_CREDIT_SYSTEM", "True") == "True"
@@ -51,6 +61,7 @@ ENABLE_CHAT_EDIT = os.getenv("ENABLE_CHAT_EDIT", "False").lower() == "true"
 
 # Setup FastAPI
 app = FastAPI(title="Pomeli Website Builder API")
+instrument_fastapi_app(app)
 
 # Templates
 templates = Jinja2Templates(directory="templates")
@@ -61,10 +72,10 @@ os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
 app.mount("/generated", StaticFiles(directory=Config.GENERATED_FOLDER), name="generated")
 
 # Logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger("fastapi")
 
 # CORS
+TRACE_CONTEXT_HEADERS = ["traceparent", "tracestate", "baggage"]
 raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 allowed_origins = [orig.strip() for orig in raw_origins.split(",") if orig.strip()]
 app.add_middleware(
@@ -72,7 +83,7 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", *TRACE_CONTEXT_HEADERS],
 )
 
 # Global variables
@@ -88,6 +99,10 @@ async def startup_event():
         logger.info(">>> [BOOT] Database initialized")
     except Exception as e:
         logger.error(f">>> [BOOT ERROR] Database init failed: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    shutdown_telemetry()
 
 # --- Authentication Dependency ---
 async def get_current_user(

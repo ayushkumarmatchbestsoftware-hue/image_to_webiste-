@@ -13,6 +13,20 @@ import shutil
 import tempfile
 from datetime import datetime, timedelta
 from typing import Optional, List, Union, Dict
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from core.telemetry import (
+    configure_logging,
+    instrument_fastapi_app,
+    setup_telemetry,
+    shutdown_telemetry,
+)
+
+configure_logging()
+setup_telemetry()
+
 import aiofiles
 
 # Fix for "Event loop is closed" error during asyncio subprocess calls on Windows.
@@ -44,9 +58,6 @@ from services.credit_query_service import get_user_real_credit
 from handlers.credit_handler import website_credits_debits
 from model.website_schema import WebsiteInfo, ChatMessage
 from model.img_info_schema import ImageInfo
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # --- CONFIGURATION ---
 WEBSITE_AI_CREDIT_COST = os.getenv("WEBSITE_AI_CREDIT_COST", "1")
@@ -55,7 +66,6 @@ ENABLE_CHAT_EDIT = False  # Disabled as requested
 MAX_IMAGES = Config.MAX_IMAGES
 
 # --- LOGGING SETUP ---
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger("fastapi")
 
 # --- APP INITIALIZATION ---
@@ -71,10 +81,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f">>> [BOOT ERROR] Database init failed: {e}")
     yield
+    # Leak Fix #3: Close all sync Redis pools on shutdown so TCP sockets are
+    # released immediately instead of waiting for the OS-level timeout.
+    try:
+        from core.redis import close_all_sync_clients
+        close_all_sync_clients()
+        logger.info(">>> [SHUTDOWN] Redis sync pools closed")
+    except Exception as _re:
+        logger.warning(f">>> [SHUTDOWN] Redis close warning: {_re}")
+    shutdown_telemetry()
 
 app = FastAPI(title="Pomeli Website Builder API", lifespan=lifespan)
+instrument_fastapi_app(app)
 
 # CORS Setup
+TRACE_CONTEXT_HEADERS = ["traceparent", "tracestate", "baggage"]
 raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 allowed_origins = [orig.strip() for orig in raw_origins.split(",") if orig.strip()]
 app.add_middleware(
@@ -82,7 +103,7 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", *TRACE_CONTEXT_HEADERS],
 )
 
 # Static & Templates
@@ -240,22 +261,38 @@ async def generate_website(
                 filepath = os.path.join(Config.UPLOAD_FOLDER, unique_filename)
                 async with aiofiles.open(filepath, "wb") as f:
                     await f.write(file_bytes)
-                
+
                 web_path = await asyncio.to_thread(
                     upload_media_to_r2, file_bytes, file.content_type,
                     folder=f"websites/{website_id}/assets"
                 )
+                # Leak Fix #7 (partial): Free the large bytes buffer immediately
+                # after both the disk write and R2 upload are complete instead of
+                # holding it until end-of-loop-iteration.
+                del file_bytes
+
                 image_urls.append(web_path)
                 image_paths.append(filepath)
 
         from core.redis import enqueue_website_ai_job
         print(f"[API IO] -> /generate | user={user_id} | industry={industry} | prompt='{prompt[:50]}...'")
-        job_id = await enqueue_website_ai_job(
-            website_id=website_id, user_id=user_id, prompt=prompt,
-            image_urls=image_urls, image_paths=image_paths, logo_url=logo_web_path,
-            user_pages=pages, user_palette=palette, user_industry=industry,
-            db_image_records=db_image_records
-        )
+        try:
+            job_id = await enqueue_website_ai_job(
+                website_id=website_id, user_id=user_id, prompt=prompt,
+                image_urls=image_urls, image_paths=image_paths, logo_url=logo_web_path,
+                user_pages=pages, user_palette=palette, user_industry=industry,
+                db_image_records=db_image_records
+            )
+        except Exception:
+            # Leak Fix #7: If enqueue fails the worker will never clean up the
+            # temp files it would have removed. Delete them here so they don't
+            # accumulate on disk indefinitely.
+            for _fp in image_paths:
+                try:
+                    os.remove(_fp)
+                except Exception:
+                    pass
+            raise
 
         print(f"[API IO] <- /generate | QUEUED | job_id={job_id} | website_id={website_id}")
         return {"success": True, "job_id": job_id, "website_id": website_id, "status": "queued"}
@@ -280,7 +317,9 @@ async def history(user_id: str = Depends(require_auth)):
     collection = get_websites_collection()
     query = {"user_id": user_id, "_id": {"$gte": ObjectId.from_datetime(cutoff)}}
     cursor = collection.find(query).sort("_id", -1)
-    websites = await cursor.to_list(length=None)
+    # Leak Fix #6: Cap at 100 documents so the full ai_data blobs for every
+    # website the user ever created are NOT all loaded into RAM simultaneously.
+    websites = await cursor.to_list(length=100)
     print(f"[API IO] <- /history | FOUND={len(websites)} items")
     
     items = []
@@ -354,7 +393,7 @@ async def download_website(website_id: str, user_id: str = Depends(require_auth)
                             # 2. Strip the preview proxy prefix from all links
                             # Converts: href="/preview/{id}/about.html" -> href="about.html"
                             html_str = re.sub(
-                                r'href=["\']\/preview\/[a-f0-9\-]+\/([\w\-.]+)(["\'])',
+                                r'href=["\']\\/preview\/[a-f0-9\-]+\/([\w\-.]+)(["\'])',
                                 r'href="\1\2',
                                 html_str
                             )
@@ -362,14 +401,19 @@ async def download_website(website_id: str, user_id: str = Depends(require_auth)
                         except: pass
                     zip_file.writestr(rel_path, content)
         
+        # Leak Fix #4: Use StreamingResponse so the ZIP bytes are streamed
+        # directly from the BytesIO buffer without creating a second full copy
+        # via getvalue(). The buffer is closed after the response is sent.
         zip_buffer.seek(0)
-        return Response(
-            content=zip_buffer.getvalue(),
+        from fastapi.responses import StreamingResponse
+        response = StreamingResponse(
+            zip_buffer,
             media_type="application/x-zip-compressed",
             headers={
                 "Content-Disposition": f"attachment; filename=website_export_{website_id[:8]}.zip"
             }
         )
+        return response
     except Exception as e:
         logger.error(f"Download failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))

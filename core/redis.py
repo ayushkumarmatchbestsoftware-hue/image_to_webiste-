@@ -9,6 +9,7 @@ from typing import Optional
 from redis import Redis as SyncRedis  # Standard sync client
 from redis.asyncio import Redis as AsyncRedis  # Async client for worker
 from dotenv import load_dotenv
+from core.telemetry import inject_trace_context
 
 load_dotenv()
 
@@ -43,6 +44,8 @@ else:
 # ─────────────────────────────────────────────
 
 # Standard sync client: used by app.py (fallback/polling) to avoid event loop issues.
+# Leak Fix #3: cap the pool at 10 connections so the client never leaks unbounded
+# TCP sockets under load. socket_keepalive keeps idle sockets verified alive.
 sync_redis = SyncRedis(
     host=_conn["host"],
     port=_conn["port"],
@@ -50,7 +53,8 @@ sync_redis = SyncRedis(
     db=_conn["db"],
     decode_responses=True,
     socket_timeout=5,
-    socket_connect_timeout=5
+    socket_connect_timeout=5,
+    max_connections=10,
 )
 
 # Async client: ONLY for worker.py's blocking pop (BRPOP).
@@ -60,7 +64,8 @@ async_redis = AsyncRedis(
     port=_conn["port"],
     password=_conn["password"],
     db=_conn["db"],
-    decode_responses=True
+    decode_responses=True,
+    max_connections=10,
 )
 
 # Backwards compatibility: point 'redis' to our async client (for worker usage)
@@ -71,14 +76,26 @@ redis = async_redis
 # Notification Redis (dedicated client for DB 1)
 # ─────────────────────────────────────────────
 
+# Leak Fix #3: cap notification pool too.
 notif_redis = SyncRedis(
     host=os.getenv("NOTIF_REDIS_HOST", "51.44.144.71"),
     port=int(os.getenv("NOTIF_REDIS_PORT", 6380)),
     password=os.getenv("NOTIF_REDIS_PASSWORD", "vcUHF8jfdfGGF016FGVG7jKF86HGC"),
     db=int(os.getenv("NOTIF_REDIS_DB", 1)),
     decode_responses=True,
-    ssl=os.getenv("NOTIF_REDIS_TLS", "false").lower() == "true"
+    ssl=os.getenv("NOTIF_REDIS_TLS", "false").lower() == "true",
+    max_connections=5,
 )
+
+
+def close_all_sync_clients():
+    """Call this on app/worker shutdown to release all sync Redis TCP sockets."""
+    for client in (sync_redis, notif_redis):
+        try:
+            client.close()
+        except Exception:
+            pass
+
 
 # ─────────────────────────────────────────────
 # Queue names
@@ -120,7 +137,8 @@ async def enqueue_website_ai_job(*, website_id: str, user_id: str, prompt: str, 
         "user_id": user_id, "prompt": prompt, "image_urls": image_urls,
         "image_paths": image_paths, "logo_url": logo_url, "user_pages": user_pages,
         "user_palette": user_palette, "user_industry": user_industry,
-        "db_image_records": db_image_records
+        "db_image_records": db_image_records,
+        "trace_context": inject_trace_context(),
     }
     
     def _run():
@@ -241,7 +259,8 @@ async def enqueue_deployment_job(*, website_id: str, user_id: str, job_id: str =
         "job_id": job_id,
         "type": "VERCEL_DEPLOYMENT",
         "website_id": website_id,
-        "user_id": user_id
+        "user_id": user_id,
+        "trace_context": inject_trace_context(),
     }
     
     def _run():
