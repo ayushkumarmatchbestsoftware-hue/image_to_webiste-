@@ -91,7 +91,13 @@ async def lifespan(app: FastAPI):
         logger.warning(f">>> [SHUTDOWN] Redis close warning: {_re}")
     shutdown_telemetry()
 
-app = FastAPI(title="Pomeli Website Builder API", lifespan=lifespan)
+app = FastAPI(
+    title="Pomeli Website Builder API",
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None
+)
 instrument_fastapi_app(app)
 
 # CORS Setup
@@ -215,6 +221,38 @@ def allowed_file(filename):
 # ROUTES
 # ---------------------------------------------------------------------------
 
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html(
+    token: Optional[str] = Query(None),
+    user_id: str = Depends(require_auth)
+):
+    openapi_url = "/openapi.json"
+    if token:
+        openapi_url = f"/openapi.json?token={token}"
+    return get_swagger_ui_html(
+        openapi_url=openapi_url,
+        title=app.title + " - Swagger UI"
+    )
+
+@app.get("/redoc", include_in_schema=False)
+async def custom_redoc_html(
+    token: Optional[str] = Query(None),
+    user_id: str = Depends(require_auth)
+):
+    openapi_url = "/openapi.json"
+    if token:
+        openapi_url = f"/openapi.json?token={token}"
+    return get_redoc_html(
+        openapi_url=openapi_url,
+        title=app.title + " - ReDoc"
+    )
+
+@app.get("/openapi.json", include_in_schema=False)
+async def get_open_api_endpoint(user_id: str = Depends(require_auth)):
+    return app.openapi()
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "service": "Website AI API"}
@@ -330,6 +368,7 @@ async def history(user_id: str = Depends(require_auth)):
             "site_name": w.get("site_name"),
             "final_url": w.get("final_url"),
             "preview_url": f"/preview/{wid}/home.html",
+            "download_url": f"/download/{wid}",
             "status": w.get("status"),
             "created_at": w.get("_id").generation_time.isoformat()
         })
