@@ -493,87 +493,129 @@
         const overlay = document.getElementById('generation-overlay');
         const statusLabel = document.getElementById('status-text');
 
-        if (jobId) {
-            overlay.style.display = 'flex';
-            let pollAttempts = 0;
-            const maxPollAttempts = 240; // ~10 minutes
-            
-            async function startPolling() {
-                try {
-                    const res = await fetch(`/job-status/${jobId}`, { headers: getHeaders() });
-                    const data = await res.json();
+        async function initEditor() {
+            let activeJobId = jobId;
 
-                    if (res.status === 404) {
-                        statusLabel.textContent = "Generation status is no longer available. Loading the site directly...";
-                        document.getElementById('iframe-loader').classList.remove('hidden');
-                        iframe.src = PREVIEW_URL;
-                        return true;
+            // Fetch the latest job if not provided in URL query parameters
+            if (!activeJobId) {
+                try {
+                    const res = await fetch(`/get-latest-job/${website_id}`, { headers: getHeaders() });
+                    const data = await res.json();
+                    if (data.success && data.job_id && (data.data.status === 'processing' || data.data.status === 'queued')) {
+                        activeJobId = data.job_id;
                     }
-                    
-                    if (data.status === 'processing') {
-                        statusLabel.textContent = "AI is writing your code and choosing styles...";
-                    }
-                    
-                    if (data.status === 'completed') {
-                        statusLabel.textContent = "Almost ready...";
-                        // Show iframe loader BEFORE setting src so no white flash
-                        document.getElementById('iframe-loader').classList.remove('hidden');
-                        iframe.src = PREVIEW_URL;
-                        
-                        setTimeout(() => {
-                            overlay.style.transition = 'opacity 0.8s ease';
-                            overlay.style.opacity = '0';
-                            setTimeout(() => overlay.style.display = 'none', 800);
-                        }, 1000);
-                        isAIGenerating = false; // Allow deploy and other actions
-                        return true; // Stop
-                    } else if (data.status === 'failed') {
-                        statusLabel.textContent = "Generation failed. Redirecting...";
-                        setTimeout(() => window.location.href = '/', 3000);
-                        return true; // Stop
-                    }
-                } catch (e) { 
-                    console.error("Poll error", e); 
-                    // If we get an error (like 401), don't show blank screen forever
-                    // but don't stop yet, maybe network is just blipping
+                } catch (e) {
+                    console.error("Error auto-resolving latest job:", e);
                 }
-                return false;
             }
 
-            // Start polling loop
-            const pollInterval = setInterval(async () => {
-                pollAttempts += 1;
-                const shouldStop = await startPolling();
-                if (shouldStop) {
-                    clearInterval(pollInterval);
-                } else if (pollAttempts >= maxPollAttempts) {
-                    clearInterval(pollInterval);
-                    statusLabel.textContent = "Generation is taking longer than expected. Please wait or refresh the page.";
-                    console.warn('Job polling stopped after max attempts');
-                    addBubble('ai', "Generation is still processing. If this continues, please refresh or try again later.");
-                }
-            }, 2500);
-            
-            // Initial call
-            startPolling();
+            if (activeJobId) {
+                overlay.style.display = 'flex';
+                let pollAttempts = 0;
+                const maxPollAttempts = 240; // ~10 minutes
+                
+                async function startPolling() {
+                    try {
+                        const res = await fetch(`/job-status/${activeJobId}`, { headers: getHeaders() });
+                        const data = await res.json();
 
-        } else {
-            // No job in progress, load existing site immediately
-            document.getElementById('iframe-loader').classList.remove('hidden');
-            iframe.src = PREVIEW_URL;
+                        if (res.status === 404) {
+                            statusLabel.textContent = "Generation status is no longer available. Loading the site directly...";
+                            document.getElementById('iframe-loader').classList.remove('hidden');
+                            iframe.src = PREVIEW_URL;
+                            return true;
+                        }
+                        
+                        if (data.status === 'processing') {
+                            statusLabel.textContent = "AI is writing your code and choosing styles...";
+                        }
+                        
+                        if (data.status === 'completed') {
+                            statusLabel.textContent = "Almost ready...";
+                            // Show iframe loader BEFORE setting src so no white flash
+                            document.getElementById('iframe-loader').classList.remove('hidden');
+                            iframe.src = PREVIEW_URL;
+                            
+                            setTimeout(() => {
+                                overlay.style.transition = 'opacity 0.8s ease';
+                                overlay.style.opacity = '0';
+                                setTimeout(() => overlay.style.display = 'none', 800);
+                            }, 1000);
+                            isAIGenerating = false; // Allow deploy and other actions
+                            return true; // Stop
+                        } else if (data.status === 'failed') {
+                            statusLabel.textContent = "Generation failed. Redirecting...";
+                            setTimeout(() => window.location.href = '/', 3000);
+                            return true; // Stop
+                        }
+                    } catch (e) { 
+                        console.error("Poll error", e); 
+                    }
+                    return false;
+                }
+
+                // Start polling loop
+                const pollInterval = setInterval(async () => {
+                    pollAttempts += 1;
+                    const shouldStop = await startPolling();
+                    if (shouldStop) {
+                        clearInterval(pollInterval);
+                    } else if (pollAttempts >= maxPollAttempts) {
+                        clearInterval(pollInterval);
+                        statusLabel.textContent = "Generation is taking longer than expected. Please wait or refresh the page.";
+                        console.warn('Job polling stopped after max attempts');
+                        addBubble('ai', "Generation is still processing. If this continues, please refresh or try again later.");
+                    }
+                }, 2500);
+                
+                // Initial call
+                startPolling();
+
+            } else {
+                // No job in progress, load existing site immediately
+                document.getElementById('iframe-loader').classList.remove('hidden');
+                iframe.src = PREVIEW_URL;
+            }
         }
 
-        // --- Iframe DOM Management ---
-        iframe.onload = () => {
-            // Hide the loading spinner — iframe has content now
-            document.getElementById('iframe-loader').classList.add('hidden');
+        initEditor();
 
+        // --- Iframe DOM Management ---
+        let placeholderPollInterval = null;
+
+        iframe.onload = () => {
             const doc = iframe.contentDocument;
             const win = iframe.contentWindow;
+
             if (isPlaceholderPreview(doc)) {
-                addBubble('ai', "The site files are not ready yet. If you just generated this site, open the editor from the generation result so it includes the job status, or refresh in a moment.");
+                // Show the loader inside the device frame
+                const loader = document.getElementById('iframe-loader');
+                loader.classList.remove('hidden');
+                
+                // Change loader text to show auto-refresh status
+                const loaderText = loader.querySelector('.iframe-loader-text');
+                if (loaderText) {
+                    loaderText.textContent = "Generating website assets... Auto-refreshing shortly.";
+                }
+
+                // Schedule automatic refreshes of the iframe if not already doing so
+                if (!placeholderPollInterval) {
+                    placeholderPollInterval = setInterval(() => {
+                        console.log("Preview not ready. Auto-refreshing iframe preview...");
+                        iframe.src = PREVIEW_URL;
+                    }, 4000); // Try loading the preview again every 4 seconds
+                }
                 return;
             }
+
+            // A real page has loaded successfully! Clear the auto-refresh interval
+            if (placeholderPollInterval) {
+                clearInterval(placeholderPollInterval);
+                placeholderPollInterval = null;
+            }
+
+            // Hide the loading spinner — iframe has content now
+            document.getElementById('iframe-loader').classList.add('hidden');
 
             // 1. Capture current filename for saving
             const path = win.location.pathname;
