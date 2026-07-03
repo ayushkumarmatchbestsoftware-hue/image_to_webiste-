@@ -133,7 +133,7 @@ async def website_credit_debit_service(
                         credits=cost,
                         direction="debit",
                         reference_id=reference_id,
-                        source="website_creation",
+                        source="Website Builder",
                         balance_after=new_balance,
                         tx_metadata={
                             "jobId": job_id,
