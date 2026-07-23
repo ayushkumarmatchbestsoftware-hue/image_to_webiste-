@@ -103,7 +103,7 @@ from core.utils import (
     generate_website_content_logic,
     build_image_map_logic,
 )
-from core.constants import PALETTE_MAP, INDUSTRY_TEMPLATES, system_prompt_text
+from core.constants import PALETTE_MAP, TEMPLATE_MAP, INDUSTRY_TEMPLATES, system_prompt_text
 
 # ── DB models ──
 from core.mongo import insert_website_data, update_website_final_url
@@ -207,6 +207,7 @@ async def process_job(job: dict):
     logo_url     = job.get("logo_url")          # R2 URL of logo (or None)
     user_pages   = job.get("user_pages", "")
     user_palette = job.get("user_palette", "auto")
+    user_template = job.get("user_template", "auto")
     user_industry = job.get("user_industry", "")
     db_image_records = job.get("db_image_records", [])
 
@@ -270,8 +271,11 @@ async def process_job(job: dict):
 
     log("INFO", job_id, "Layout resolved", sections=",".join(layout))
 
-    # ── Step 4: Apply palette override ──
+    # ── Step 4: Apply template + palette overrides ──
     theme = data.get("theme", {})
+    if user_template and user_template != "auto" and user_template in TEMPLATE_MAP:
+        theme.update(TEMPLATE_MAP[user_template])
+        log("INFO", job_id, "Template style applied", template=user_template)
     if user_palette and user_palette != "auto" and user_palette in PALETTE_MAP:
         theme.update(PALETTE_MAP[user_palette])
         log("INFO", job_id, "Palette override applied", palette=user_palette)

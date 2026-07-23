@@ -158,6 +158,12 @@ PALETTE_MAP = {
     "onyx":      {"primary": "#1c1917", "primary_dark": "#000000", "bg": "#ffffff", "bg_alt": "#fafaf9", "text_main": "#1c1917", "text_muted": "#78716c", "accent": "#f59e0b"},
 }
 
+TEMPLATE_MAP = {
+    "minimal":   {"hero_style": "bold-center", "card_style": "flat",     "divider_style": "none",     "font_heading": "Outfit",           "font_body": "Plus Jakarta Sans", "radius_card": "0px",  "radius_btn": "0px"},
+    "bold":      {"hero_style": "split-left",  "card_style": "elevated", "divider_style": "diagonal", "font_heading": "Outfit",           "font_body": "Plus Jakarta Sans", "radius_card": "20px", "radius_btn": "100px"},
+    "editorial": {"hero_style": "split-left",  "card_style": "outlined", "divider_style": "wave",     "font_heading": "Fraunces",         "font_body": "Plus Jakarta Sans", "radius_card": "4px",  "radius_btn": "4px"},
+}
+
 INDUSTRY_TEMPLATES = {
     "restaurant": {
         "label": "Restaurant / Food",
