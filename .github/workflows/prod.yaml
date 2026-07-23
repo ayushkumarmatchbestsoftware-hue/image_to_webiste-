@@ -190,9 +190,7 @@ jobs:
           host: ${{ secrets[matrix.host_secret] }}
           username: ubuntu
           key: ${{ secrets[matrix.key_secret] }}
-          script_stop: true
-          command_timeout: 60m
-          envs: DEPLOY_ACTOR,TRIGGERING_ACTOR,WEB_NEW_IMAGE,WORKER_NEW_IMAGE,WEB_IMAGE_ARCHIVE,WORKER_IMAGE_ARCHIVE
+          envs: WEB_NEW_IMAGE,WORKER_NEW_IMAGE,WEB_IMAGE_ARCHIVE,WORKER_IMAGE_ARCHIVE
           script: |
             set -euo pipefail
 
@@ -255,10 +253,7 @@ jobs:
             done
 
             if [ "$HEALTH_OK" != "true" ]; then
-              echo "Health check failed. Printing logs."
-
-              sudo docker logs --tail 50 flask-app-web-prod || true
-
+              sudo docker logs --tail 50 flask-app-web-staging || true
               exit 1
             fi
 

@@ -129,14 +129,14 @@ def _set_job_status_internal(job_id: str, status: str, result: Optional[dict] = 
     sync_redis.hset(key, mapping=payload)
     sync_redis.expire(key, JOB_TTL)
 
-async def enqueue_website_ai_job(*, website_id: str, user_id: str, prompt: str, image_urls: list, image_paths: list, logo_url: Optional[str], user_pages: str, user_palette: str, user_industry: str, db_image_records: list) -> str:
+async def enqueue_website_ai_job(*, website_id: str, user_id: str, prompt: str, image_urls: list, image_paths: list, logo_url: Optional[str], user_pages: str, user_palette: str, user_template: str = "auto", user_industry: str, db_image_records: list) -> str:
     job_id = str(uuid.uuid4())
     created_at = datetime.utcnow().isoformat() + "Z"
     job_payload = {
         "job_id": job_id, "type": "WEBSITE_GENERATION", "website_id": website_id,
         "user_id": user_id, "prompt": prompt, "image_urls": image_urls,
         "image_paths": image_paths, "logo_url": logo_url, "user_pages": user_pages,
-        "user_palette": user_palette, "user_industry": user_industry,
+        "user_palette": user_palette, "user_template": user_template, "user_industry": user_industry,
         "db_image_records": db_image_records,
         "trace_context": inject_trace_context(),
     }

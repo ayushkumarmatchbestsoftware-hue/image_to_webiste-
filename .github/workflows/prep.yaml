@@ -162,11 +162,8 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST_PREP_US }}
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY_FLASK_APP_PREP }}
-          script_stop: true
-          command_timeout: 60m
-          envs: DEPLOY_ACTOR,TRIGGERING_ACTOR,WEB_NEW_IMAGE,WORKER_NEW_IMAGE,WEB_IMAGE_ARCHIVE,WORKER_IMAGE_ARCHIVE
-
+          key: ${{ secrets.EC2_SSH_KEY_FLASK_APP_STAGING }}
+          envs: WEB_NEW_IMAGE,WORKER_NEW_IMAGE,WEB_IMAGE_ARCHIVE,WORKER_IMAGE_ARCHIVE
           script: |
             set -euo pipefail
 
@@ -232,11 +229,8 @@ jobs:
             done
 
             if [ "$HEALTH_OK" != "true" ]; then
-              echo "Health check failed. Printing logs."
-
-              sudo docker logs --tail 50 flask-app-web-prep || true
-
-              exit 0
+              sudo docker logs --tail 50 flask-app-web-staging || true
+              exit 1
             fi
 
             echo "Cleaning temporary files"

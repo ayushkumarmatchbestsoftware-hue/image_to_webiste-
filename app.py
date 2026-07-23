@@ -269,6 +269,7 @@ async def generate_website(
     industry: str = Form(""),
     pages: str = Form(""),
     palette: str = Form("auto"),
+    template: str = Form("auto"),
     logo: Optional[UploadFile] = File(None),
     images: List[UploadFile] = File([]),
     user_id: str = Depends(require_auth),
@@ -318,7 +319,7 @@ async def generate_website(
             job_id = await enqueue_website_ai_job(
                 website_id=website_id, user_id=user_id, prompt=prompt,
                 image_urls=image_urls, image_paths=image_paths, logo_url=logo_web_path,
-                user_pages=pages, user_palette=palette, user_industry=industry,
+                user_pages=pages, user_palette=palette, user_template=template, user_industry=industry,
                 db_image_records=db_image_records
             )
         except Exception:
@@ -416,11 +417,11 @@ async def download_website(website_id: str, user_id: str = Depends(require_auth)
             for f in files:
                 obj_key = f['Key']
                 rel_path = obj_key[len(prefix):]
-                
+
                 # Exclude internal files like backups
                 if not rel_path or rel_path == "home_backup.html":
                     continue
-                
+
                 content = await asyncio.to_thread(fetch_media_from_r2, obj_key)
                 if content:
                     # Clean HTML files before zipping for a "clean", local-ready export
@@ -430,14 +431,17 @@ async def download_website(website_id: str, user_id: str = Depends(require_auth)
                             # 1. Remove editor-only markup
                             html_str = clean_editor_artifacts(html_str)
                             # 2. Strip the preview proxy prefix from all links
-                            # Converts: href="/preview/{id}/about.html" -> href="about.html"
+                            # Converts: href="/preview/{id}/about.html(#hash)" -> href="about.html(#hash)"
                             html_str = re.sub(
-                                r'href=["\']\\/preview\/[a-f0-9\-]+\/([\w\-.]+)(["\'])',
-                                r'href="\1\2',
+                                r'href=(["\'])/preview/[a-f0-9\-]+/([\w\-.]+)((?:#[^"\']*)?)\1',
+                                r'href=\1\2\3\1',
                                 html_str
                             )
                             content = html_str.encode('utf-8')
                         except: pass
+                        # 3. home.html also ships as index.html so the download opens by default
+                        if rel_path == "home.html":
+                            zip_file.writestr("index.html", content)
                     zip_file.writestr(rel_path, content)
         
         # Leak Fix #4: Use StreamingResponse so the ZIP bytes are streamed
