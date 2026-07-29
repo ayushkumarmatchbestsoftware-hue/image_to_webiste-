@@ -233,6 +233,40 @@
             100% { transform: scale(0.9); opacity: 0.6; }
         }
 
+        /* Generation Overlay */
+        #generation-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 1000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .skeleton-preview {
+            width: 80%; max-width: 900px; height: 60%;
+            background: #111; border-radius: 20px;
+            overflow: hidden; padding: 40px;
+            display: flex; flex-direction: column; gap: 20px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .sk-line {
+            height: 20px; background: linear-gradient(90deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+            background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px;
+        }
+        .sk-title { height: 40px; width: 60%; }
+        .sk-body { height: 100px; width: 100%; }
+        .sk-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+        .sk-card { height: 120px; }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .status-label {
+            margin-top: 30px; font-size: 18px; color: var(--text-dim);
+            letter-spacing: 0.05em; font-weight: 500;
+            animation: pulse-text 2s infinite;
+        }
+        @keyframes pulse-text { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+
         /* Responsive Breakpoints - Mobile Overlay Action */
         .mobile-nav-toggle {
             display: none;
@@ -344,6 +378,18 @@
     </style>
 </head>
 <body>
+    <div id="generation-overlay">
+        <div class="skeleton-preview">
+            <div class="sk-line sk-title"></div>
+            <div class="sk-line sk-body"></div>
+            <div class="sk-grid">
+                <div class="sk-line sk-card"></div>
+                <div class="sk-line sk-card"></div>
+                <div class="sk-line sk-card"></div>
+            </div>
+        </div>
+        <div class="status-label" id="status-text">AI is crafting your brand personality...</div>
+    </div>
     <div id="deploy-toast" class="deploy-toast">
         <div class="toast-content">
             <div class="toast-icon">🚀</div>
@@ -430,7 +476,8 @@
         let isAIGenerating = false;
 
         const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
+        const token = urlParams.get('token'); 
+        const jobId = urlParams.get('job_id');
 
         // Create a completely absolute URL starting with https:// to avoid proxy mixed-content redirects
         const PREVIEW_URL = `${window.location.origin}/preview/${website_id}/home.html`;
@@ -442,14 +489,93 @@
             return h;
         }
 
-        // Load the preview immediately regardless of generation job status.
-        // /preview/{website_id}/home.html itself serves a "Still generating..." /
-        // "Generation Failed: ..." placeholder until the real page exists, and the
-        // iframe.onload handler below auto-refreshes every 4s while that placeholder
-        // is showing, so there's no need to gate the iframe behind job-status polling.
-        function initEditor() {
-            document.getElementById('iframe-loader').classList.remove('hidden');
-            iframe.src = PREVIEW_URL;
+        // --- AUTOMATIC GENERATION POLLING ---
+        const overlay = document.getElementById('generation-overlay');
+        const statusLabel = document.getElementById('status-text');
+
+        async function initEditor() {
+            let activeJobId = jobId;
+
+            // Fetch the latest job if not provided in URL query parameters
+            if (!activeJobId) {
+                try {
+                    const res = await fetch(`/get-latest-job/${website_id}`, { headers: getHeaders() });
+                    const data = await res.json();
+                    if (data.success && data.job_id && (data.data.status === 'processing' || data.data.status === 'queued')) {
+                        activeJobId = data.job_id;
+                    }
+                } catch (e) {
+                    console.error("Error auto-resolving latest job:", e);
+                }
+            }
+
+            if (activeJobId) {
+                overlay.style.display = 'flex';
+                let pollAttempts = 0;
+                const maxPollAttempts = 240; // ~10 minutes
+                
+                async function startPolling() {
+                    try {
+                        const res = await fetch(`/job-status/${activeJobId}`, { headers: getHeaders() });
+                        const data = await res.json();
+
+                        if (res.status === 404) {
+                            statusLabel.textContent = "Generation status is no longer available. Loading the site directly...";
+                            document.getElementById('iframe-loader').classList.remove('hidden');
+                            iframe.src = PREVIEW_URL;
+                            return true;
+                        }
+                        
+                        if (data.status === 'processing') {
+                            statusLabel.textContent = "AI is writing your code and choosing styles...";
+                        }
+                        
+                        if (data.status === 'completed') {
+                            statusLabel.textContent = "Almost ready...";
+                            // Show iframe loader BEFORE setting src so no white flash
+                            document.getElementById('iframe-loader').classList.remove('hidden');
+                            iframe.src = PREVIEW_URL;
+                            
+                            setTimeout(() => {
+                                overlay.style.transition = 'opacity 0.8s ease';
+                                overlay.style.opacity = '0';
+                                setTimeout(() => overlay.style.display = 'none', 800);
+                            }, 1000);
+                            isAIGenerating = false; // Allow deploy and other actions
+                            return true; // Stop
+                        } else if (data.status === 'failed') {
+                            statusLabel.textContent = "Generation failed. Redirecting...";
+                            setTimeout(() => window.location.href = '/', 3000);
+                            return true; // Stop
+                        }
+                    } catch (e) { 
+                        console.error("Poll error", e); 
+                    }
+                    return false;
+                }
+
+                // Start polling loop
+                const pollInterval = setInterval(async () => {
+                    pollAttempts += 1;
+                    const shouldStop = await startPolling();
+                    if (shouldStop) {
+                        clearInterval(pollInterval);
+                    } else if (pollAttempts >= maxPollAttempts) {
+                        clearInterval(pollInterval);
+                        statusLabel.textContent = "Generation is taking longer than expected. Please wait or refresh the page.";
+                        console.warn('Job polling stopped after max attempts');
+                        addBubble('ai', "Generation is still processing. If this continues, please refresh or try again later.");
+                    }
+                }, 2500);
+                
+                // Initial call
+                startPolling();
+
+            } else {
+                // No job in progress, load existing site immediately
+                document.getElementById('iframe-loader').classList.remove('hidden');
+                iframe.src = PREVIEW_URL;
+            }
         }
 
         initEditor();
