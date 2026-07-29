@@ -489,14 +489,24 @@ async def run_worker():
     log_worker(f"Listening on queue: {WEBSITE_AI_QUEUE}")
     log_worker("=" * 60)
 
-    # Ping Redis to confirm connection before entering loop
-    try:
-        from core.redis import redis as redis_client
-        pong = await redis_client.ping()
-        log_worker("Redis connection: OK", pong=pong)
-    except Exception as conn_err:
-        log_worker("FATAL: Cannot connect to Redis — exiting", error=str(conn_err))
-        sys.exit(1)
+    # Ping Redis to confirm connection before entering the main loop.
+    # Retries indefinitely with capped backoff instead of exiting — exiting here
+    # just hands off to Docker's much slower restart-policy backoff, so a
+    # transient DNS/network hiccup resolving the 'redis' hostname on container
+    # startup can otherwise leave the worker down for minutes instead of seconds.
+    from core.redis import redis as redis_client
+    retry_delay = 2
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            pong = await redis_client.ping()
+            log_worker("Redis connection: OK", pong=pong, attempt=attempt)
+            break
+        except Exception as conn_err:
+            log_worker(f"Redis not reachable (attempt {attempt}) — retrying in {retry_delay}s", error=str(conn_err))
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, 30)
 
     while True:
         try:
