@@ -407,10 +407,29 @@ async def download_website(website_id: str, user_id: str = Depends(require_auth)
         # 1. List all files for this website in R2
         prefix = f"websites/{website_id}/"
         files = await asyncio.to_thread(list_objects_in_folder, prefix)
-        
+
         if not files:
             raise HTTPException(status_code=404, detail="No files found for this website")
-        
+
+        # Pages can drift out of sync with each other across separate generation/
+        # chat-edit jobs (e.g. about.html's nav links to services.html from a job
+        # where that page rendered, but a later/earlier job never (re)created it).
+        # Know the real, current set of pages so dead nav links can be caught below.
+        valid_pages = {
+            f['Key'][len(prefix):]
+            for f in files
+            if f['Key'][len(prefix):].endswith(".html") and f['Key'][len(prefix):] != "home_backup.html"
+        }
+        valid_pages.add("index.html")
+
+        def _fix_dead_page_links(html_str: str) -> str:
+            def _replace(m):
+                quote, target = m.group(1), m.group(2)
+                if target not in valid_pages:
+                    return f'href={quote}home.html{quote}'
+                return m.group(0)
+            return re.sub(r'href=(["\'])([\w\-]+\.html)(?:#[^"\']*)?\1', _replace, html_str)
+
         # 2. Create ZIP in memory
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -437,9 +456,12 @@ async def download_website(website_id: str, user_id: str = Depends(require_auth)
                                 r'href=\1\2\3\1',
                                 html_str
                             )
+                            # 3. Fall back to home.html for nav links pointing at a
+                            # page that doesn't actually exist in this export.
+                            html_str = _fix_dead_page_links(html_str)
                             content = html_str.encode('utf-8')
                         except: pass
-                        # 3. home.html also ships as index.html so the download opens by default
+                        # 4. home.html also ships as index.html so the download opens by default
                         if rel_path == "home.html":
                             zip_file.writestr("index.html", content)
                     zip_file.writestr(rel_path, content)
