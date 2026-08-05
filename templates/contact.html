@@ -74,8 +74,8 @@
         <div class="reveal">
             <div class="contact-header">
                 <span class="section-label">{{ contact.get('label', 'Connect') }}</span>
-                <h2 class="contact-title" contenteditable="true">{{ contact.title }}</h2>
-                <p class="contact-description" contenteditable="true">{{ contact.description or "We're here to discuss your vision and help you realize your brand's full potential." }}</p>
+                <h2 class="contact-title" contenteditable="true" data-sync-field="contact.title">{{ contact.title }}</h2>
+                <p class="contact-description" contenteditable="true" data-sync-field="contact.description">{{ contact.description or "We're here to discuss your vision and help you realize your brand's full potential." }}</p>
             </div>
 
             <div class="contact-items">
@@ -87,7 +87,7 @@
                     </div>
                     <div>
                         <div class="c-label">Direct Inquiry</div>
-                        <div class="c-value" contenteditable="true">{{ contact.email }}</div>
+                        <div class="c-value" contenteditable="true" data-sync-field="contact.email">{{ contact.email }}</div>
                     </div>
                 </div>
 
@@ -99,7 +99,7 @@
                     </div>
                     <div>
                         <div class="c-label">Voice</div>
-                        <div class="c-value" contenteditable="true">{{ contact.get('phone', '+1 (555) 000-0000') }}</div>
+                        <div class="c-value" contenteditable="true" data-sync-field="contact.phone">{{ contact.get('phone', '+1 (555) 000-0000') }}</div>
                     </div>
                 </div>
 
@@ -111,7 +111,7 @@
                     </div>
                     <div>
                         <div class="c-label">Presence</div>
-                        <div class="c-value" contenteditable="true">{{ contact.get('address', 'London / New York / Remote') }}</div>
+                        <div class="c-value" contenteditable="true" data-sync-field="contact.address">{{ contact.get('address', 'London / New York / Remote') }}</div>
                     </div>
                 </div>
             </div>

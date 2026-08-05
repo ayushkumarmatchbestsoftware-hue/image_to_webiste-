@@ -26,7 +26,11 @@ def clean_editor_artifacts(html: str) -> str:
     
     # 4. Clean up interactive attributes
     html = re.sub(r'\s*contenteditable=(["\'])?true\1?', '', html, flags=re.IGNORECASE)
-    html = re.sub(r'\s*data-[a-zA-Z0-9_\-]+=(["\']).*?\1', '', html)
+    # NOTE: data-swappable / data-sync-field are permanent template markers (not
+    # editor-injected artifacts) used respectively to gate the image-swap overlay
+    # and to keep duplicated sections (e.g. Contact) in sync across pages, so they
+    # must survive this cleanup and are excluded from the strip below.
+    html = re.sub(r'\s*data-(?!swappable=|sync-field=)[a-zA-Z0-9_\-]+=(["\']).*?\1', '', html)
     
     # 5. Remove editor-related classes
     def _clean_classes(m):
@@ -46,6 +50,37 @@ def clean_editor_artifacts(html: str) -> str:
     html = html.replace('initImageDropZones();', '').replace('showSaveIndicator();', '')
     
     return html
+
+def sync_fields_between_pages(source_html: str, target_html: str) -> str:
+    """
+    Copy the text of elements tagged data-sync-field="..." from source_html into
+    the matching-tagged elements of target_html. Used to keep sections that are
+    duplicated across two pages (e.g. the Contact block embedded in home.html and
+    the standalone contact.html) in sync after the user edits either one in the
+    editor. Best-effort: fields missing from either side are left untouched.
+    """
+    if not source_html or not target_html:
+        return target_html
+
+    field_pattern = re.compile(
+        r'<([a-zA-Z0-9]+)([^>]*\bdata-sync-field=(["\'])([\w.\-]+)\3[^>]*)>(.*?)</\1>',
+        re.IGNORECASE | re.DOTALL
+    )
+
+    new_values = {}
+    for tag, attrs, quote, field, content in field_pattern.findall(source_html):
+        new_values[field] = content
+
+    if not new_values:
+        return target_html
+
+    def _replace(m):
+        tag, attrs, quote, field, content = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
+        if field in new_values and new_values[field] != content:
+            return f"<{tag}{attrs}>{new_values[field]}</{tag}>"
+        return m.group(0)
+
+    return field_pattern.sub(_replace, target_html)
 
 def get_niche_key_logic(prompt: str, NICHE_DESIGN) -> str:
     p = prompt.lower()

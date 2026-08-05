@@ -696,6 +696,7 @@
 
         function hasBackgroundImage(el) {
             if (!el || el.closest('nav') || el.closest('footer')) return false;
+            if (el.dataset.swappable === 'false') return false;
             const inlineBg = el.style && el.style.backgroundImage;
             const computedBg = iframe.contentWindow.getComputedStyle(el).backgroundImage;
             return (inlineBg && inlineBg !== 'none') || (computedBg && computedBg !== 'none');

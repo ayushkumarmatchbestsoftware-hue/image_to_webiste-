@@ -48,7 +48,7 @@
 </style>
 
 {% set a_bg = about_img or hero_img %}
-<section class="about-landing" id="about" {% if a_bg %}style="background-image: url('{{ a_bg }}');"{% endif %}>
+<section class="about-landing" id="about" data-swappable="{{ 'true' if about_img else 'false' }}" {% if a_bg %}style="background-image: url('{{ a_bg }}');"{% endif %}>
     <div class="about-grid reveal">
         <div class="about-header-side">
             <h1 contenteditable="true">{{ about.heading }}</h1>
