@@ -192,13 +192,14 @@ except Exception as e:
 # --- DESIGN UTILS ---
 from core.constants import NICHE_DESIGN, LAYOUT_POOLS, PALETTE_MAP, INDUSTRY_TEMPLATES, system_prompt_text
 from core.utils import (
-    get_niche_key_logic, 
-    get_fallback_tokens_logic, 
-    get_layout_blueprint_logic, 
+    get_niche_key_logic,
+    get_fallback_tokens_logic,
+    get_layout_blueprint_logic,
     validate_and_fix_theme,
     generate_website_content_logic,
     clean_editor_artifacts,
-    perform_chat_edit_logic
+    perform_chat_edit_logic,
+    sync_fields_between_pages
 )
 
 def get_fallback_tokens(prompt: str):
@@ -635,6 +636,30 @@ async def save_html(request: Request, user_id: str = Depends(require_auth)):
             folder=f"websites/{website_id}", filename=page_name
         )
         print(f"[API IO] <- /save | SUCCESS | path=websites/{website_id}/{page_name}")
+
+        # The Contact section is duplicated between home.html (embedded) and
+        # contact.html (standalone page). Keep the sibling page's matching
+        # fields (title/description/email/phone/address) in sync so an edit
+        # made on either one is reflected on the other. Best-effort only: if
+        # the sibling page doesn't exist for this site, this is a no-op and
+        # never affects the primary save above.
+        if page_name in ('contact.html', 'home.html'):
+            sibling_name = 'home.html' if page_name == 'contact.html' else 'contact.html'
+            try:
+                sibling_bytes = await asyncio.to_thread(
+                    fetch_media_from_r2, f"websites/{website_id}/{sibling_name}"
+                )
+                sibling_html = sibling_bytes.decode('utf-8')
+                synced_html = sync_fields_between_pages(html, sibling_html)
+                if synced_html != sibling_html:
+                    await asyncio.to_thread(
+                        upload_media_to_r2, synced_html.encode('utf-8'), "text/html",
+                        folder=f"websites/{website_id}", filename=sibling_name
+                    )
+                    print(f"[API IO] <- /save | SYNCED contact fields -> {sibling_name}")
+            except Exception as sync_err:
+                logger.warning(f"Contact field sync ({page_name} -> {sibling_name}) skipped: {sync_err}")
+
         return {"success": True}
     except Exception as e:
         logger.error(f"Save failed: {e}")
