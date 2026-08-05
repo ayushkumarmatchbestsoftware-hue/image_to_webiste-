@@ -728,7 +728,7 @@
   {# ── ABOUT (Restructured Layout) ── #}
   {% elif section == 'about' %}
   {% set a_bg = about_img %}
-  <section class="about-section" id="about" {% if a_bg %}style="background-image: url('{{ a_bg }}');"{% endif %}>
+  <section class="about-section" id="about" data-swappable="{{ 'true' if about_img else 'false' }}" {% if a_bg %}style="background-image: url('{{ a_bg }}');"{% endif %}>
     <div class="about-grid reveal">
       
       <div class="about-header-side">
