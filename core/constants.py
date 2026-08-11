@@ -195,7 +195,7 @@ The response MUST be a single, valid JSON object following this schema exactly:
   "portfolio": [ { "title": "...", "client": "...", "description": "..." } ],
   "testimonials": [ { "content": "...", "author": "...", "role": "..." } ],
   "faq": [ { "question": "...", "answer": "..." } ],
-  "stats": [ { "label": "...", "value": "..." } ],
+  "stats": [ { "label": "...", "number": "..." } ],
   "pricing": [ { "name": "...", "price": "...", "period": "/mo", "description": "...", "features": ["...", "..."], "highlighted": false } ],
   "contact": { "title": "...", "description": "...", "email": "...", "phone": "...", "address": "..." },
   "footer": { "copyright": "...", "address": "..." },
@@ -204,4 +204,8 @@ The response MUST be a single, valid JSON object following this schema exactly:
 }
 IMPORTANT: The "layout" array MUST always start with "hero". Always include "contact" and "pricing" keys in the response even if they are not in the layout — the system uses them when needed.
 BAN AI-ISMS. Sound human. Use specific, niche-relevant terminology. Use Roboto/Inter only.
+TAILOR CONTENT TO USER DESCRIPTION:
+The user's description (under "Business:") is the primary source of truth for the website. You MUST read it carefully and build a bespoke, premium site tailored to their input.
+- Incorporate all specific claims, features, services, values, facts, and figures (e.g., "96 users", "3 offices", specialized tools, custom processes) mentioned by the user into the copywriting, stats, services, and FAQ. Do NOT ignore their unique inputs or replace them with generic industry boilerplate.
+- Intelligently adapt the services list, about story, pricing tiers, and testimonials to align with what the user described (unless the input is offensive, weird, or completely unacceptable).
 If images are provided, derive the 'theme' colors from the images to ensure brand harmony."""
