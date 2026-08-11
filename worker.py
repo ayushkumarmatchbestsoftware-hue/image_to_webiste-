@@ -317,6 +317,15 @@ async def process_job(job: dict):
     )
 
     # ── Step 7: Render + upload home.html ──
+    raw_stats = data.get("stats", [])
+    normalized_stats = []
+    if isinstance(raw_stats, list):
+        for s in raw_stats:
+            if isinstance(s, dict):
+                label = s.get("label") or s.get("lbl", "")
+                number = s.get("number") or s.get("value") or s.get("val", "")
+                normalized_stats.append({"label": label, "number": number})
+
     home_html = jinja_env.get_template("home.html").render(
         **base_ctx,
         home=data.get("home", {}),
@@ -326,7 +335,7 @@ async def process_job(job: dict):
         testimonials=data.get("testimonials", []),
         faq=data.get("faq", []),
         pricing=data.get("pricing", []),
-        stats=data.get("stats", []),
+        stats=normalized_stats,
         contact=data.get("contact", {}),
     )
 
