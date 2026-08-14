@@ -8,7 +8,9 @@ import asyncio
 import traceback
 import urllib.parse
 import uuid as pyuuid
-from PIL import Image
+# NOTE: PIL is intentionally NOT imported at module level — it's only needed
+# by compress_image() below, during an actual deploy, so it's imported
+# lazily right at that point of use instead (see run_vercel_deployment).
 
 from core.r2 import upload_media_to_r2, fetch_media_from_r2, R2_PUBLIC_URL
 from core.mongo import get_website_layout
@@ -27,6 +29,7 @@ async def run_vercel_deployment(website_id: str):
     # Compress helper
     def compress_image(raw_bytes: bytes, max_width: int = 1920, quality: int = 82) -> bytes:
         try:
+            from PIL import Image  # lazy import — only needed for an actual deploy
             img = Image.open(io.BytesIO(raw_bytes))
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGBA")

@@ -1,15 +1,12 @@
 import os
 import asyncio
 import json
-import uuid
 import time
 from datetime import datetime
 from urllib.parse import urlparse
 from typing import Optional
 from redis import Redis as SyncRedis  # Standard sync client
-from redis.asyncio import Redis as AsyncRedis  # Async client for worker
 from dotenv import load_dotenv
-from core.telemetry import inject_trace_context
 
 load_dotenv()
 
@@ -43,7 +40,10 @@ else:
 # Redis clients
 # ─────────────────────────────────────────────
 
-# Standard sync client: used by app.py (fallback/polling) to avoid event loop issues.
+# Standard sync client: the only Redis client used by the app now. All job
+# generation/deployment work runs in-process (see core/generation.py) via
+# asyncio.to_thread, so a single sync client with a capped pool is sufficient —
+# there is no separate worker process needing its own async/blocking client.
 # Leak Fix #3: cap the pool at 10 connections so the client never leaks unbounded
 # TCP sockets under load. socket_keepalive keeps idle sockets verified alive.
 sync_redis = SyncRedis(
@@ -56,21 +56,6 @@ sync_redis = SyncRedis(
     socket_connect_timeout=5,
     max_connections=10,
 )
-
-# Async client: ONLY for worker.py's blocking pop (BRPOP).
-# This is created at module level but will be used in the worker's single loop.
-async_redis = AsyncRedis(
-    host=_conn["host"],
-    port=_conn["port"],
-    password=_conn["password"],
-    db=_conn["db"],
-    decode_responses=True,
-    max_connections=10,
-)
-
-# Backwards compatibility: point 'redis' to our async client (for worker usage)
-# but for app.py routes, we will use the sync client via to_thread.
-redis = async_redis
 
 # ─────────────────────────────────────────────
 # Notification Redis (dedicated client for DB 1)
@@ -101,7 +86,6 @@ def close_all_sync_clients():
 # Queue names
 # ─────────────────────────────────────────────
 
-WEBSITE_AI_QUEUE = "queue:website_ai"
 NOTIFICATION_QUEUE = "notification-queue:wait" # BullMQ 'wait' list with empty prefix
 
 def _job_key(job_id: str) -> str:
@@ -129,25 +113,21 @@ def _set_job_status_internal(job_id: str, status: str, result: Optional[dict] = 
     sync_redis.hset(key, mapping=payload)
     sync_redis.expire(key, JOB_TTL)
 
-async def enqueue_website_ai_job(*, website_id: str, user_id: str, prompt: str, image_urls: list, image_paths: list, logo_url: Optional[str], user_pages: str, user_palette: str, user_template: str = "auto", user_industry: str, db_image_records: list) -> str:
-    job_id = str(uuid.uuid4())
+async def create_job_record(*, job_id: str, website_id: str) -> None:
+    """
+    Create the initial "queued" status row for a job that will be processed
+    in-process via a FastAPI BackgroundTask (see core/generation.py) — this
+    replaces the old enqueue_website_ai_job/enqueue_deployment_job functions,
+    minus the Redis LIST push, since there is no separate queue/worker anymore.
+    Used identically by both /generate and /deploy.
+    """
     created_at = datetime.utcnow().isoformat() + "Z"
-    job_payload = {
-        "job_id": job_id, "type": "WEBSITE_GENERATION", "website_id": website_id,
-        "user_id": user_id, "prompt": prompt, "image_urls": image_urls,
-        "image_paths": image_paths, "logo_url": logo_url, "user_pages": user_pages,
-        "user_palette": user_palette, "user_template": user_template, "user_industry": user_industry,
-        "db_image_records": db_image_records,
-        "trace_context": inject_trace_context(),
-    }
-    
+
     def _run():
-        sync_redis.lpush(WEBSITE_AI_QUEUE, json.dumps(job_payload))
         _set_job_status_internal(job_id, "queued", result={"created_at": created_at})
         sync_redis.set(_website_job_key(website_id), job_id, ex=JOB_TTL)
-        
+
     await asyncio.to_thread(_run)
-    return job_id
 
 async def get_job_status(job_id: str) -> Optional[dict]:
     """Helper used by app.py — now uses sync client in thread to avoid Event Loop errors."""
@@ -250,23 +230,3 @@ async def mark_job_failed(job_id: str, error: str):
         sync_redis.hset(_job_key(job_id), mapping=payload)
         sync_redis.expire(_job_key(job_id), JOB_TTL)
     await asyncio.to_thread(run_sync)
-
-async def enqueue_deployment_job(*, website_id: str, user_id: str, job_id: str = None) -> str:
-    if not job_id:
-        job_id = str(uuid.uuid4())
-    created_at = datetime.utcnow().isoformat() + "Z"
-    job_payload = {
-        "job_id": job_id,
-        "type": "VERCEL_DEPLOYMENT",
-        "website_id": website_id,
-        "user_id": user_id,
-        "trace_context": inject_trace_context(),
-    }
-    
-    def _run():
-        sync_redis.lpush(WEBSITE_AI_QUEUE, json.dumps(job_payload))
-        _set_job_status_internal(job_id, "queued", result={"created_at": created_at})
-        sync_redis.set(_website_job_key(website_id), job_id, ex=JOB_TTL)
-        
-    await asyncio.to_thread(_run)
-    return job_id

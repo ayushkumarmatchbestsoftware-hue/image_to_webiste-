@@ -16,16 +16,6 @@ services:
     networks:
       - cloudflare_net
 
-  worker:
-    image: ${WORKER_NEW_IMAGE}
-    container_name: fastapi-app-worker-staging
-    restart: always
-    env_file:
-      - .env
-    command: ["python", "worker.py"]
-    networks:
-      - cloudflare_net
-
 networks:
   cloudflare_net:
     external: true

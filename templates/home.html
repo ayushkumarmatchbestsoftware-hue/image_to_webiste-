@@ -647,23 +647,19 @@
         </div>
       </div>
 
+      {# Sourced from the canonical AI-generated 'stats' list — never fabricated.
+         If the business gave us no real quantifiable facts, 'stats' is empty
+         and this strip is simply omitted rather than showing fake numbers. #}
+      {% if stats %}
       <div class="hero-ni-proof reveal reveal-delay-2">
+        {% for s in stats[:3] %}
         <div class="hero-ni-proof-item">
-          <span class="ni-proof-num" contenteditable="true">{{ about.get('stat1_number', '12+') }}</span>
-          <span class="ni-proof-label" contenteditable="true">{{ about.get('stat1_label', 'Years of Expertise') }}</span>
-          <div class="ni-proof-desc" contenteditable="true">{{ home.get('pillar1_desc', 'Meticulously crafted solutions that prioritize performance and robust architectural integrity.') }}</div>
+          <span class="ni-proof-num" contenteditable="true">{{ s.number }}</span>
+          <span class="ni-proof-label" contenteditable="true">{{ s.label }}</span>
         </div>
-        <div class="hero-ni-proof-item">
-          <span class="ni-proof-num" contenteditable="true">{{ about.get('stat2_number', '340+') }}</span>
-          <span class="ni-proof-label" contenteditable="true">{{ about.get('stat2_label', 'Clients Served') }}</span>
-          <div class="ni-proof-desc" contenteditable="true">{{ home.get('pillar2_desc', 'Transforming complex challenges into streamlined, high-performance digital experiences.') }}</div>
-        </div>
-        <div class="hero-ni-proof-item">
-          <span class="ni-proof-num" contenteditable="true">{{ about.get('stat3_number', '97%') }}</span>
-          <span class="ni-proof-label" contenteditable="true">{{ about.get('stat3_label', 'Client Satisfaction') }}</span>
-          <div class="ni-proof-desc">Consistently recognized for exceeding expectations and setting new industry benchmarks.</div>
-        </div>
+        {% endfor %}
       </div>
+      {% endif %}
       {% endif %}
 
     </div>
@@ -743,8 +739,8 @@
         <div class="about-s-item reveal-delay-{{ loop.index }}">
           <div class="about-s-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              {% if s.get('icon_type') == 'star' %}<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-              {% elif s.get('icon_type') == 'zap' %}<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              {% if s.get('icon') == 'star' %}<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              {% elif s.get('icon') == 'zap' %}<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
               {% else %}<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>{% endif %}
             </svg>
           </div>
