@@ -234,7 +234,13 @@ def setup_telemetry() -> bool:
     if _configured_tracing:
         return _tracing_enabled
 
-    _set_propagators()
+    # Check whether tracing will actually be used BEFORE importing anything
+    # OpenTelemetry-related — every code path that would use propagators
+    # (get_tracer/inject_trace_context/extract_trace_context) already checks
+    # _tracing_enabled and no-ops when it's False, so there is nothing for
+    # propagators to do when no endpoint is configured. Skipping the import
+    # entirely in that case avoids pulling in opentelemetry.propagate/baggage
+    # for a deployment that will never export a trace.
     endpoint = _trace_endpoint()
     if os.getenv("OTEL_SDK_DISABLED", "").lower() == "true":
         logging.getLogger(__name__).warning("[otel] OTEL_SDK_DISABLED=true; tracing export is disabled")
@@ -248,6 +254,7 @@ def setup_telemetry() -> bool:
         _configured_tracing = True
         return False
 
+    _set_propagators()
     try:
         from opentelemetry import trace
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter

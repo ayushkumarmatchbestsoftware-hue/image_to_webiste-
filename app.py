@@ -55,7 +55,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import insert, update, select, func
 from core.db import get_session_factory, init_db
 from core.mongo import insert_website_data, get_website_layout, update_website_layout, insert_chat_message, get_websites_collection, update_website_final_url
-from core.r2 import upload_media_to_r2, R2_PUBLIC_URL, fetch_media_from_r2, r2_client, R2_BUCKET_NAME
+from core.r2 import upload_media_to_r2, R2_PUBLIC_URL, fetch_media_from_r2, R2_BUCKET_NAME
 from services.credit_query_service import get_user_real_credit
 from handlers.credit_handler import website_credits_debits
 from model.website_schema import WebsiteInfo, ChatMessage

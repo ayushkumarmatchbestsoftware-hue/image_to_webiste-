@@ -1,5 +1,8 @@
 import os
-from motor.motor_asyncio import AsyncIOMotorClient
+# NOTE: motor/pymongo (~7MB RSS just to import) is intentionally NOT imported
+# at module level — client construction here was already lazy (see
+# get_mongo_client below); this just defers the underlying import to match,
+# so nothing pulls in motor until a Mongo operation actually happens.
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,12 +13,13 @@ MONGO_DB_NAME = os.getenv("MONGO_DB", "xelta_db")
 # Reuse the client globally
 _mongo_client = None
 
-def get_mongo_client() -> AsyncIOMotorClient:
+def get_mongo_client():
     global _mongo_client
     if _mongo_client is None:
         if not MONGODB_URL:
             # Fallback for unexpected situations
             raise ValueError("MONGODB_URL is missing from environment variables.")
+        from motor.motor_asyncio import AsyncIOMotorClient
         _mongo_client = AsyncIOMotorClient(MONGODB_URL)
     return _mongo_client
 

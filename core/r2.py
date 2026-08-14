@@ -1,9 +1,10 @@
 import os
 import uuid
-import boto3
 from typing import Optional
 from dotenv import load_dotenv
-from botocore.config import Config
+# NOTE: boto3/botocore (~7MB RSS just to import) is intentionally NOT
+# imported at module level — it's deferred to get_r2_client() below, on
+# first actual storage call.
 load_dotenv()
 
 
@@ -28,17 +29,27 @@ if not all([
 
 
 # ===============================
-# R2 S3-Compatible Client
+# R2 S3-Compatible Client (lazy — see note on the deferred boto3 import above)
 # ===============================
 
-r2_client = boto3.client(
-    service_name="s3",
-    endpoint_url=f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
-    aws_access_key_id=R2_ACCESS_KEY_ID,
-    aws_secret_access_key=R2_SECRET_ACCESS_KEY,
-    region_name="auto",  # REQUIRED for Cloudflare R2
-    config=Config(proxies={}),
-)
+_r2_client = None
+
+def get_r2_client():
+    """Lazily import boto3 + construct the R2 client on first actual use,
+    then cache it for the lifetime of the process."""
+    global _r2_client
+    if _r2_client is None:
+        import boto3
+        from botocore.config import Config
+        _r2_client = boto3.client(
+            service_name="s3",
+            endpoint_url=f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
+            aws_access_key_id=R2_ACCESS_KEY_ID,
+            aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+            region_name="auto",  # REQUIRED for Cloudflare R2
+            config=Config(proxies={}),
+        )
+    return _r2_client
 
 
 # ===============================
@@ -61,7 +72,7 @@ def upload_media_to_r2(
         object_key = f"{folder}/{uuid.uuid4()}.{extension}"
 
     # Upload object to R2
-    r2_client.put_object(
+    get_r2_client().put_object(
         Bucket=R2_BUCKET_NAME,
         Key=object_key,
         Body=file_bytes,
@@ -75,7 +86,7 @@ def fetch_media_from_r2(object_key: str) -> bytes:
     """
     Fetch an object from R2.
     """
-    response = r2_client.get_object(
+    response = get_r2_client().get_object(
         Bucket=R2_BUCKET_NAME,
         Key=object_key,
     )
@@ -85,7 +96,7 @@ def list_objects_in_folder(prefix: str):
     """
     Lists all objects in a specific R2 folder (prefix).
     """
-    response = r2_client.list_objects_v2(
+    response = get_r2_client().list_objects_v2(
         Bucket=R2_BUCKET_NAME,
         Prefix=prefix
     )
