@@ -18,7 +18,6 @@ jobs:
     timeout-minutes: 120
     env:
       WEB_IMAGE_NAME: flask-app-web
-      WORKER_IMAGE_NAME: flask-app-worker
       APP_DIRECTORY: /home/ubuntu/website-generator
       BRANCH: deploy/staging
       TEMP_IMAGE_DIR: /tmp/flask-app-images
@@ -35,9 +34,7 @@ jobs:
           set -euo pipefail
           SHORT_SHA="${GITHUB_SHA::7}"
           echo "WEB_NEW_IMAGE=${WEB_IMAGE_NAME}:stg-${SHORT_SHA}" >> "$GITHUB_ENV"
-          echo "WORKER_NEW_IMAGE=${WORKER_IMAGE_NAME}:stg-${SHORT_SHA}" >> "$GITHUB_ENV"
           echo "WEB_IMAGE_ARCHIVE=${WEB_IMAGE_NAME}-stg-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
-          echo "WORKER_IMAGE_ARCHIVE=${WORKER_IMAGE_NAME}-stg-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
 
       - name: Free disk space before build
         run: |
@@ -72,11 +69,6 @@ jobs:
           set -euo pipefail
           docker build -t "${WEB_NEW_IMAGE}" .
 
-      - name: Build worker image
-        run: |
-          set -euo pipefail
-          docker build -t "${WORKER_NEW_IMAGE}" .
-
       - name: Trivy Web Image Scan
         continue-on-error: true
         uses: aquasecurity/trivy-action@0.35.0
@@ -85,20 +77,11 @@ jobs:
           vuln-type: os
           severity: CRITICAL,HIGH,MEDIUM
 
-      - name: Trivy Worker Image Scan
-        continue-on-error: true
-        uses: aquasecurity/trivy-action@0.35.0
-        with:
-          image-ref: ${{ env.WORKER_NEW_IMAGE }}
-          vuln-type: os
-          severity: CRITICAL,HIGH,MEDIUM
-
       - name: Export Docker image archives
         run: |
           set -euo pipefail
           mkdir -p exported-images
           docker save "${WEB_NEW_IMAGE}" | gzip -1 > "exported-images/${WEB_IMAGE_ARCHIVE}"
-          docker save "${WORKER_NEW_IMAGE}" | gzip -1 > "exported-images/${WORKER_IMAGE_ARCHIVE}"
 
       - name: Copy Docker images to EC2
         uses: appleboy/scp-action@v0.1.7
@@ -126,15 +109,12 @@ jobs:
             HEALTHCHECK_URL="http://127.0.0.1:5077/health"
 
             WEB_NEW_IMAGE="${{ env.WEB_NEW_IMAGE }}"
-            WORKER_NEW_IMAGE="${{ env.WORKER_NEW_IMAGE }}"
             WEB_IMAGE_ARCHIVE="${{ env.WEB_IMAGE_ARCHIVE }}"
-            WORKER_IMAGE_ARCHIVE="${{ env.WORKER_IMAGE_ARCHIVE }}"
 
             echo "============================================================"
             echo "FLASK-APP :: STARTING STAGING DEPLOYMENT"
             echo "============================================================"
             echo "Web Image    : ${WEB_NEW_IMAGE}"
-            echo "Worker Image : ${WORKER_NEW_IMAGE}"
             echo "============================================================"
 
             mkdir -p "$TEMP"
@@ -142,9 +122,6 @@ jobs:
 
             echo "Loading web image"
             gunzip -c "$TEMP/${WEB_IMAGE_ARCHIVE}" | sudo docker load
-
-            echo "Loading worker image"
-            gunzip -c "$TEMP/${WORKER_IMAGE_ARCHIVE}" | sudo docker load
 
             cd "$APP_DIRECTORY"
 
@@ -155,7 +132,6 @@ jobs:
 
             cat > .env.deploy <<EOF
             WEB_NEW_IMAGE=${WEB_NEW_IMAGE}
-            WORKER_NEW_IMAGE=${WORKER_NEW_IMAGE}
             EOF
 
             echo "Generated .env.deploy"
@@ -169,7 +145,7 @@ jobs:
             sudo docker compose --env-file .env.deploy down --remove-orphans || true
 
             echo "Removing old staging containers if present"
-            sudo docker rm -f flask-app-web-staging flask-app-worker-staging || true
+            sudo docker rm -f flask-app-web-staging || true
 
             echo "Starting updated compose stack"
             # ADDED: --no-build flag prevents docker compose from attempting a remote registry pull
@@ -195,7 +171,6 @@ jobs:
             if [ "$HEALTH_OK" != "true" ]; then
               echo "Health check failed. Printing logs."
               sudo docker logs --tail 100 flask-app-web-staging || true
-              sudo docker logs --tail 100 flask-app-worker-staging || true
               exit 1
             fi
 

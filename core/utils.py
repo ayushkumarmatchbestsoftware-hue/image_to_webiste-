@@ -3,8 +3,9 @@ import json
 import re
 import asyncio
 import traceback
-from PIL import Image
-import io
+# NOTE: PIL is intentionally NOT imported at module level — it's only needed
+# by generate_website_content_logic() below when images were actually
+# uploaded, so it's imported lazily right at that point of use instead.
 
 # NICHE_DESIGN, LAYOUT_POOLS, PALETTE_MAP, INDUSTRY_TEMPLATES would go here
 # or be imported from constants.py
@@ -188,12 +189,14 @@ CRITICAL RULES for Copy:
 1. NO AI-ISMS: Ban "Unlock", "Empower", "Comprehensive", "Seamless", "Journey", "Elevate".
 2. PORTFOLIO MATCHING: You must generate EXACTLY {expected_port_count} portfolio items in the 'portfolio' list to match images 3, 4, and 5.
 3. Content must be 100% realistic. If it's a law firm, sound like a top attorney. If it's a software agency, use specialized technical terms.
-4. NO "Welcome to", "Experience the", "Discover the", "Our journey"."""
+4. NO "Welcome to", "Experience the", "Discover the", "Our journey".
+5. FACTS: The "Business:" text above is the only source of truth. Extract every concrete fact it contains (years of experience, counts, locations, founding date, certifications, etc.) and reuse the exact same figures everywhere they are relevant — "stats" is the canonical place for them. Never state a number for "Business:" that isn't grounded in what was actually written above, and never contradict a fact you already stated elsewhere in this same response."""
 
         content_parts = [full_prompt]
         # Keep track of opened PIL images so we can close them after the API call
         _opened_images = []
         if image_paths:
+            from PIL import Image  # lazy import — only needed when images were uploaded
             for i, path in enumerate(image_paths):
                 try:
                     img = Image.open(path)
@@ -211,8 +214,8 @@ CRITICAL RULES for Copy:
                 contents=content_parts,
                 config={
                     "system_instruction": system_prompt,
-                    "temperature": 0.85, 
-                    "max_output_tokens": 4000
+                    "temperature": 0.85,
+                    "max_output_tokens": 4500
                 }
             )
         finally:

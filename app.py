@@ -44,8 +44,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from werkzeug.utils import secure_filename
-from google import genai
-from PIL import Image
+# NOTE: `google.genai` (the Gemini SDK) is intentionally NOT imported here at
+# module level — it's the single heaviest import in this app (~45MB RSS just
+# to import it, measured). It's only needed by /chat-edit, so it's imported
+# lazily inside get_genai_client() below, on first actual use.
 from bson import ObjectId
 from config import Config
 import uuid as pyuuid
@@ -178,42 +180,45 @@ async def check_credits(user_id: str = Depends(require_auth)):
             }
         )
 
-# --- AI CLIENT ---
-try:
-    _api_key = Config.GEMINI_API_KEY
-    genai_client = genai.Client(api_key=_api_key) if _api_key else None
-except Exception as e:
-    logger.error(f"GenAI Init failed: {e}")
-    genai_client = None
+# --- AI CLIENT (lazy — see note on the removed top-level `google.genai` import) ---
+_genai_client = None
+_genai_client_init_attempted = False
+
+def get_genai_client():
+    """
+    Lazily import + construct the Gemini client on first actual use, and
+    cache it for the lifetime of the process. Avoids paying the ~45MB import
+    cost for requests that never touch Gemini (health checks, previews,
+    saves, job-status polls, etc.) — most of what this process serves.
+    """
+    global _genai_client, _genai_client_init_attempted
+    if not _genai_client_init_attempted:
+        _genai_client_init_attempted = True
+        try:
+            from google import genai
+            _api_key = Config.GEMINI_API_KEY
+            _genai_client = genai.Client(api_key=_api_key) if _api_key else None
+        except Exception as e:
+            logger.error(f"GenAI Init failed: {e}")
+            _genai_client = None
+    return _genai_client
 
 # ---------------------------------------------------------------------------
 # CONSTANTS & UTILITIES
 # ---------------------------------------------------------------------------
 # --- DESIGN UTILS ---
-from core.constants import NICHE_DESIGN, LAYOUT_POOLS, PALETTE_MAP, INDUSTRY_TEMPLATES, system_prompt_text
+# NOTE: generation-specific helpers (fallback tokens, layout blueprint, theme
+# validation, the AI content pipeline itself) now live entirely in
+# core/generation.py, which runs the real /generate pipeline as a background
+# task. app.py no longer calls into them directly, so they're not imported
+# here anymore.
 from core.utils import (
-    get_niche_key_logic,
-    get_fallback_tokens_logic,
-    get_layout_blueprint_logic,
-    validate_and_fix_theme,
-    generate_website_content_logic,
     clean_editor_artifacts,
     perform_chat_edit_logic,
     sync_fields_between_pages
 )
-
-def get_fallback_tokens(prompt: str):
-    return get_fallback_tokens_logic(prompt, NICHE_DESIGN)
-
-def get_layout_blueprint(prompt: str):
-    return get_layout_blueprint_logic(prompt, LAYOUT_POOLS)
-
-async def generate_website_content(prompt, image_paths=None, image_count=0, industry=None):
-    return await generate_website_content_logic(
-        genai_client, prompt, system_prompt_text, get_fallback_tokens, get_layout_blueprint, 
-        INDUSTRY_TEMPLATES, validate_and_fix_theme, image_paths=image_paths, 
-        image_count=image_count, industry=industry
-    )
+from core.redis import create_job_record
+from core.generation import run_generation_job, run_deployment_job
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
@@ -314,18 +319,14 @@ async def generate_website(
                 image_urls.append(web_path)
                 image_paths.append(filepath)
 
-        from core.redis import enqueue_website_ai_job
+        job_id = str(uuid.uuid4())
         print(f"[API IO] -> /generate | user={user_id} | industry={industry} | prompt='{prompt[:50]}...'")
         try:
-            job_id = await enqueue_website_ai_job(
-                website_id=website_id, user_id=user_id, prompt=prompt,
-                image_urls=image_urls, image_paths=image_paths, logo_url=logo_web_path,
-                user_pages=pages, user_palette=palette, user_template=template, user_industry=industry,
-                db_image_records=db_image_records
-            )
+            await create_job_record(job_id=job_id, website_id=website_id)
         except Exception:
-            # Leak Fix #7: If enqueue fails the worker will never clean up the
-            # temp files it would have removed. Delete them here so they don't
+            # Leak Fix #7: If the job record fails to write, the background
+            # task below is never scheduled and will never clean up the temp
+            # files it would have removed. Delete them here so they don't
             # accumulate on disk indefinitely.
             for _fp in image_paths:
                 try:
@@ -333,6 +334,18 @@ async def generate_website(
                 except Exception:
                     pass
             raise
+
+        # Generation runs in-process as a FastAPI background task (no separate
+        # worker process / job queue) — scheduled here, executed after this
+        # response is sent, bounded by its own concurrency semaphore and
+        # 25-minute timeout inside core/generation.py.
+        background_tasks.add_task(
+            run_generation_job,
+            job_id=job_id, website_id=website_id, user_id=user_id, prompt=prompt,
+            image_urls=image_urls, image_paths=image_paths, logo_url=logo_web_path,
+            user_pages=pages, user_palette=palette, user_template=template, user_industry=industry,
+            db_image_records=db_image_records,
+        )
 
         print(f"[API IO] <- /generate | QUEUED | job_id={job_id} | website_id={website_id}")
         return {"success": True, "job_id": job_id, "website_id": website_id, "status": "queued"}
@@ -377,7 +390,7 @@ async def history(user_id: str = Depends(require_auth)):
     return {"success": True, "items": items}
 
 @app.post("/deploy")
-async def deploy_to_vercel(request: Request, user_id: str = Depends(require_auth)):
+async def deploy_to_vercel(request: Request, background_tasks: BackgroundTasks, user_id: str = Depends(require_auth)):
     try:
         # Check if it's a JSON body (expected) or path-based params
         try:
@@ -388,10 +401,15 @@ async def deploy_to_vercel(request: Request, user_id: str = Depends(require_auth
 
         if not website_id:
             return JSONResponse(status_code=400, content={"error": "Missing website_id in JSON body"})
-        
-        from core.redis import enqueue_deployment_job
+
+        job_id = str(uuid.uuid4())
         print(f"[API IO] -> /deploy | user={user_id} | website_id={website_id}")
-        job_id = await enqueue_deployment_job(website_id=website_id, user_id=user_id)
+        await create_job_record(job_id=job_id, website_id=website_id)
+
+        # Deployment runs in-process as a FastAPI background task, same as
+        # /generate — no separate worker process / job queue.
+        background_tasks.add_task(run_deployment_job, job_id=job_id, website_id=website_id, user_id=user_id)
+
         print(f"[API IO] <- /deploy | QUEUED | job_id={job_id}")
         return {"success": True, "job_id": job_id, "status": "queued"}
     except Exception as e:
@@ -611,7 +629,7 @@ async def chat_edit(request: Request, user_id: str = Depends(require_auth)):
         if not instruction or not html:
             raise HTTPException(status_code=400, detail="Missing data")
             
-        result = await perform_chat_edit_logic(genai_client, instruction, html, page_name)
+        result = await perform_chat_edit_logic(get_genai_client(), instruction, html, page_name)
         return result
     except Exception as e:
         logger.error(f"Chat edit failed: {e}")

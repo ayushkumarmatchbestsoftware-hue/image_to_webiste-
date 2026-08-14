@@ -12,7 +12,6 @@ concurrency:
 
 env:
   WEB_IMAGE_NAME: flask-app-web
-  WORKER_IMAGE_NAME: flask-app-worker
   APP_DIRECTORY: /home/ubuntu/website-generator
   BRANCH: deploy/prod
   TEMP_IMAGE_DIR: /tmp/flask-app-images
@@ -63,9 +62,7 @@ jobs:
           SHORT_SHA="${GITHUB_SHA::7}"
 
           echo "WEB_NEW_IMAGE=${WEB_IMAGE_NAME}:prod-${SHORT_SHA}" >> "$GITHUB_ENV"
-          echo "WORKER_NEW_IMAGE=${WORKER_IMAGE_NAME}:prod-${SHORT_SHA}" >> "$GITHUB_ENV"
           echo "WEB_IMAGE_ARCHIVE=${WEB_IMAGE_NAME}-prod-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
-          echo "WORKER_IMAGE_ARCHIVE=${WORKER_IMAGE_NAME}-prod-${SHORT_SHA}.tar.gz" >> "$GITHUB_ENV"
 
       - name: Free disk space before build
         run: |
@@ -83,12 +80,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build web & worker images
+      - name: Build web image
         run: |
           set -euo pipefail
 
           docker build -t "${WEB_NEW_IMAGE}" .
-          docker build -t "${WORKER_NEW_IMAGE}" .
 
       - name: Export Docker image archives
         run: |
@@ -99,13 +95,8 @@ jobs:
           docker save "${WEB_NEW_IMAGE}" \
             | gzip -1 > "exported-images/${WEB_IMAGE_ARCHIVE}"
 
-          docker save "${WORKER_NEW_IMAGE}" \
-            | gzip -1 > "exported-images/${WORKER_IMAGE_ARCHIVE}"
-
           echo "WEB_NEW_IMAGE=${WEB_NEW_IMAGE}" > exported-images/env_vars.txt
-          echo "WORKER_NEW_IMAGE=${WORKER_NEW_IMAGE}" >> exported-images/env_vars.txt
           echo "WEB_IMAGE_ARCHIVE=${WEB_IMAGE_ARCHIVE}" >> exported-images/env_vars.txt
-          echo "WORKER_IMAGE_ARCHIVE=${WORKER_IMAGE_ARCHIVE}" >> exported-images/env_vars.txt
 
           ls -lh exported-images
 
@@ -183,14 +174,12 @@ jobs:
           TRIGGERING_ACTOR: ${{ github.triggering_actor }}
 
           WEB_NEW_IMAGE: ${{ env.WEB_NEW_IMAGE }}
-          WORKER_NEW_IMAGE: ${{ env.WORKER_NEW_IMAGE }}
           WEB_IMAGE_ARCHIVE: ${{ env.WEB_IMAGE_ARCHIVE }}
-          WORKER_IMAGE_ARCHIVE: ${{ env.WORKER_IMAGE_ARCHIVE }}
         with:
           host: ${{ secrets[matrix.host_secret] }}
           username: ubuntu
           key: ${{ secrets[matrix.key_secret] }}
-          envs: WEB_NEW_IMAGE,WORKER_NEW_IMAGE,WEB_IMAGE_ARCHIVE,WORKER_IMAGE_ARCHIVE
+          envs: WEB_NEW_IMAGE,WEB_IMAGE_ARCHIVE
           script: |
             set -euo pipefail
 
@@ -205,7 +194,6 @@ jobs:
             echo "Triggered By        : $DEPLOY_ACTOR"
             echo "Re-run Triggered By : $TRIGGERING_ACTOR"
             echo "Web Image           : ${WEB_NEW_IMAGE}"
-            echo "Worker Image        : ${WORKER_NEW_IMAGE}"
             echo "============================================================"
 
             mkdir -p "$TEMP"
@@ -215,9 +203,6 @@ jobs:
             echo "Loading web image"
             gunzip -c "$TEMP/${WEB_IMAGE_ARCHIVE}" | sudo docker load
 
-            echo "Loading worker image"
-            gunzip -c "$TEMP/${WORKER_IMAGE_ARCHIVE}" | sudo docker load
-
             cd "$APP_DIRECTORY"
 
             echo "Syncing latest repository state"
@@ -226,7 +211,6 @@ jobs:
             git reset --hard origin/deploy/prod
 
             export WEB_NEW_IMAGE="${WEB_NEW_IMAGE}"
-            export WORKER_NEW_IMAGE="${WORKER_NEW_IMAGE}"
 
             echo "Stopping existing compose stack"
             sudo -E docker compose down --remove-orphans || true
