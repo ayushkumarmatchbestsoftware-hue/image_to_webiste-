@@ -837,6 +837,7 @@
         </div>
         <div id="logoPreview" class="preview-row" style="margin-top:0; margin-bottom: 24px;"></div>
 
+                    <div id="creditCostBadge" style="display:none; font-size:0.75rem; color:var(--muted); text-align:center; margin-bottom:10px;"></div>
                     <button id="generateBtn" class="gen-btn" onclick="generateWebsite()">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                         Generate Website
@@ -1002,6 +1003,25 @@ const logoPreview = document.getElementById('logoPreview');
 let uploadedFiles = [];
 let uploadedLogo = null;
 
+// Show the configured credit cost (from the backend, sourced from env) next
+// to the Generate button. Best-effort only — if this fails or the credit
+// system is disabled, the badge just stays hidden; it never blocks generation.
+(async function fetchAndShowCreditCost() {
+    try {
+        const res = await fetch('/credit-cost');
+        if (!res.ok) return;
+        const data = await res.json();
+        const cost = data && data.costs && data.costs.website_generation;
+        const badge = document.getElementById('creditCostBadge');
+        if (badge && data.enabled && cost) {
+            badge.textContent = `Generating a website costs ${cost} credit${cost === 1 ? '' : 's'}`;
+            badge.style.display = 'block';
+        }
+    } catch (e) {
+        // Non-critical — silently skip if the endpoint is unreachable.
+    }
+})();
+
 function renderLogoPreview() {
     logoPreview.innerHTML = '';
     if (uploadedLogo) {
@@ -1125,6 +1145,7 @@ async function generateWebsite() {
 
     const formData = new FormData();
     formData.append('prompt', prompt);
+    formData.append('business_name', businessName);
     formData.append('pages', checkedSections.join(','));
     formData.append('palette', paletteValue);
     if (industry) formData.append('industry', industry);
