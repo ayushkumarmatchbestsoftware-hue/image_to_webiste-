@@ -267,11 +267,27 @@ async def health_check():
 async def index():
     return {"status": "online", "service": "Website AI API", "message": "Backend is running correctly."}
 
+@app.get("/credit-cost")
+async def credit_cost():
+    """
+    Exposes configured credit costs to the frontend (sourced from env vars)
+    so the UI can show users what an action costs before they commit.
+    Static config only, not user-specific — deliberately not behind auth,
+    same as /health.
+    """
+    return {
+        "enabled": ENABLE_CREDIT_SYSTEM,
+        "costs": {
+            "website_generation": int(WEBSITE_AI_CREDIT_COST),
+        }
+    }
+
 @app.post("/generate")
 async def generate_website(
     request: Request,
     background_tasks: BackgroundTasks,
     prompt: str = Form(...),
+    business_name: str = Form(""),
     industry: str = Form(""),
     pages: str = Form(""),
     palette: str = Form("auto"),
@@ -342,6 +358,7 @@ async def generate_website(
         background_tasks.add_task(
             run_generation_job,
             job_id=job_id, website_id=website_id, user_id=user_id, prompt=prompt,
+            business_name=business_name,
             image_urls=image_urls, image_paths=image_paths, logo_url=logo_web_path,
             user_pages=pages, user_palette=palette, user_template=template, user_industry=industry,
             db_image_records=db_image_records,

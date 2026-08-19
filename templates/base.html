@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ site_name }} — {{ site_title }}</title>
+    <title>{{ site_name }}{% if site_title and site_title != site_name %} — {{ site_title }}{% endif %}</title>
+
+    {% if favicon_url and favicon_url != 'None' %}
+    <link rel="icon" href="{{ favicon_url }}"{% if favicon_sized %} type="image/png" sizes="32x32"{% endif %}>
+    <link rel="apple-touch-icon" href="{{ favicon_apple_url or favicon_url }}"{% if favicon_sized %} sizes="180x180"{% endif %}>
+    {% endif %}
 
     {% set hf = theme.get('font_heading', 'Outfit') if theme else 'Outfit' %}
     {% set bf = theme.get('font_body', 'Plus Jakarta Sans') if theme else 'Plus Jakarta Sans' %}

@@ -22,6 +22,7 @@ fully re-serializing everything.
 """
 
 import asyncio
+import html
 import json
 import os
 import traceback
@@ -47,7 +48,7 @@ from core.redis import (
     mark_job_failed,
     enqueue_notification,
 )
-from core.r2 import upload_media_to_r2, R2_PUBLIC_URL
+from core.r2 import upload_media_to_r2, fetch_media_from_r2, R2_PUBLIC_URL
 from core.mongo import insert_website_data, update_website_final_url
 from services.vercel_service import run_vercel_deployment
 
@@ -129,6 +130,38 @@ def get_fallback_tokens(p):
 
 def get_layout_blueprint(p):
     return get_layout_blueprint_logic(p, LAYOUT_POOLS)
+
+
+def _build_favicon_variants(logo_bytes: bytes, website_id: str) -> dict:
+    """
+    Resize the uploaded logo into standard favicon sizes (32x32 for the
+    browser tab icon, 180x180 for apple-touch-icon), padded onto a
+    transparent square canvas so non-square logos aren't distorted, and
+    upload each as its own R2 asset. Returns {size: url}.
+
+    Raises on anything PIL can't handle (e.g. an SVG logo — PIL can't
+    rasterize vector formats) or any other failure. Callers must treat this
+    as best-effort and fall back to the original logo URL on exception —
+    a bad favicon must never fail the whole generation job.
+    """
+    from PIL import Image  # lazy import — only needed when a logo was uploaded
+    import io
+
+    img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
+    urls = {}
+    for size in (32, 180):
+        thumb = img.copy()
+        thumb.thumbnail((size, size), Image.LANCZOS)
+        canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        offset = ((size - thumb.width) // 2, (size - thumb.height) // 2)
+        canvas.paste(thumb, offset, thumb)
+        out = io.BytesIO()
+        canvas.save(out, format="PNG")
+        urls[size] = upload_media_to_r2(
+            out.getvalue(), "image/png",
+            folder=f"websites/{website_id}/assets", filename=f"favicon-{size}.png"
+        )
+    return urls
 
 
 # ── Concurrency caps ──
@@ -221,6 +254,7 @@ async def run_generation_job(
     website_id: str,
     user_id: str,
     prompt: str,
+    business_name: str = "",
     image_urls: list,
     image_paths: list,
     logo_url,
@@ -254,6 +288,7 @@ async def run_generation_job(
             await asyncio.wait_for(
                 _run_generation_job_inner(
                     job_id=job_id, website_id=website_id, user_id=user_id, prompt=prompt,
+                    business_name=business_name,
                     image_urls=image_urls, image_paths=image_paths, logo_url=logo_url,
                     user_pages=user_pages, user_palette=user_palette, user_template=user_template,
                     user_industry=user_industry, db_image_records=db_image_records,
@@ -284,6 +319,7 @@ async def _run_generation_job_inner(
     website_id: str,
     user_id: str,
     prompt: str,
+    business_name: str = "",
     image_urls: list,
     image_paths: list,
     logo_url,
@@ -367,8 +403,47 @@ async def _run_generation_job_inner(
         clean_image_urls = [u for u in image_urls if u]
         image_map = build_image_map_logic(clean_image_urls, layout)
 
+        # ── Step 4b: Build favicon-sized logo variants (best-effort) ──
+        # Never allowed to fail the job — any error here just falls back to
+        # using the original, full-size logo URL as the favicon href, same
+        # as before this feature existed.
+        favicon_url = None
+        favicon_apple_url = None
+        favicon_sized = False
+        if logo_url:
+            try:
+                object_key = (
+                    logo_url[len(R2_PUBLIC_URL) + 1:]
+                    if R2_PUBLIC_URL and logo_url.startswith(R2_PUBLIC_URL)
+                    else None
+                )
+                if object_key:
+                    logo_bytes = await asyncio.to_thread(fetch_media_from_r2, object_key)
+                    favicon_urls = await asyncio.to_thread(_build_favicon_variants, logo_bytes, website_id)
+                    favicon_url = favicon_urls.get(32)
+                    favicon_apple_url = favicon_urls.get(180)
+                    favicon_sized = bool(favicon_url)
+                    log("INFO", job_id, "Favicon variants generated (32x32, 180x180)")
+            except Exception as fav_err:
+                log("WARN", job_id, "Favicon resize skipped — using original logo as favicon", error=str(fav_err))
+        if not favicon_url:
+            favicon_url = logo_url
+        if not favicon_apple_url:
+            favicon_apple_url = favicon_url
+
         # ── Step 5: Filter Layout & Prepare final context ──
-        site_name = data.get("site_info", {}).get("display_name", "My Business")
+        ai_display_name = data.get("site_info", {}).get("display_name", "My Business")
+        if business_name and business_name.strip():
+            # The user's literal brand name always wins over whatever the AI
+            # invented for display_name — this is what shows in the browser
+            # tab title next to the favicon, and throughout the nav/footer/
+            # hero, so it must faithfully reflect what the user actually
+            # typed rather than an AI paraphrase. Collapse stray whitespace
+            # and HTML-escape it, since this is raw user input flowing into
+            # templates rendered with autoescape=False.
+            site_name = html.escape(" ".join(business_name.split()))
+        else:
+            site_name = ai_display_name
         site_title = data.get("site_info", {}).get("site_title", site_name)
         tagline = data.get("site_info", {}).get("tagline", "")
         footer = data.get("footer", {})
@@ -390,6 +465,9 @@ async def _run_generation_job_inner(
             image_count=len(clean_image_urls),
             has_images=(len(clean_image_urls) > 0),
             logo=logo_url,
+            favicon_url=favicon_url,
+            favicon_apple_url=favicon_apple_url,
+            favicon_sized=favicon_sized,
             services_img=image_map.get("services"),
             testimonials_img=image_map.get("testimonials"),
             overflow_imgs=image_map.get("overflow", []),
