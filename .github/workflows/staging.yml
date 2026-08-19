@@ -22,6 +22,7 @@ jobs:
       BRANCH: deploy/staging
       TEMP_IMAGE_DIR: /tmp/flask-app-images
       HEALTHCHECK_URL: http://127.0.0.1:5077/health
+      CONTAINER_NAME: flask-app-web-staging
 
     steps:
       - name: Checkout deploy/staging
@@ -107,6 +108,7 @@ jobs:
             APP_DIRECTORY="/home/ubuntu/website-generator"
             TEMP="/tmp/flask-app-images"
             HEALTHCHECK_URL="http://127.0.0.1:5077/health"
+            CONTAINER_NAME="flask-app-web-staging"
 
             WEB_NEW_IMAGE="${{ env.WEB_NEW_IMAGE }}"
             WEB_IMAGE_ARCHIVE="${{ env.WEB_IMAGE_ARCHIVE }}"
@@ -130,29 +132,21 @@ jobs:
             git checkout deploy/staging
             git reset --hard origin/deploy/staging
 
-            cat > .env.deploy <<EOF
-            WEB_NEW_IMAGE=${WEB_NEW_IMAGE}
-            EOF
+            echo "Stopping existing container (if running)"
+            sudo docker stop "$CONTAINER_NAME" || true
 
-            echo "Generated .env.deploy"
-            # Note: Removed "cat .env.deploy" to protect secrets leaking if injected here in the future
+            echo "Removing old container (if present)"
+            sudo docker rm -f "$CONTAINER_NAME" || true
 
-            echo "Validating docker compose config"
-            # Redirecting stdout/stderr for config validation prevents sensitive env tokens from printing to GitHub log histories
-            sudo docker compose --env-file .env.deploy config > /dev/null
+            echo "Starting new container"
+            sudo docker run -d \
+              --name "$CONTAINER_NAME" \
+              --restart unless-stopped \
+              -p 5077:5000 \
+              "$WEB_NEW_IMAGE"
 
-            echo "Stopping existing compose stack"
-            sudo docker compose --env-file .env.deploy down --remove-orphans || true
-
-            echo "Removing old staging containers if present"
-            sudo docker rm -f flask-app-web-staging || true
-
-            echo "Starting updated compose stack"
-            # ADDED: --no-build flag prevents docker compose from attempting a remote registry pull
-            sudo docker compose --env-file .env.deploy up -d --no-build --force-recreate --remove-orphans
-
-            echo "Compose status"
-            sudo docker compose --env-file .env.deploy ps
+            echo "Container status"
+            sudo docker ps --filter "name=${CONTAINER_NAME}"
 
             echo "Running health check"
             HEALTH_OK="false"
@@ -170,7 +164,7 @@ jobs:
 
             if [ "$HEALTH_OK" != "true" ]; then
               echo "Health check failed. Printing logs."
-              sudo docker logs --tail 100 flask-app-web-staging || true
+              sudo docker logs --tail 100 "$CONTAINER_NAME" || true
               exit 1
             fi
 
