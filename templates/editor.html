@@ -624,6 +624,46 @@
 
             lastSavedHTML = doc.documentElement.outerHTML;
 
+            // 1b. Sync this editor tab's own title/favicon from the loaded
+            // preview, so the browser tab shows THIS project's actual brand
+            // (uploaded logo + brand name) instead of the generic default —
+            // dynamically, per project, with no hardcoded branding. Runs on
+            // every real (non-placeholder) page load, so it self-corrects
+            // once generation finishes even if this tab was opened before
+            // that, and it can never show a stale previous project's
+            // favicon, since every full navigation to /editor/{id} starts
+            // from the generic default and re-syncs from this iframe's own
+            // (site-specific, R2-URL-scoped) content.
+            try {
+                if (doc.title) {
+                    const brandName = doc.title.split('—')[0].trim();
+                    if (brandName) document.title = `${brandName} | Editor`;
+                }
+                const previewIcon = doc.querySelector('link[rel="icon"]');
+                if (previewIcon && previewIcon.href) {
+                    let ownIcon = document.querySelector('link[rel="icon"]');
+                    if (!ownIcon) {
+                        ownIcon = document.createElement('link');
+                        ownIcon.rel = 'icon';
+                        document.head.appendChild(ownIcon);
+                    }
+                    ownIcon.href = previewIcon.href;
+                    if (previewIcon.type) ownIcon.type = previewIcon.type;
+                }
+                const previewAppleIcon = doc.querySelector('link[rel="apple-touch-icon"]');
+                if (previewAppleIcon && previewAppleIcon.href) {
+                    let ownAppleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+                    if (!ownAppleIcon) {
+                        ownAppleIcon = document.createElement('link');
+                        ownAppleIcon.rel = 'apple-touch-icon';
+                        document.head.appendChild(ownAppleIcon);
+                    }
+                    ownAppleIcon.href = previewAppleIcon.href;
+                }
+            } catch (e) {
+                // Non-critical — leave the editor's existing title/favicon untouched.
+            }
+
             // 2. Inject help styles 
             const style = doc.createElement('style');
             style.textContent = `

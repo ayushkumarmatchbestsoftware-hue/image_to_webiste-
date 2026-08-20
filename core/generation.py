@@ -150,8 +150,14 @@ def _build_favicon_variants(logo_bytes: bytes, website_id: str) -> dict:
     img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
     urls = {}
     for size in (32, 180):
+        # Fit within ~86% of the canvas (not the full size) so the logo
+        # always has a small margin instead of touching the edge on
+        # whichever dimension its aspect ratio happens to fill exactly —
+        # a logo flush against the favicon's border reads as a cropped/
+        # cut-off icon rather than a deliberately-designed one.
+        fit_size = max(1, round(size * 0.86))
         thumb = img.copy()
-        thumb.thumbnail((size, size), Image.LANCZOS)
+        thumb.thumbnail((fit_size, fit_size), Image.LANCZOS)
         canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         offset = ((size - thumb.width) // 2, (size - thumb.height) // 2)
         canvas.paste(thumb, offset, thumb)
@@ -448,6 +454,15 @@ async def _run_generation_job_inner(
         tagline = data.get("site_info", {}).get("tagline", "")
         footer = data.get("footer", {})
 
+        # Dedicated browser-tab title — kept separate from site_title because
+        # site_title is also the literal hero H1 on the homepage (home.html),
+        # where the fuller AI-written phrase is exactly what's wanted there.
+        # The browser tab itself is always just the brand name (the exact
+        # name from the input, or the AI's display_name if none was typed) —
+        # never combined with a tagline, so there's no way for it to ever
+        # look duplicated regardless of what the AI writes for site_title.
+        page_title = site_name
+
         # Only keep sections that were actually returned by the AI (key exists in data)
         # IMPORTANT: use 'section in data' NOT 'data.get(section)' because {} and [] are falsy
         original_layout = list(layout)
@@ -459,7 +474,7 @@ async def _run_generation_job_inner(
         log("INFO", job_id, f"Pruned layout from {len(original_layout)} to {len(active_layout)} active sections")
 
         base_ctx = dict(
-            site_name=site_name, site_title=site_title,
+            site_name=site_name, site_title=site_title, page_title=page_title,
             tagline=tagline, theme=theme, footer=footer,
             layout=active_layout, image_map=image_map,
             image_count=len(clean_image_urls),
