@@ -117,10 +117,17 @@
             border-radius: 6px; /* Makes solid AI backgrounds look like deliberate app icons */
         }
 
-        .nav-links { 
+        .nav-links {
             display: flex; gap: clamp(16px, 3vw, 48px); /* Responsive gap */
-            flex-wrap: wrap; justify-content: flex-end; 
+            /* Never wrap into a misaligned second row when a lot of sections
+               are selected — stay a single row and scroll horizontally
+               instead if it doesn't all fit (scrollbar hidden for a clean
+               look; the mobile hamburger menu below 768px is unaffected). */
+            flex-wrap: nowrap; justify-content: flex-start;
+            overflow-x: auto; overflow-y: hidden; padding-bottom: 4px;
+            scrollbar-width: none; -ms-overflow-style: none;
         }
+        .nav-links::-webkit-scrollbar { display: none; }
         .nav-links a {
             font-family: var(--font-body); font-size: 0.85rem; font-weight: 800;
             color: var(--text-main); text-decoration: none; text-transform: uppercase;
