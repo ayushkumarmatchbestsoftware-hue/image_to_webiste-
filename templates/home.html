@@ -38,13 +38,18 @@
     font-size: 1.15rem; color: var(--text-muted); line-height: 1.6; max-width: 550px; margin: 0; opacity: 1;
 }
 .hero-visual { position: relative; }
-.hero-visual { 
-    width: 100%; aspect-ratio: 16/10; background: var(--bg-alt); border-radius: 40px; 
-    box-shadow: 0 60px 120px -20px rgba(0,0,0,0.18); border: 1.5px solid rgba(0,0,0,0.03); 
-    overflow: hidden; 
+.hero-visual {
+    width: 100%; background: var(--bg-alt); border-radius: 40px;
+    box-shadow: 0 60px 120px -20px rgba(0,0,0,0.18); border: 1.5px solid rgba(0,0,0,0.03);
+    overflow: hidden; line-height: 0;
 }
-.hero-visual img { 
-    width: 100%; height: 100%; object-fit: contain; border-radius: 40px;
+/* No fixed aspect-ratio here (unlike the card grids below): this is a single
+   standalone image with no neighboring cards to stay level with (confirmed
+   via .hero-bottom-grid's align-items:start), so the box can simply take the
+   uploaded image's own shape — full image, no crop, no blank space, and a
+   sane max-height keeps an unusually tall upload from blowing out the layout. */
+.hero-visual img {
+    width: 100%; height: auto; max-height: 640px; object-fit: contain; border-radius: 40px; display: block;
 }
 
 /* ── NO IMAGES: Light minimal premium editorial hero ── */
@@ -273,10 +278,14 @@
 .stat-num  { font-family: var(--font-heading); font-size: 2.8rem; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.03em; margin-bottom: 4px; }
 .stat-lbl  { font-size: 0.78rem; color: rgba(255,255,255,0.6); font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; }
 
-.about-section { 
+.about-section {
     background-color: var(--primary-dark);
     background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85));
-    background-size: contain; background-position: center; background-repeat: no-repeat;
+    /* cover (not contain) so the uploaded about-image always fills this
+       fixed-height section with no letterboxed bars — matches the same
+       image's already-correct handling on the standalone about.html page,
+       and any cropping here is barely visible under the dark overlay below. */
+    background-size: cover; background-position: center; background-repeat: no-repeat;
     background-attachment: fixed;
     padding: 140px var(--gutter); position: relative; overflow: hidden;
     min-height: 60vh; display: flex; align-items: center; justify-content: center;
@@ -414,8 +423,14 @@
 .p-card:hover { transform: translateY(-4px); }
 
 .p-img { overflow: hidden; position: relative; margin-bottom: 24px; aspect-ratio: 16/10; border-radius: 12px; background: var(--bg-alt); }
-.p-img img { width: 100%; height: 100%; object-fit: contain; transition: transform 0.8s ease; }
-.p-card:hover .p-img img { transform: scale(1.05); }
+.p-img img { width: 100%; height: 100%; }
+/* Blurred-backdrop fill: a soft, scaled-up blur of the same photo sits behind
+   the full uncropped image, so a mismatched-aspect-ratio upload never shows
+   blank space in this fixed-shape card — the real photo (in front) is never
+   cropped, only the decorative blur is scaled to fill any leftover edges. */
+.p-img .img-blur-bg { position: absolute; inset: 0; object-fit: cover; filter: blur(30px) brightness(0.75) saturate(1.1); transform: scale(1.15); }
+.p-img img:not(.img-blur-bg) { position: relative; z-index: 1; object-fit: contain; transition: transform 0.8s ease; }
+.p-card:hover .p-img img:not(.img-blur-bg) { transform: scale(1.05); }
 
 /* Text-Only Card Enhancements */
 .p-card.text-only { padding-top: 20px; border-top: 1.5px solid var(--text-main); }
@@ -817,6 +832,7 @@
       <div class="p-card reveal reveal-delay-{{ loop.index }}" data-id="port_{{ loop.index }}">
         <div class="p-img">
           {% if p_img %}
+            <img class="img-blur-bg" src="{{ p_img }}" alt="" aria-hidden="true">
             <img src="{{ p_img }}" alt="{{ p.title }}">
           {% endif %}
         </div>

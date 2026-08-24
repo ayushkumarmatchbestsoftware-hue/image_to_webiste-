@@ -670,14 +670,26 @@
                 /* Hide legacy editor UI (if any remains) */
                 #save-bar, #edit-toolbar, #edit-hint-bar { display: none !important; }
                 .eb-editable:hover { outline: 2px dashed #6366f1 !important; cursor: pointer; }
-                .eb-img-edit:hover { outline: 3px solid #6366f1 !important; cursor: pointer; position: relative; }
-                .eb-img-edit:hover::before {
-                    content: "Click to Swap Image";
-                    position: absolute; top: 12px; right: 12px;
-                    background: rgba(99,102,241,0.95); color: #fff; font-size: 11px; font-weight: 700;
-                    padding: 4px 12px; border-radius: 6px; pointer-events: none; z-index: 1000;
-                    opacity: 1; text-transform: uppercase; letter-spacing: 0.05em;
+                /* Swappable images/sections: a subtle boundary + a small edit-icon
+                   badge in the corner on hover, instead of a heavy full-outline
+                   "blue coverage" look — matters most for large background-image
+                   sections (e.g. About), where a thick border around the whole
+                   element used to read as if the entire area were selected. */
+                .eb-img-edit { position: relative; cursor: pointer; }
+                .eb-img-edit:hover { outline: 2px dashed rgba(99,102,241,0.45) !important; outline-offset: -2px; }
+                .eb-img-edit::after {
+                    content: '';
+                    position: absolute; top: 10px; right: 10px;
+                    width: 34px; height: 34px; border-radius: 50%;
+                    background-color: rgba(99,102,241,0.95);
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z'/%3E%3C/svg%3E");
+                    background-repeat: no-repeat; background-position: center; background-size: 16px 16px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+                    opacity: 0; transform: scale(0.85);
+                    transition: opacity .15s ease, transform .15s ease;
+                    pointer-events: none; z-index: 1000;
                 }
+                .eb-img-edit:hover::after { opacity: 1; transform: scale(1); }
             `;
             doc.head.appendChild(style);
 
@@ -729,6 +741,12 @@
             doc.querySelectorAll('img').forEach(el => {
                 // EXCLUDE NAVIGATION & FOOTER: Do not make the Logo replaceable
                 if (el.closest('nav') || el.closest('footer')) return;
+                // EXCLUDE decorative blurred-backdrop copies (see .img-blur-bg
+                // in home.html/portfolio.html's portfolio cards) — they're
+                // paired with a sharp foreground image of the same photo and
+                // kept in sync automatically (see setImageSource below), so
+                // only the sharp copy should be independently clickable.
+                if (el.classList.contains('img-blur-bg')) return;
 
                 el.classList.add('eb-img-edit');
             });
@@ -799,6 +817,15 @@
                     source.removeAttribute('data-srcset');
                 });
             }
+
+            // Some image slots (portfolio cards) pair this sharp foreground
+            // image with a decorative blurred-backdrop copy of the same
+            // photo, so the card never shows blank space regardless of the
+            // uploaded image's aspect ratio (see .img-blur-bg). Keep that
+            // backdrop in sync so it never shows a stale image after a swap.
+            const pairWrapper = img.closest('.p-img, .portfolio-img-wrap');
+            const bgImg = pairWrapper ? pairWrapper.querySelector('.img-blur-bg') : null;
+            if (bgImg && bgImg !== img) bgImg.src = url;
         }
 
         function setBackgroundImage(el, url) {

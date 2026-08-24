@@ -37,7 +37,13 @@
     .portfolio-card:hover { transform: translateY(-12px); box-shadow: 0 40px 100px rgba(0,0,0,0.1); }
     .portfolio-img-wrap { overflow: hidden; position: relative; aspect-ratio: 16/10; margin-bottom: 24px; border-radius: 12px; background: var(--bg-alt); }
     .portfolio-img-wrap.hide { display: none; }
-    .portfolio-img-wrap img { width: 100%; height: 100%; object-fit: contain; transition: transform 1s cubic-bezier(.16,1,.3,1); }
+    .portfolio-img-wrap img { width: 100%; height: 100%; }
+    /* Blurred-backdrop fill — see home.html's .p-img for the full rationale:
+       a soft blur of the same photo fills any leftover edge space so the
+       fixed-shape card never shows blank bars, while the real photo on top
+       is always shown fully, uncropped. */
+    .portfolio-img-wrap .img-blur-bg { position: absolute; inset: 0; object-fit: cover; filter: blur(30px) brightness(0.75) saturate(1.1); transform: scale(1.15); }
+    .portfolio-img-wrap img:not(.img-blur-bg) { position: relative; z-index: 1; object-fit: contain; transition: transform 1s cubic-bezier(.16,1,.3,1); }
     .portfolio-meta { margin-top: 24px; display: grid; gap: 16px; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 24px; }
     .portfolio-meta-item { display: flex; flex-direction: column; gap: 6px; }
     .portfolio-meta-label { font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); opacity: 0.5; }
@@ -105,7 +111,7 @@
         {% endif %}
         <div class="portfolio-card {{ 'text-only' if not p_img }} reveal reveal-delay-{{ loop.index }}">
             <div class="portfolio-img-wrap {{ 'hide' if not p_img }}">
-                {% if p_img %}<img src="{{ p_img }}" alt="{{ p.title }}">{% endif %}
+                {% if p_img %}<img class="img-blur-bg" src="{{ p_img }}" alt="" aria-hidden="true"><img src="{{ p_img }}" alt="{{ p.title }}">{% endif %}
             </div>
             <div class="portfolio-info">
                 <div>
