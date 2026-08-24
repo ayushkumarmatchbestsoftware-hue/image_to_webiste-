@@ -348,6 +348,22 @@ async def _run_generation_job_inner(
         log("INFO", job_id, "Status → processing",
             website_id=website_id[:8], images=len(image_urls), industry=user_industry or "auto")
 
+        # Parse the user's explicit "Pages to Include" selection once, up
+        # front — this is the actual list of section checkboxes they ticked,
+        # distinct from the AI's own auto-guessed "suggested layout" for this
+        # business type. Reused both to tell Gemini exactly which sections it
+        # must generate (so a section the user deliberately picked can't be
+        # silently skipped just because it wasn't part of a generic guess)
+        # and, after generation, to decide what actually renders.
+        _VALID_SECTIONS = {
+            "hero", "about", "services", "portfolio",
+            "testimonials", "stats", "faq", "pricing", "contact"
+        }
+        requested_sections = None
+        if user_pages:
+            _parsed = [s.strip() for s in user_pages.split(',') if s.strip() in _VALID_SECTIONS]
+            requested_sections = _parsed if _parsed else None
+
         # ── Step 1: Run AI content generation ──
         log("INFO", job_id, "Calling Gemini AI for content generation",
             model="gemini-flash", image_count=len(image_paths))
@@ -364,6 +380,7 @@ async def _run_generation_job_inner(
                 image_paths,
                 len(image_paths),
                 industry=user_industry or None,
+                requested_sections=requested_sections,
             )
         finally:
             # Always clean up local temp files, regardless of whether Gemini
@@ -384,15 +401,10 @@ async def _run_generation_job_inner(
             site_name=data.get("site_info", {}).get("display_name", "?"))
 
         # ── Step 2: Resolve layout ──
-        if user_pages:
-            valid_sections = {
-                "hero", "about", "services", "portfolio",
-                "testimonials", "stats", "faq", "pricing", "contact"
-            }
-            requested = [s.strip() for s in user_pages.split(',') if s.strip() in valid_sections]
-            layout = requested if requested else data.get("layout", ["hero", "about", "services", "contact"])
-        else:
-            layout = data.get("layout", ["hero", "about", "services", "contact"])
+        # Reuses the same requested_sections parsed above (and already told
+        # to Gemini as mandatory) rather than re-deriving it — one source of
+        # truth for "what the user actually asked for".
+        layout = requested_sections if requested_sections else data.get("layout", ["hero", "about", "services", "contact"])
 
         log("INFO", job_id, "Layout resolved", sections=",".join(layout))
 

@@ -146,7 +146,7 @@ def rgba_from_hex(hex_color: str, opacity: float = 0.12) -> str:
         return f"rgba(0,0,0,{opacity})"
     return f"rgba({rgb[0]},{rgb[1]},{rgb[2]},{opacity})"
 
-async def generate_website_content_logic(genai_client, prompt, system_prompt, get_fallback_tokens, get_layout_blueprint, INDUSTRY_TEMPLATES, validate_and_fix_theme, image_paths=None, image_count=0, industry=None):
+async def generate_website_content_logic(genai_client, prompt, system_prompt, get_fallback_tokens, get_layout_blueprint, INDUSTRY_TEMPLATES, validate_and_fix_theme, image_paths=None, image_count=0, industry=None, requested_sections=None):
     if not genai_client:
         return None
     try:
@@ -166,6 +166,23 @@ async def generate_website_content_logic(genai_client, prompt, system_prompt, ge
             industry_block = f"\n\n{industry_template['inject']}\n"
             layout = industry_template["default_sections"]
 
+        # If the user explicitly picked which sections to include (the
+        # "Pages to Include" checkboxes), that choice is authoritative and
+        # overrides both the auto-inferred blueprint above and the industry
+        # template's defaults — otherwise a section the user deliberately
+        # selected could be silently skipped just because it wasn't part of
+        # a generic guess for this business type.
+        if requested_sections:
+            layout = requested_sections
+        layout_line = (
+            f"REQUIRED SECTIONS: {layout}\n"
+            "The user explicitly selected these sections — you MUST generate complete, "
+            "real content for every single one of them. Do not omit or skip any section "
+            "in this list, even if it seems less central to this specific business."
+            if requested_sections
+            else f"SUGGESTED LAYOUT: {layout}"
+        )
+
         full_prompt = f"""Business: {prompt}{industry_block}
 {image_summary}
 
@@ -180,7 +197,7 @@ DEVELOPER DESIGN TOKENS (pair these with Roboto for a premium look):
 - accent: {fallback['accent']}
 - mood: {fallback['mood']}
 
-SUGGESTED LAYOUT: {layout}
+{layout_line}
 IMAGES UPLOADED: {image_count}
 {"Analyze uploaded images for color and mood." if image_count > 0 else "No images — generate theme from business type only."}
 
