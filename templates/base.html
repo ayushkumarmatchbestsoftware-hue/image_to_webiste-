@@ -1,3 +1,23 @@
+{%- set nav_map = {
+    'about': ('About', 'about.html'),
+    'services': ('Services', 'services.html'),
+    'portfolio': ('Portfolio', 'portfolio.html'),
+    'testimonials': ('Testimonials', 'home.html#testimonials'),
+    'stats': ('Stats', 'home.html#stats'),
+    'faq': ('FAQ', 'home.html#faq'),
+    'pricing': ('Pricing', 'home.html#pricing'),
+    'contact': ('Contact', 'contact.html')
+} -%}
+{#- Count how many nav items will actually render (Home + selected sections
+   that have a nav entry) so the CSS below can shrink spacing only when
+   there are enough items that they wouldn't otherwise fit in one row —
+   zero change for the common case of a handful of sections. -#}
+{%- set ns = namespace(nav_count=1) -%}
+{%- for section in layout -%}
+    {%- if section != 'hero' and section in nav_map -%}
+        {%- set ns.nav_count = ns.nav_count + 1 -%}
+    {%- endif -%}
+{%- endfor -%}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -118,20 +138,29 @@
         }
 
         .nav-links {
-            display: flex; gap: clamp(16px, 3vw, 48px); /* Responsive gap */
-            /* Never wrap into a misaligned second row when a lot of sections
-               are selected — stay a single row and scroll horizontally
-               instead if it doesn't all fit (scrollbar hidden for a clean
-               look; the mobile hamburger menu below 768px is unaffected). */
+            display: flex;
+            /* Spacing tightens automatically as more sections are selected,
+               so a full "all sections" nav still fits in one row instead of
+               relying on the scroll fallback below — unchanged from the
+               original generous spacing whenever there are only a handful
+               of items (the common case). */
+            gap: {% if ns.nav_count > 7 %}clamp(8px, 1.2vw, 20px){% elif ns.nav_count > 5 %}clamp(12px, 2vw, 32px){% else %}clamp(16px, 3vw, 48px){% endif %};
+            /* Never wrap into a misaligned second row — stay a single row
+               and scroll horizontally (as a last resort, e.g. a very narrow
+               window) instead of breaking or clipping; scrollbar hidden for
+               a clean look. The mobile hamburger menu below 768px is
+               unaffected. */
             flex-wrap: nowrap; justify-content: flex-start;
             overflow-x: auto; overflow-y: hidden; padding-bottom: 4px;
             scrollbar-width: none; -ms-overflow-style: none;
         }
         .nav-links::-webkit-scrollbar { display: none; }
         .nav-links a {
-            font-family: var(--font-body); font-size: 0.85rem; font-weight: 800;
+            font-family: var(--font-body);
+            font-size: {% if ns.nav_count > 7 %}0.7rem{% elif ns.nav_count > 5 %}0.78rem{% else %}0.85rem{% endif %};
+            font-weight: 800;
             color: var(--text-main); text-decoration: none; text-transform: uppercase;
-            letter-spacing: 0.15em; transition: all 0.3s ease; opacity: 0.85;
+            letter-spacing: {% if ns.nav_count > 7 %}0.08em{% else %}0.15em{% endif %}; transition: all 0.3s ease; opacity: 0.85;
             white-space: nowrap;
         }
         .nav-links a:hover { opacity: 1; color: var(--primary); transform: translateY(-1px); }
@@ -336,17 +365,6 @@
     </style>
 </head>
 <body>
-
-{% set nav_map = {
-    'about': ('About', 'about.html'),
-    'services': ('Services', 'services.html'),
-    'portfolio': ('Portfolio', 'portfolio.html'),
-    'testimonials': ('Testimonials', 'home.html#testimonials'),
-    'stats': ('Stats', 'home.html#stats'),
-    'faq': ('FAQ', 'home.html#faq'),
-    'pricing': ('Pricing', 'home.html#pricing'),
-    'contact': ('Contact', 'contact.html')
-} %}
 
 <nav id="main-nav">
     <div class="nav-inner">

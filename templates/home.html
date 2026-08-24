@@ -609,7 +609,7 @@
       </div>
       <div class="hero-bottom-grid">
         <div class="hero-content reveal reveal-delay-1">
-          <p contenteditable="true">{{ home.subtitle }}</p>
+          <p contenteditable="true">{{ home.get('subtitle') or 'Thoughtfully designed, built to perform, and made to grow with your business.' }}</p>
           <div class="v-pillars-grid">
             <div class="v-pillar">
               <div class="v-pillar-title" contenteditable="true">{{ home.get('pillar1_title', 'Engineered Precision') }}</div>
@@ -652,7 +652,7 @@
           <h1 contenteditable="true">{{ site_title }}</h1>
         </div>
         <div class="hero-ni-right reveal reveal-delay-1">
-          <p contenteditable="true">{{ home.subtitle }}</p>
+          <p contenteditable="true">{{ home.get('subtitle') or 'Thoughtfully designed, built to perform, and made to grow with your business.' }}</p>
           {% if home.cta %}
           <div class="hero-ni-ctas">
             <a href="#contact" class="btn" contenteditable="true">{{ home.cta }}</a>
