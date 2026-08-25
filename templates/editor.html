@@ -690,6 +690,25 @@
                     pointer-events: none; z-index: 1000;
                 }
                 .eb-img-edit:hover::after { opacity: 1; transform: scale(1); }
+                /* <img> elements are "replaced elements" and don't reliably
+                   render ::before/::after in browsers, so the badge above
+                   only ever shows for background-image sections (real <div>/
+                   <section> elements). For actual <img> swap targets, a real
+                   sibling element is appended instead (see setupEditableFields)
+                   with matching styling, shown via a pure-CSS sibling hover
+                   rule so no extra JS listeners are needed. */
+                .eb-img-edit-badge {
+                    position: absolute; top: 10px; right: 10px;
+                    width: 34px; height: 34px; border-radius: 50%;
+                    background-color: rgba(99,102,241,0.95);
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z'/%3E%3C/svg%3E");
+                    background-repeat: no-repeat; background-position: center; background-size: 16px 16px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+                    opacity: 0; transform: scale(0.85);
+                    transition: opacity .15s ease, transform .15s ease;
+                    pointer-events: none; z-index: 1000;
+                }
+                img.eb-img-edit:hover ~ .eb-img-edit-badge { opacity: 1; transform: scale(1); }
             `;
             doc.head.appendChild(style);
 
@@ -718,7 +737,14 @@
 
         function setupEditableFields(doc) {
             // Text Editing
-            doc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, .c-value').forEach(el => {
+            // NOTE: contenteditable="true" baked into the generated templates
+            // never survives to this point (clean_editor_artifacts strips it
+            // server-side before /preview serves the page), so this selector
+            // is the ONLY thing that makes a field genuinely click-to-edit +
+            // auto-save. Tag-name selectors (h1-h6, p, span) cover most text,
+            // but several data-driven fields render as <div>/<li> and were
+            // silently unreachable — listed explicitly by class below.
+            doc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, .c-value, .badge-item, .case-title, .case-desc, .case-meta-value, .detail-value, .faq-a, .pricing-name, .pricing-price, .pricing-feature, .stat-num, .stat-lbl, .t-name, .t-role, .v-pillar-title, .v-pillar-desc').forEach(el => {
                 // EXCLUDE NAVIGATION & FOOTER: Do not make structural links/text editable
                 if (el.closest('nav') || el.closest('footer')) return;
 
@@ -749,6 +775,20 @@
                 if (el.classList.contains('img-blur-bg')) return;
 
                 el.classList.add('eb-img-edit');
+
+                // <img> tags don't render ::after (see the .eb-img-edit-badge
+                // comment above), so append a real sibling badge element and
+                // let a pure-CSS sibling-hover rule show/hide it — matches
+                // the ::after badge's look without extra JS event listeners.
+                const parent = el.parentElement;
+                if (parent && !parent.querySelector(':scope > .eb-img-edit-badge')) {
+                    if (iframe.contentWindow.getComputedStyle(parent).position === 'static') {
+                        parent.style.position = 'relative';
+                    }
+                    const badge = doc.createElement('div');
+                    badge.className = 'eb-img-edit-badge';
+                    parent.appendChild(badge);
+                }
             });
         }
 
@@ -992,6 +1032,9 @@
                 el.classList.remove('eb-editable', 'eb-img-edit');
                 if (!el.classList.length) el.removeAttribute('class');
             });
+            // Remove the JS-injected sibling badges used for <img> edit icons
+            // (see setupImageReplacement) — they're editor-only UI, not content.
+            cleanDoc.querySelectorAll('.eb-img-edit-badge').forEach(el => el.remove());
             cleanDoc.querySelectorAll('[contenteditable]').forEach(el => {
                 el.removeAttribute('contenteditable');
             });

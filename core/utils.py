@@ -153,12 +153,19 @@ async def generate_website_content_logic(genai_client, prompt, system_prompt, ge
         fallback = get_fallback_tokens(prompt)
         layout   = get_layout_blueprint(prompt)
 
+        # Portfolio item COUNT is intentionally independent of how many images
+        # were uploaded — the template renders a portfolio card fine with no
+        # photo, so a business with 0-2 images must not end up with an empty
+        # portfolio section. expected_port_count only governs how many of
+        # those items get PAIRED with an uploaded image (images 3-5, capped
+        # at 3 slots); it is never the total item count Gemini is told to
+        # produce.
         expected_port_count = min(3, max(0, image_count - 2))
         image_summary = ""
         if image_count > 0:
             image_summary = f"\nIMAGE ALLOCATION (MUST MATCH):\n- Image 1: Hero\n- Image 2: About"
             if image_count >= 3:
-                image_summary += f"\n- Images 3 to {min(5, image_count)}: Portfolio Case Studies (You MUST generate exactly {expected_port_count} items in the 'portfolio' list)."
+                image_summary += f"\n- Images 3 to {min(5, image_count)}: Portfolio Case Studies (pair these with the first {expected_port_count} portfolio items — see rule 2 below)."
 
         industry_block = ""
         industry_template = INDUSTRY_TEMPLATES.get(industry) if industry else None
@@ -204,10 +211,11 @@ IMAGES UPLOADED: {image_count}
 Write copy like a senior creative director for a high-end boutique agency. Roleplay as a human.
 CRITICAL RULES for Copy:
 1. NO AI-ISMS: Ban "Unlock", "Empower", "Comprehensive", "Seamless", "Journey", "Elevate".
-2. PORTFOLIO MATCHING: You must generate EXACTLY {expected_port_count} portfolio items in the 'portfolio' list to match images 3, 4, and 5.
-3. Content must be 100% realistic. If it's a law firm, sound like a top attorney. If it's a software agency, use specialized technical terms.
-4. NO "Welcome to", "Experience the", "Discover the", "Our journey".
-5. FACTS: The "Business:" text above is the only source of truth. Extract every concrete fact it contains (years of experience, counts, locations, founding date, certifications, etc.) and reuse the exact same figures everywhere they are relevant — "stats" is the canonical place for them. Never state a number for "Business:" that isn't grounded in what was actually written above, and never contradict a fact you already stated elsewhere in this same response."""
+2. PORTFOLIO: Generate AT LEAST 3 portfolio/case-study items with specific, realistic project details for this business — this is a fixed minimum regardless of how many images were uploaded; a portfolio card with no photo is perfectly fine and already supported. {f"The first {expected_port_count} of these items will be paired with uploaded images 3 to {min(5, image_count)} — make those especially detailed and specific to what the image shows." if expected_port_count > 0 else ""}
+3. TESTIMONIALS: If "testimonials" is a requested/suggested section, generate AT LEAST 3 distinct testimonials with varied, specific author names and roles — avoid a single generic one-liner.
+4. Content must be 100% realistic. If it's a law firm, sound like a top attorney. If it's a software agency, use specialized technical terms.
+5. NO "Welcome to", "Experience the", "Discover the", "Our journey".
+6. FACTS: The "Business:" text above is the only source of truth. Extract EVERY concrete fact it contains (years of experience, counts, locations, founding date, certifications, etc.) — not just the first one you notice — and reuse the exact same figures everywhere they are relevant; "stats" is the canonical place for all of them together. Never state a number that isn't grounded in what was actually written above, and never contradict a fact you already stated elsewhere in this same response. If the business description genuinely contains few or no quantifiable facts, a short or empty "stats" list is correct — never invent additional numbers just to make the list longer."""
 
         content_parts = [full_prompt]
         # Keep track of opened PIL images so we can close them after the API call

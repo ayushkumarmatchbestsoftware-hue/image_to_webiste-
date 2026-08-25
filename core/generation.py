@@ -475,13 +475,23 @@ async def _run_generation_job_inner(
         # look duplicated regardless of what the AI writes for site_title.
         page_title = site_name
 
-        # Only keep sections that were actually returned by the AI (key exists in data)
+        # Only keep sections that were actually returned by the AI (key exists
+        # in data) — UNLESS the user explicitly requested this exact list via
+        # the "Pages to Include" checkboxes (requested_sections), in which
+        # case every section they picked is kept unconditionally, the same
+        # way 'hero' already always is. An explicit user choice must never be
+        # silently dropped from the nav/page just because the AI's response
+        # happened to omit that key despite the mandatory-section prompt
+        # instruction above — each section's own template block already
+        # reads through data.get(section, ...)-style defaults, so it renders
+        # gracefully (if a little thin) even when the AI's content for it
+        # was sparse, rather than the section vanishing with no explanation.
         # IMPORTANT: use 'section in data' NOT 'data.get(section)' because {} and [] are falsy
         original_layout = list(layout)
-        active_layout = []
-        for section in original_layout:
-            if section == 'hero' or section in data:
-                active_layout.append(section)
+        if requested_sections:
+            active_layout = original_layout
+        else:
+            active_layout = [s for s in original_layout if s == 'hero' or s in data]
 
         log("INFO", job_id, f"Pruned layout from {len(original_layout)} to {len(active_layout)} active sections")
 
