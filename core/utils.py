@@ -212,7 +212,7 @@ Write copy like a senior creative director for a high-end boutique agency. Rolep
 CRITICAL RULES for Copy:
 1. NO AI-ISMS: Ban "Unlock", "Empower", "Comprehensive", "Seamless", "Journey", "Elevate".
 2. PORTFOLIO: Generate AT LEAST 3 portfolio/case-study items with specific, realistic project details for this business — this is a fixed minimum regardless of how many images were uploaded; a portfolio card with no photo is perfectly fine and already supported. {f"The first {expected_port_count} of these items will be paired with uploaded images 3 to {min(5, image_count)} — make those especially detailed and specific to what the image shows." if expected_port_count > 0 else ""}
-3. TESTIMONIALS: If "testimonials" is a requested/suggested section, generate AT LEAST 3 distinct testimonials with varied, specific author names and roles — avoid a single generic one-liner.
+3. TESTIMONIALS: If "testimonials" is a requested/suggested section, generate AT LEAST 3 distinct testimonials, each 2-3 full sentences (not a one-line blurb) that references a specific, concrete detail of the work this business does — varied author names, roles, and company names, no two testimonials praising the same aspect of the business.
 4. Content must be 100% realistic. If it's a law firm, sound like a top attorney. If it's a software agency, use specialized technical terms.
 5. NO "Welcome to", "Experience the", "Discover the", "Our journey".
 6. FACTS: The "Business:" text above is the only source of truth. Extract EVERY concrete fact it contains (years of experience, counts, locations, founding date, certifications, etc.) — not just the first one you notice — and reuse the exact same figures everywhere they are relevant; "stats" is the canonical place for all of them together. Never state a number that isn't grounded in what was actually written above, and never contradict a fact you already stated elsewhere in this same response. If the business description genuinely contains few or no quantifiable facts, a short or empty "stats" list is correct — never invent additional numbers just to make the list longer."""
@@ -240,7 +240,14 @@ CRITICAL RULES for Copy:
                 config={
                     "system_instruction": system_prompt,
                     "temperature": 0.85,
-                    "max_output_tokens": 4500
+                    # Was 4500 — too tight a budget for a full 9-section site
+                    # (rich portfolio + 3+ multi-sentence testimonials + stats
+                    # + faq + pricing + theme/layout metadata all compete for
+                    # the same output budget). The model was complying with
+                    # the "at least 3 items" instructions but compressing each
+                    # field's substance to fit, which read as "sparse" content
+                    # even though prompt wording alone kept getting stronger.
+                    "max_output_tokens": 8192
                 }
             )
         finally:

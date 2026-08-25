@@ -139,12 +139,20 @@
 
         .nav-links {
             display: flex;
+            /* Flex items default to min-width:auto, which means the browser
+               sizes this to its full content width instead of shrinking to
+               whatever space is actually left next to the logo — the flex
+               row then overflows .nav-inner, and the tail end gets silently
+               hard-clipped by body's overflow-x:hidden (no way to scroll to
+               it). min-width:0 lets flexbox actually constrain this box to
+               the available space so overflow-x:auto below can do its job. */
+            min-width: 0; flex: 1 1 auto;
             /* Spacing tightens automatically as more sections are selected,
                so a full "all sections" nav still fits in one row instead of
                relying on the scroll fallback below — unchanged from the
                original generous spacing whenever there are only a handful
                of items (the common case). */
-            gap: {% if ns.nav_count > 7 %}clamp(8px, 1.2vw, 20px){% elif ns.nav_count > 5 %}clamp(12px, 2vw, 32px){% else %}clamp(16px, 3vw, 48px){% endif %};
+            gap: {% if ns.nav_count > 7 %}clamp(6px, 1vw, 16px){% elif ns.nav_count > 5 %}clamp(12px, 2vw, 32px){% else %}clamp(16px, 3vw, 48px){% endif %};
             /* Never wrap into a misaligned second row — stay a single row
                and scroll horizontally (as a last resort, e.g. a very narrow
                window) instead of breaking or clipping; scrollbar hidden for
@@ -157,11 +165,11 @@
         .nav-links::-webkit-scrollbar { display: none; }
         .nav-links a {
             font-family: var(--font-body);
-            font-size: {% if ns.nav_count > 7 %}0.7rem{% elif ns.nav_count > 5 %}0.78rem{% else %}0.85rem{% endif %};
+            font-size: {% if ns.nav_count > 7 %}0.65rem{% elif ns.nav_count > 5 %}0.78rem{% else %}0.85rem{% endif %};
             font-weight: 800;
             color: var(--text-main); text-decoration: none; text-transform: uppercase;
-            letter-spacing: {% if ns.nav_count > 7 %}0.08em{% else %}0.15em{% endif %}; transition: all 0.3s ease; opacity: 0.85;
-            white-space: nowrap;
+            letter-spacing: {% if ns.nav_count > 7 %}0.04em{% else %}0.15em{% endif %}; transition: all 0.3s ease; opacity: 0.85;
+            white-space: nowrap; flex-shrink: 0;
         }
         .nav-links a:hover { opacity: 1; color: var(--primary); transform: translateY(-1px); }
         .nav-links a.active { opacity: 1; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 4px; }
