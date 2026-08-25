@@ -73,7 +73,7 @@
         <!-- INFO SIDE -->
         <div class="reveal">
             <div class="contact-header">
-                <span class="section-label">{{ contact.get('label', 'Connect') }}</span>
+                <span class="section-label" contenteditable="true">{{ contact.get('label', 'Connect') }}</span>
                 <h2 class="contact-title" contenteditable="true" data-sync-field="contact.title">{{ contact.title }}</h2>
                 <p class="contact-description" contenteditable="true" data-sync-field="contact.description">{{ contact.description or "We're here to discuss your vision and help you realize your brand's full potential." }}</p>
             </div>
