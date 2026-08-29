@@ -97,7 +97,7 @@ def _plate(w, h, obj, ground):
 
 def render(slug: str) -> str:
     """Render one Pack's home page with its own demo seller. Returns HTML."""
-    from core.generation import jinja_env
+    from core.rendering import jinja_env
     from core.packs import PACKS, get_pack
     from core.design import derive_design
     from core.composition import plan_composition, make_sect

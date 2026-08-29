@@ -35,6 +35,7 @@ keeps the output structurally sound whatever the model does.
 | Path | What it holds |
 |---|---|
 | `core/` | the pipeline — one concern per module |
+| `core/rendering.py` | the Jinja environment every page is rendered through |
 | `core/artdirector.py` | the only agent: chooses the design, then critiques the rendered page |
 | `core/commerce.py` | catalogue, server-side pricing, orders, state machine |
 | `core/payments.py` | cash on delivery and UPI |
@@ -100,3 +101,10 @@ Everything has a working default except the model key. See `.env.example`.
 Generation, imagery, publishing and the commerce layer are working. GST,
 shipping, refunds and a hosted payment gateway are not built. The merchant API
 is unauthenticated unless `SHOP_REQUIRE_KEY=1`.
+
+There is one entry point — `api.server:app`. The older Flask/FastAPI apps, the
+text-only generation route, the credits and billing stack and the pre-Pack
+templates have been removed: roughly 6,900 lines that nothing reachable from
+that entry point touched. `core/r2.py`, `core/redis.py` and `core/mongo.py`
+remain because they are the interfaces `api/local_mode.py` substitutes at
+runtime, and are what you would point at real services.

@@ -17,7 +17,6 @@ from core.r2 import upload_media_to_r2, fetch_media_from_r2
 
 from typing import List, Optional
 import traceback
-from core.generation import run_generation_job
 from core.redis import create_job_record, get_job_status
 
 router = APIRouter()
@@ -153,63 +152,6 @@ async def generate_from_photo(
     return {"success": True, "job_id": job_id, "website_id": website_id,
             "status": "queued", "photo_token": photo_token}
 
-
-@router.post("/generate")
-async def generate(
-    background_tasks: BackgroundTasks,
-    prompt: str = Form(...),
-    business_name: str = Form(""),
-    industry: str = Form(""),
-    pages: str = Form(""),
-    palette: str = Form("auto"),
-    template: str = Form("auto"),
-    logo: Optional[UploadFile] = File(None),
-    images: List[UploadFile] = File([]),
-):
-    if not Config.GEMINI_API_KEY:
-        return JSONResponse(status_code=500, content={
-            "error": "GEMINI_API_KEY is not set. Put it in .env and restart."})
-    try:
-        website_id = str(uuid.uuid4())
-
-        logo_url = None
-        if logo and logo.filename:
-            logo_url = await asyncio.to_thread(
-                upload_media_to_r2, await logo.read(),
-                logo.content_type or "image/png",
-                f"websites/{website_id}/assets")
-
-        image_urls, image_paths = [], []
-        for f in images[:Config.MAX_IMAGES]:
-            if not (f and f.filename):
-                continue
-            data = await f.read()
-            # Gemini reads pixels off local disk; the pipeline deletes these.
-            local = os.path.join(Config.UPLOAD_FOLDER,
-                                 f"{uuid.uuid4()}_{os.path.basename(f.filename)}")
-            with open(local, "wb") as fh:
-                fh.write(data)
-            image_paths.append(local)
-            image_urls.append(await asyncio.to_thread(
-                upload_media_to_r2, data, f.content_type or "image/jpeg",
-                f"websites/{website_id}/assets"))
-
-        job_id = str(uuid.uuid4())
-        await create_job_record(job_id=job_id, website_id=website_id)
-
-        background_tasks.add_task(
-            run_generation_job,
-            job_id=job_id, website_id=website_id, user_id=DEV_USER_ID,
-            prompt=prompt, business_name=business_name,
-            image_urls=image_urls, image_paths=image_paths, logo_url=logo_url,
-            user_pages=pages, user_palette=palette, user_template=template,
-            user_industry=industry, db_image_records=[],
-        )
-        return {"success": True, "job_id": job_id,
-                "website_id": website_id, "status": "queued"}
-    except Exception as e:
-        traceback.print_exc()
-        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.get("/job-status/{job_id}")

@@ -189,15 +189,6 @@ def _mongo_module():
 
 
 # ------------------------------------------------------------------- Vercel
-def _vercel_module():
-    m = types.ModuleType("services.vercel_service")
-
-    async def run_vercel_deployment(*args, **kwargs):
-        raise RuntimeError("Vercel deployment is disabled in local test mode")
-
-    m.run_vercel_deployment = run_vercel_deployment
-    return m
-
 
 def install():
     """Register the fakes so later `from core.x import y` resolves to them."""
@@ -205,5 +196,4 @@ def install():
     sys.modules["core.r2"] = _r2_module()
     sys.modules["core.redis"] = _redis_module()
     sys.modules["core.mongo"] = _mongo_module()
-    sys.modules["services.vercel_service"] = _vercel_module()
     print(f"[local-mode] external connections replaced (store: {STORE_DIR})")

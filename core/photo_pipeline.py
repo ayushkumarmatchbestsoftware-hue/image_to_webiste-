@@ -39,7 +39,7 @@ from core.offline import api_available, offline_spec, offline_copy
 from core.sharecard import build_card, build_favicon
 from core.imagery import build_image_set
 from core.progress import report
-from core.generation import jinja_env
+from core.rendering import jinja_env
 from core.r2 import upload_media_to_r2, fetch_media_from_r2, R2_PUBLIC_URL
 from core.redis import mark_job_processing, mark_job_completed, mark_job_failed
 from core.utils import build_image_map_logic
