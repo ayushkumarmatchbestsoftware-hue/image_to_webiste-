@@ -41,7 +41,9 @@ keeps the output structurally sound whatever the model does.
 | `core/publish.py` | hosting — a readable public URL per site |
 | `templates/packs/` | the designs; each is a `_shell.html` plus a `home.html` |
 | `skills/` | design criteria as editable Markdown, read by the agent at runtime |
-| `api/` | the web layer — every endpoint, plus the three UI pages under `api/ui/` |
+| `api/server.py` | app assembly only — middleware, mounts, router registration |
+| `api/routes/` | one router per area: system, generate, sites, designs, shop, publish |
+| `api/ui/` | the three pages a person sees: upload, orders, designs |
 | `api/local_mode.py` | stand-ins for MongoDB, Redis, R2 and Vercel, so the service runs with no external accounts |
 
 ## Running it
