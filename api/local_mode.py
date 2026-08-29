@@ -3,8 +3,8 @@ Local stand-ins for every external connection this project makes.
 
 Import and install BEFORE anything imports core.generation:
 
-    from local_test import shims
-    shims.install()
+    from api import local_mode
+    local_mode.install()
     from core.generation import run_generation_job   # now bound to the fakes
 
 Replaces
@@ -206,4 +206,4 @@ def install():
     sys.modules["core.redis"] = _redis_module()
     sys.modules["core.mongo"] = _mongo_module()
     sys.modules["services.vercel_service"] = _vercel_module()
-    print(f"[SHIM] external connections replaced (store: {STORE_DIR})")
+    print(f"[local-mode] external connections replaced (store: {STORE_DIR})")

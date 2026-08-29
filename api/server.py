@@ -4,7 +4,7 @@ Local test server for the website generator.
 Runs the REAL generation pipeline (core/generation.py -> Gemini -> Jinja
 templates) with every external connection swapped for a local stand-in.
 
-    python local_test/server.py        # http://127.0.0.1:5000
+    python -m uvicorn api.server:app   # http://127.0.0.1:8000
 
 Only GEMINI_API_KEY is required.
 """
@@ -32,8 +32,8 @@ if os.name == "nt":
         pass
 
 # ---- swap the connections out BEFORE core.generation is imported ----
-from local_test import shims
-shims.install()
+from api import local_mode
+local_mode.install()
 
 # Uvicorn installs handlers on its own loggers and leaves the root logger bare,
 # so every logger.info() in core/ went nowhere — which is why the pipeline
@@ -58,7 +58,8 @@ from core.r2 import upload_media_to_r2, fetch_media_from_r2
 
 # The pipeline skips credit deduction for exactly this id (generation.py step 11).
 DEV_USER_ID = "00000000-0000-0000-0000-000000000001"
-FRONTEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend.html")
+UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
+FRONTEND = os.path.join(UI_DIR, "upload.html")
 
 app = FastAPI(title="Website Generator - Local Test Harness")
 
@@ -121,8 +122,7 @@ async def templates_gallery():
     Each is rendered live rather than screenshotted, so the gallery can never
     drift out of date the way a folder of images does.
     """
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "templates_gallery.html")
+    path = os.path.join(UI_DIR, "designs.html")
     with open(path, encoding="utf-8") as fh:
         return HTMLResponse(fh.read())
 
@@ -163,8 +163,8 @@ async def health():
                                   if not info["key_present"] else ""),
         "model_content": info["model_content"],
         "model_fast": info["model_fast"],
-        "jobs": len(shims.JOBS),
-        "websites": len(shims.WEBSITES),
+        "jobs": len(local_mode.JOBS),
+        "websites": len(local_mode.WEBSITES),
         # Whether the Art Director agent can actually run, and on what. Both
         # halves can fail independently: no vision model means no critique even
         # with a live key, and no browser means nothing to critique.
@@ -454,7 +454,7 @@ async def download(website_id: str, single: int = 0):
     if not pages:
         raise HTTPException(status_code=404, detail="Nothing generated yet")
 
-    doc = shims.WEBSITES.get(website_id, {})
+    doc = local_mode.WEBSITES.get(website_id, {})
     # Falls back to a Pack that actually exists. This used to name
     # "illustrator", which was removed on 27 Aug — a record missing its `pack`
     # would then inline no stylesheet at all and download as unstyled HTML.
@@ -472,7 +472,7 @@ async def download(website_id: str, single: int = 0):
     for k in keys:
         if "/assets/" not in k or k.endswith(".html"):
             continue
-        url = f"{shims.PUBLIC_URL}/{k}"
+        url = f"{local_mode.PUBLIC_URL}/{k}"
         if url in home_html:
             product_images[url] = await asyncio.to_thread(fetch_media_from_r2, k)
 
@@ -528,7 +528,7 @@ async def save(request: Request):
 @app.get("/history")
 async def history():
     items = []
-    for wid, doc in reversed(list(shims.WEBSITES.items())):
+    for wid, doc in reversed(list(local_mode.WEBSITES.items())):
         items.append({
             "website_id": wid,
             "site_name": doc.get("site_name"),
@@ -608,7 +608,7 @@ def _merchant_ok(website_id: str, request: Request) -> bool:
 @app.get("/shop/{website_id}", response_class=HTMLResponse)
 async def shop_dashboard(website_id: str):
     """The merchant's order desk. Served as a plain page; it talks to the API."""
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
+    path = os.path.join(UI_DIR, "orders.html")
     with open(path, encoding="utf-8") as fh:
         return HTMLResponse(fh.read())
 
@@ -682,7 +682,7 @@ async def place_order(website_id: str, request: Request):
     try:
         from core import notify as _notify
         _notify.order_placed(order, _shop.get_settings(website_id),
-                             (shims.WEBSITES.get(website_id, {}) or {}).get("site_name", ""))
+                             (local_mode.WEBSITES.get(website_id, {}) or {}).get("site_name", ""))
     except Exception as e:
         _log.warning(f"order notification skipped: {e}")
 
@@ -806,7 +806,7 @@ async def publish_site(website_id: str, request: Request):
         return JSONResponse(status_code=404,
                             content={"error": "nothing generated for this site yet"})
 
-    doc = shims.WEBSITES.get(website_id, {}) or {}
+    doc = local_mode.WEBSITES.get(website_id, {}) or {}
     # Settings first: they are on disk, so they survive the restart that empties
     # the in-memory website document.
     name = ((_shop.get_settings(website_id) or {}).get("site_name")

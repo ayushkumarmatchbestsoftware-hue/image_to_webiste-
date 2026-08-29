@@ -7,6 +7,20 @@ services:
       - "5077:5000"
     env_file:
       - .env
+    environment:
+      # Must be the address a buyer's phone can actually reach. Without it,
+      # asset and API URLs stay relative — fine inside the site, broken the
+      # moment a storefront link is shared, because og:image has to resolve.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      # The merchant endpoints change order state. Off by default so local work
+      # is frictionless; on staging that default would let anyone holding a
+      # site id mark orders shipped or cancelled.
+      SHOP_REQUIRE_KEY: "1"
+    volumes:
+      # Generated sites, published storefronts and the ORDER STORE. Containers
+      # are replaced on every deploy, so without this a redeploy would delete
+      # real customer orders — names, addresses and all.
+      - ./data/local_store:/app/local_store
     healthcheck:
       test:
         - CMD
@@ -16,7 +30,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 25s
     networks:
       - cloudflare_net
 networks:

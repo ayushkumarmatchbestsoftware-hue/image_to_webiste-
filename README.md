@@ -41,14 +41,15 @@ keeps the output structurally sound whatever the model does.
 | `core/publish.py` | hosting — a readable public URL per site |
 | `templates/packs/` | the designs; each is a `_shell.html` plus a `home.html` |
 | `skills/` | design criteria as editable Markdown, read by the agent at runtime |
-| `local_test/` | a self-contained harness: the API, an upload UI, and the order desk |
+| `api/` | the web layer — every endpoint, plus the three UI pages under `api/ui/` |
+| `api/local_mode.py` | stand-ins for MongoDB, Redis, R2 and Vercel, so the service runs with no external accounts |
 
 ## Running it
 
 ```bash
 pip install -r requirements.txt
 cp .env.example .env          # then add a model API key
-python -m uvicorn local_test.server:app --reload --port 8000
+python -m uvicorn api.server:app --reload --port 8000
 ```
 
 | | |
@@ -60,7 +61,7 @@ python -m uvicorn local_test.server:app --reload --port 8000
 | `/s/{slug}/` | a published storefront |
 | `/health` | provider, agent and browser status |
 
-`local_test/` replaces MongoDB, Redis, R2 and Vercel with local equivalents, so
+`api/local_mode.py` replaces MongoDB, Redis, R2 and Vercel with local equivalents, so
 the pipeline runs end to end on one machine with no external service. Orders are
 the exception: they are written to disk and survive a restart, because an order
 is an obligation between two people.

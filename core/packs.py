@@ -125,7 +125,7 @@ PACKS = {
     },
     "binder": {
         "title": "Binder",
-        "source": "adapted from the Atelier & Co design (local_test/2.MD)",
+        "source": "adapted from a supplied Atelier & Co design",
         "character": "a dark spine of vertical tabs down the left edge with the "
                      "content on a paper sheet lifted off it; Fraunces over "
                      "Inter, Space Mono labels, one ink ledger strip",
