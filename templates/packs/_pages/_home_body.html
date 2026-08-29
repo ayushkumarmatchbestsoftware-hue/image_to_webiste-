@@ -16,7 +16,7 @@
 {% if services %}
 <section>
   <div class="wrap">
-    <h2>{{ home.label or 'What we make' }}</h2>
+    <h2>{{ home.label or t('nav_services') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <div class="cards">
       {% for s in services[:3] %}
@@ -30,7 +30,7 @@
 {% if about and about.description %}
 <section class="band">
   <div class="wrap">
-    <h2>{{ about.heading or 'About' }}</h2>
+    <h2>{{ about.heading or t('sec_about') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <div class="with-shot">
       <div>
@@ -48,12 +48,12 @@
 {% if portfolio %}
 <section>
   <div class="wrap">
-    <h2>Work</h2>
+    <h2>{{ t('nav_work') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <ul class="work">
       {% for p in portfolio[:3] %}
       <li>
-        <span class="tag">{{ p.tag or 'Piece' }}</span>
+        <span class="tag">{{ p.tag or t('tag_piece') }}</span>
         <div><h3>{{ p.title }}</h3><p>{{ p.description }}{% if p.outcome %} &mdash; {{ p.outcome }}{% endif %}</p></div>
       </li>
       {% endfor %}
@@ -65,13 +65,13 @@
 {% if contact %}
 <section class="band">
   <div class="wrap">
-    <h2>{{ contact.title or 'Get in touch' }}</h2>
+    <h2>{{ contact.title or t('nav_contact') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <p class="lede">{{ contact.description }}</p>
     <div class="contact-grid">
-      {% if contact.phone %}<div><span>Phone</span><b>{{ contact.phone }}</b></div>{% endif %}
-      {% if contact.email %}<div><span>Email</span><b>{{ contact.email }}</b></div>{% endif %}
-      {% if contact.address %}<div><span>Where</span><b>{{ contact.address }}</b></div>{% endif %}
+      {% if contact.phone %}<div><span>{{ t('contact_phone') }}</span><b>{{ contact.phone }}</b></div>{% endif %}
+      {% if contact.email %}<div><span>{{ t('contact_email') }}</span><b>{{ contact.email }}</b></div>{% endif %}
+      {% if contact.address %}<div><span>{{ t('contact_where') }}</span><b>{{ contact.address }}</b></div>{% endif %}
     </div>
   </div>
 </section>

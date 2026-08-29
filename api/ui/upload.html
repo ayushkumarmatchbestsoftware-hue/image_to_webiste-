@@ -185,6 +185,30 @@
       <label>Brand name</label>
       <input type="text" id="brand" placeholder="Channapatna Toys">
 
+      <label>Language</label>
+      <input type="text" id="lang" list="langs" value="en"
+             placeholder="en, hi, ar, es, ja&hellip;">
+      <datalist id="langs">
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="bn">Bengali</option>
+        <option value="ta">Tamil</option>
+        <option value="te">Telugu</option>
+        <option value="mr">Marathi</option>
+        <option value="gu">Gujarati</option>
+        <option value="pa">Punjabi</option>
+        <option value="ar">Arabic</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+        <option value="pt">Portuguese</option>
+        <option value="de">German</option>
+        <option value="ja">Japanese</option>
+        <option value="zh">Chinese</option>
+      </datalist>
+      <p class="hint" style="margin:-6px 0 12px;font-size:.78rem;opacity:.6">
+        The list is a shortcut, not a limit &mdash; type any language code and
+        the site is written in it.</p>
+
       <div class="row">
         <div><label>Price</label><input type="text" id="price" placeholder="&#8377;450"></div>
         <div><label>Spacing</label>
@@ -399,6 +423,7 @@ async function build(){
   fd.append("photo_token",TOKEN);
   fd.append("extra_tokens",EXTRA.join(","));
   fd.append("brand_name",$("brand").value);
+  fd.append("language",($("lang").value||"en").trim());
   fd.append("price",$("price").value);
   fd.append("seller_facts",$("facts").value);
   fd.append("density",$("density").value);

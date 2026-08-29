@@ -1,0 +1,24 @@
+{#
+  Specifications — the rows a buyer checks before paying.
+
+  Deliberately a plain definition list rather than a designed panel: each Pack
+  already styles dl/dt/dd in its own voice, so this arrives looking like it
+  belongs rather than like a widget bolted on.
+
+  Emitted only when there is something true to put in it. An empty spec table
+  is worse than none, and a padded one is worse still - a buyer can check a
+  measurement by holding the thing.
+#}
+{% if specifications %}
+<section {{ sect(9, 'specs-section') }}>
+  <div class="wrap">
+    <h2 class="{{ hclass }}">{{ t('sec_specs') }}</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    <dl class="specs">
+      {% for sp in specifications %}
+      <dt>{{ sp.label }}</dt><dd>{{ sp.value }}</dd>
+      {% endfor %}
+    </dl>
+  </div>
+</section>
+{% endif %}

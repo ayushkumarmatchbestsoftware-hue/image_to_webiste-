@@ -1,3 +1,4 @@
+from core import i18n as _i18n
 """
 Demo content for the template gallery.
 
@@ -160,12 +161,13 @@ def render(slug: str) -> str:
         layout=["hero", "services", "portfolio", "about", "contact"],
         image_map={}, image_count=1, has_images=True, logo=None,
         favicon_url=None, favicon_apple_url=None, favicon_sized=False,
-        share_card_url=None, story_card_url=None, site_url="", site_lang="en",
+        share_card_url=None, story_card_url=None, site_url="",
         services_img=None, testimonials_img=None, overflow_imgs=[], images=[hero],
         shots={"hero": hero, "wide": wide, "square": square,
                "hero_w": 900, "hero_h": 1150, "wide_w": 1400, "wide_h": 823,
                "square_w": 900, "square_h": 900},
         is_cutout=True, price=b["price"], asset_base=pack.get("asset_base", "/a"),
+        **_i18n.context('en'),
         shot_cap=int(min(900, 900) * 1.25),
         pack=dict(pack, slug=slug), comp=comp, sect=make_sect(comp),
         stats=data["stats"], **{k: v for k, v in data.items() if k != "stats"})

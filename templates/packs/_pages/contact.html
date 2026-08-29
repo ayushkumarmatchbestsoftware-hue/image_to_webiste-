@@ -7,23 +7,23 @@
 {% block main %}
 <section>
   <div class="wrap">
-    <h2 class="{{ hclass }}">{{ contact.title or 'Get in touch' }}</h2>
+    <h2 class="{{ hclass }}">{{ contact.title or t('nav_contact') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <p class="lede">{{ contact.description }}</p>
 
     <div class="contact-grid">
-      {% if contact.phone %}<div><span class="{{ tclass }}">Phone</span><b>{{ contact.phone }}</b></div>{% endif %}
-      {% if contact.email %}<div><span class="{{ tclass }}">Email</span><b>{{ contact.email }}</b></div>{% endif %}
-      {% if contact.address %}<div><span class="{{ tclass }}">Where</span><b>{{ contact.address }}</b></div>{% endif %}
+      {% if contact.phone %}<div><span class="{{ tclass }}">{{ t('contact_phone') }}</span><b>{{ contact.phone }}</b></div>{% endif %}
+      {% if contact.email %}<div><span class="{{ tclass }}">{{ t('contact_email') }}</span><b>{{ contact.email }}</b></div>{% endif %}
+      {% if contact.address %}<div><span class="{{ tclass }}">{{ t('contact_where') }}</span><b>{{ contact.address }}</b></div>{% endif %}
     </div>
 
     {% if wa %}
     <p style="margin-top:32px">
-      <a class="cta {{ tclass }}" href="https://wa.me/{{ wa }}?text={{ site_name }}">{{ home.cta or 'Message us' }}</a>
+      <a class="cta {{ tclass }}" href="https://wa.me/{{ wa }}?text={{ site_name }}">{{ home.cta or t('contact_message') }}</a>
     </p>
     {% elif contact.email %}
     <p style="margin-top:32px">
-      <a class="cta {{ tclass }}" href="mailto:{{ contact.email }}">{{ home.cta or 'Email us' }}</a>
+      <a class="cta {{ tclass }}" href="mailto:{{ contact.email }}">{{ home.cta or t('contact_email_us') }}</a>
     </p>
     {% endif %}
   </div>
@@ -32,7 +32,7 @@
 {% if faq %}
 <section class="band">
   <div class="wrap">
-    <h2 class="{{ hclass }}">Before you ask</h2>
+    <h2 class="{{ hclass }}">{{ t('sec_questions_label') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <div class="faq">
       {% for f in faq %}<div><h3 class="{{ hclass }}">{{ f.question }}</h3><p>{{ f.answer }}</p></div>{% endfor %}

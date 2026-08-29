@@ -15,8 +15,8 @@
 {% set _avg = ((_rated | sum(attribute='rating')) / (_rated | length)) if _rated else 5 %}
 <section class="reviews-section {{ reviews_band | default('band') }} reveal">
   <div class="wrap">
-    <p class="eyebrow {{ tclass }}">What buyers say</p>
-    <h2 class="{{ hclass }}">Reviews</h2>
+    <p class="eyebrow {{ tclass }}">{{ t('sec_reviews_label') }}</p>
+    <h2 class="{{ hclass }}">{{ t('sec_reviews') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
 
     <div class="rating-summary" data-eb-keep>
@@ -29,7 +29,7 @@
       </div>
     </div>
 
-    <div class="reviews" id="eb-reviews">
+    <div class="{{ t('reviews_count') }}" id="eb-reviews">
       {% for t in _revs %}
       <article class="review" data-eb-item="review">
         <span class="review__stars" aria-label="{{ t.rating | default(5) }} out of 5">

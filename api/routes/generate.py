@@ -101,6 +101,7 @@ async def generate_from_photo(
     density: str = Form("generous"),
     spin: int = Form(0),
     override_triage: bool = Form(False),
+    language: str = Form("en"),
     category: str = Form(""),
     sub_type: str = Form(""),
 ):
@@ -146,7 +147,8 @@ async def generate_from_photo(
         image_path=work, image_url=image_url, extra_paths=extra_paths,
         brand_name=brand_name,
         price=price, seller_facts=seller_facts, density=density,
-        spin=int(spin), override_triage=bool(override_triage),
+        spin=int(spin), language=language,
+        override_triage=bool(override_triage),
         user_category=category, user_sub_type=sub_type,
     )
     return {"success": True, "job_id": job_id, "website_id": website_id,

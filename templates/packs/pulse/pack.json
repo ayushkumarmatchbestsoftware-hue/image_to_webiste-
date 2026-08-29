@@ -11,7 +11,6 @@
   "use_case": "streetwear, sneakers, gadgets, gear, anything with a drop",
   "categories": {
     "apparel": 2.4,
-    "other": 2.2,
     "toys": 1.2,
     "food": 0.5
   },

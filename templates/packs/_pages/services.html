@@ -7,7 +7,7 @@
 {% block main %}
 <section>
   <div class="wrap">
-    <h2 class="{{ hclass }}">{{ home.label or 'What we make' }}</h2>
+    <h2 class="{{ hclass }}">{{ home.label or t('nav_services') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <p class="lede">{{ home.subtitle or tagline }}</p>
     {% set _g = shots.get('gallery') or [] %}
@@ -26,7 +26,7 @@
 {% if faq %}
 <section class="band">
   <div class="wrap">
-    <h2 class="{{ hclass }}">Questions</h2>
+    <h2 class="{{ hclass }}">{{ t('sec_questions') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <div class="faq">
       {% for f in faq %}<div><h3 class="{{ hclass }}">{{ f.question }}</h3><p>{{ f.answer }}</p></div>{% endfor %}

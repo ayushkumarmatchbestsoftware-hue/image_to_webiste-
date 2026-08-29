@@ -33,7 +33,7 @@
     <p class="hero-sub">{{ home.subtitle or tagline }}</p>{% endif %}
     <div class="buy">
       {% if price %}<span class="price {{ tclass }}">{{ price }}</span>{% endif %}
-      <a class="cta {{ tclass }}" href="{{ _cta_href }}">{{ home.cta or 'Enquire' }}</a>
+      <a class="cta {{ tclass }}" href="{{ _cta_href }}">{{ home.cta or t('cta_enquire') }}</a>
     </div>
   </div>
 </section>
@@ -74,12 +74,21 @@
 {% endif %}
 
 {% include "packs/_pages/_feature.html" %}
-{% include "packs/_pages/_reviews.html" %}
+{% include "packs/_pages/_specs.html" %}
+{% if testimonials %}
+{% set _r = testimonials[0] %}
+<section {{ sect(8, 'said') }}>
+  <div class="wrap said__wrap">
+    <blockquote class="said__quote">{{ _r.text }}</blockquote>
+    <p class="said__who">{{ _r.name }}{% if _r.role %} &middot; {{ _r.role }}{% endif %}</p>
+  </div>
+</section>
+{% endif %}
 
 {% if contact %}
 <section {{ sect(3) }}>
   <div class="wrap contact-quiet">
-    <h2>{{ contact.title or 'Enquire' }}</h2>
+    <h2>{{ contact.title or t('cta_enquire') }}</h2>
     <p class="lede">{{ contact.description }}</p>
     <p class="lines">
       {% if contact.phone %}{{ contact.phone }}{% endif %}

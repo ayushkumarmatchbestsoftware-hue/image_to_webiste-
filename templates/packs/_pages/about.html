@@ -28,7 +28,7 @@
 {% if home.pillar1_title or home.pillar2_title %}
 <section class="band">
   <div class="wrap">
-    <h2 class="{{ hclass }}">How we work</h2>
+    <h2 class="{{ hclass }}">{{ t('sec_how') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <div class="cards">
       {% if home.pillar1_title %}
@@ -58,7 +58,7 @@
 {% if faq %}
 <section class="band">
   <div class="wrap">
-    <h2 class="{{ hclass }}">Questions</h2>
+    <h2 class="{{ hclass }}">{{ t('sec_questions') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <div class="faq">
       {% for f in faq %}<div><h3 class="{{ hclass }}">{{ f.question }}</h3><p>{{ f.answer }}</p></div>{% endfor %}

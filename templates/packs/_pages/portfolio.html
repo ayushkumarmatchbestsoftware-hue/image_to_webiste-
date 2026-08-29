@@ -7,7 +7,7 @@
 {% block main %}
 <section>
   <div class="wrap">
-    <h2 class="{{ hclass }}">Our work</h2>
+    <h2 class="{{ hclass }}">{{ t('sec_work') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     {% if portfolio %}
     <ul class="work">
@@ -22,7 +22,7 @@
         {% if _g and loop.index0 < _g|length %}
         <figure class="work-shot"><img src="{{ _g[loop.index0] }}" alt="{{ p.title }}"></figure>
         {% endif %}
-        <span class="tag {{ tclass }}">{{ p.tag or 'Piece' }}</span>
+        <span class="tag {{ tclass }}">{{ p.tag or t('tag_piece') }}</span>
         <div>
           <h3 class="{{ hclass }}">{{ p.title }}</h3>
           <p>{{ p.description }}{% if p.client %} &middot; {{ p.client }}{% endif %}{% if p.outcome %} &mdash; {{ p.outcome }}{% endif %}</p>
@@ -39,7 +39,7 @@
 {% if services %}
 <section class="band">
   <div class="wrap">
-    <h2 class="{{ hclass }}">{{ home.label or 'What we make' }}</h2>
+    <h2 class="{{ hclass }}">{{ home.label or t('nav_services') }}</h2>
     {% if has_rule %}<hr class="rule">{% endif %}
     <div class="cards">
       {% for s in services %}

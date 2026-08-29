@@ -1,0 +1,74 @@
+{#
+  Structured data — schema.org Product, as JSON-LD.
+
+  A keywords meta tag has been ignored by Google for well over a decade. THIS
+  is what actually earns a rich result: the price, the availability and the
+  star rating shown beside the link in search. For a small seller competing
+  against marketplaces, that row of stars is worth more than any amount of
+  keyword tuning.
+
+  Everything here is emitted only when it is true. A rating is claimed only if
+  reviews exist, a price only if one was set, availability only when the
+  catalogue says the thing is orderable. Structured data that overstates gets
+  the rich result revoked and the domain flagged, so the conservative version
+  is also the effective one.
+
+  `tojson` handles the escaping, so a quote or an apostrophe in the seller's
+  own copy cannot break out of the script element.
+#}
+{% if site_title %}
+{% set _img = shots.get('wide') or shots.get('hero') or shots.get('square') %}
+{% set _revs = testimonials | selectattr('text') | list %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": {{ (seo.title if seo and seo.title else site_title) | striptags | tojson }},
+  "description": {{ meta_description | striptags | tojson }}
+  {%- if _img %},
+  "image": {{ _img | tojson }}
+  {%- endif %}
+  {%- if site_name %},
+  "brand": {"@type": "Brand", "name": {{ site_name | striptags | tojson }}}
+  {%- endif %}
+  {%- if specifications %},
+  "additionalProperty": [
+    {%- for sp in specifications %}
+    {"@type": "PropertyValue", "name": {{ sp.label | striptags | tojson }},
+     "value": {{ (sp.value or '') | striptags | tojson }}}{{ "," if not loop.last }}
+    {%- endfor %}
+  ]
+  {%- endif %}
+  {%- if price_amount %},
+  "offers": {
+    "@type": "Offer",
+    "price": {{ price_amount | tojson }},
+    "priceCurrency": {{ (currency_code or 'INR') | tojson }},
+    "availability": "https://schema.org/InStock"
+    {%- if contact and contact.email %},
+    "seller": {"@type": "Organization", "name": {{ site_name | striptags | tojson }}}
+    {%- endif %}
+  }
+  {%- endif %}
+  {%- if _revs %},
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "{{ ((_revs | sum(attribute='rating') / (_revs | length)) if _revs[0].rating else 5) | round(1) }}",
+    "reviewCount": {{ _revs | length }}
+  },
+  "review": [
+    {%- for r in _revs[:3] %}
+    {
+      "@type": "Review",
+      "reviewBody": {{ r.text | striptags | tojson }},
+      "author": {"@type": "Person", "name": {{ (r.name or 'Customer') | striptags | tojson }}}
+      {%- if r.rating %},
+      "reviewRating": {"@type": "Rating", "ratingValue": "{{ r.rating }}"}
+      {%- endif %}
+    }{{ "," if not loop.last }}
+    {%- endfor %}
+  ]
+  {%- endif %}
+}
+</script>
+{% endif %}

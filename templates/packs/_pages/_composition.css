@@ -273,6 +273,16 @@ figure.plate-fit img{
 }
 {% endif %}
 
+/* Specifications: a plain two-column list. Each Pack already has a voice for
+     dt/dd, so this inherits rather than inventing a look of its own. */
+  .specs{display:grid;grid-template-columns:auto 1fr;gap:0 22px;margin:0;
+    max-width:660px}
+  .specs dt{font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;
+    opacity:.62;padding:12px 0;border-top:1px solid var(--c-line)}
+  .specs dd{margin:0;padding:12px 0;border-top:1px solid var(--c-line)}
+  @media(max-width:560px){.specs{grid-template-columns:1fr;gap:0}
+    .specs dd{padding-top:0;border-top:0;padding-bottom:14px}}
+
 /* ── Motion ───────────────────────────────────────────────────────────────
    Sections rise a little as they arrive. Staggered by child index so a grid
    of cards resolves in sequence rather than all at once. */

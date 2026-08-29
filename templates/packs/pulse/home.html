@@ -22,10 +22,10 @@
 <div class="perf" aria-hidden="true"></div>
 {% if price or stats or contact.address %}
 <div class="perf__row">
-  {% if price %}<span>Price <b>{{ price }}</b></span>{% endif %}
+  {% if price %}<span>{{ t('care_price') }} <b>{{ price }}</b></span>{% endif %}
   {% if stats and stats[0].number %}
     <span>{{ stats[0].label }} <b>{{ stats[0].number }}</b></span>{% endif %}
-  {% if contact.address %}<span>Made in <b>{{ contact.address }}</b></span>{% endif %}
+  {% if contact.address %}<span>{{ t('care_made_in') }} <b>{{ contact.address }}</b></span>{% endif %}
   {% if home.label %}<span><b>{{ home.label }}</b></span>{% endif %}
 </div>
 {% endif %}
@@ -74,16 +74,33 @@
 {% endif %}
 
 {% include "packs/_pages/_feature.html" %}
-{% include "packs/_pages/_reviews.html" %}
+{% include "packs/_pages/_specs.html" %}
+{% if testimonials %}
+<section {{ sect(8, 'wearers') }}>
+  <div class="wrap">
+    <div class="wearers__head">
+      <span class="wearers__n">{{ testimonials | length }}</span>
+      <span class="wearers__label">{{ t('sec_reviews_label') }}</span>
+    </div>
+    <ol class="wearers__list">
+      {% for r in testimonials[:4] %}
+      <li><span class="wearers__i">{{ '%02d' % loop.index }}</span>
+          <p>{{ r.text }}</p>
+          <cite>{{ r.name }}</cite></li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+{% endif %}
 
 {% if contact %}
 <section {{ sect(3, 'band') }}>
   <div class="wrap">
     <h2>{{ contact.title or 'Get it' }}</h2>
     <div class="contact-grid">
-      {% if contact.phone %}<div><span>Phone</span><b>{{ contact.phone }}</b></div>{% endif %}
-      {% if contact.email %}<div><span>Email</span><b>{{ contact.email }}</b></div>{% endif %}
-      {% if contact.address %}<div><span>Where</span><b>{{ contact.address }}</b></div>{% endif %}
+      {% if contact.phone %}<div><span>{{ t('contact_phone') }}</span><b>{{ contact.phone }}</b></div>{% endif %}
+      {% if contact.email %}<div><span>{{ t('contact_email') }}</span><b>{{ contact.email }}</b></div>{% endif %}
+      {% if contact.address %}<div><span>{{ t('contact_where') }}</span><b>{{ contact.address }}</b></div>{% endif %}
     </div>
   </div>
 </section>

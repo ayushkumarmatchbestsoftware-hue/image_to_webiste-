@@ -31,10 +31,10 @@
           <dd>{{ home.pillar1_desc }}</dd>{% endif %}
         {% if home.pillar2_title %}<dt>{{ home.pillar2_title }}</dt>
           <dd>{{ home.pillar2_desc }}</dd>{% endif %}
-        {% if price %}<dt>Price</dt><dd>{{ price }}</dd>{% endif %}
-        {% if contact.address %}<dt>Made in</dt><dd>{{ contact.address }}</dd>{% endif %}
+        {% if price %}<dt>{{ t('care_price') }}</dt><dd>{{ price }}</dd>{% endif %}
+        {% if contact.address %}<dt>{{ t('care_made_in') }}</dt><dd>{{ contact.address }}</dd>{% endif %}
       </dl>
-      <a class="cta {{ tclass }}" href="{{ _cta_href }}">{{ home.cta or 'Enquire' }}</a>
+      <a class="cta {{ tclass }}" href="{{ _cta_href }}">{{ home.cta or t('cta_enquire') }}</a>
     </div>
     {% if port_img %}
     <figure class="file__plate">
@@ -100,7 +100,7 @@
 <section {{ sect(3, 'band') }}>
   <div class="wrap">
     <p class="eyebrow">The studio</p>
-    <h2>{{ about.heading or 'About' }}</h2>
+    <h2>{{ about.heading or t('sec_about') }}</h2>
     <div class="with-shot">
       <div>
         <p class="lede">{{ about.description }}</p>
@@ -115,7 +115,23 @@
 {% endif %}
 
 {% include "packs/_pages/_feature.html" %}
-{% include "packs/_pages/_reviews.html" %}
+{% include "packs/_pages/_specs.html" %}
+{% if testimonials %}
+<section {{ sect(8, 'refbay') }}>
+  <div class="wrap">
+    <p class="eyebrow {{ tclass }}">{{ t('sec_reviews_label') }}</p>
+    <div class="refs">
+      {% for r in testimonials[:3] %}
+      <figure class="ref">
+        <span class="ref__tab">{{ '%02d' % loop.index }}</span>
+        <blockquote>{{ r.text }}</blockquote>
+        <figcaption>{{ r.name }}{% if r.role %} &middot; {{ r.role }}{% endif %}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {% if contact %}
 <section {{ sect(4) }}>
@@ -124,8 +140,8 @@
     <h2>{{ contact.title or 'Start a conversation' }}</h2>
     <p class="lede">{{ contact.description }}</p>
     <div class="contact-grid">
-      {% if contact.phone %}<div><span>Phone</span><b>{{ contact.phone }}</b></div>{% endif %}
-      {% if contact.email %}<div><span>Email</span><b>{{ contact.email }}</b></div>{% endif %}
+      {% if contact.phone %}<div><span>{{ t('contact_phone') }}</span><b>{{ contact.phone }}</b></div>{% endif %}
+      {% if contact.email %}<div><span>{{ t('contact_email') }}</span><b>{{ contact.email }}</b></div>{% endif %}
       {% if contact.address %}<div><span>Studio</span><b>{{ contact.address }}</b></div>{% endif %}
     </div>
   </div>

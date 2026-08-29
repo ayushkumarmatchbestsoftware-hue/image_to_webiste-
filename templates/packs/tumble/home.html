@@ -19,8 +19,8 @@
       <p class="hero-sub">{{ home.subtitle or tagline }}</p>
       <div class="buy">
         {% if price %}<span class="price">{{ price }}</span>{% endif %}
-        {% if wa %}<a class="cta" href="https://wa.me/{{ wa }}?text={{ site_name }}">{{ home.cta or 'Enquire' }} &rarr;</a>
-        {% elif contact.email %}<a class="cta" href="mailto:{{ contact.email }}">{{ home.cta or 'Enquire' }} &rarr;</a>{% endif %}
+        {% if wa %}<a class="cta" href="https://wa.me/{{ wa }}?text={{ site_name }}">{{ home.cta or t('cta_enquire') }} &rarr;</a>
+        {% elif contact.email %}<a class="cta" href="mailto:{{ contact.email }}">{{ home.cta or t('cta_enquire') }} &rarr;</a>{% endif %}
         {% if 'about' in layout %}<a class="btn btn--ghost" href="about.html">Our story</a>{% endif %}
       </div>
     </div>
@@ -57,7 +57,7 @@
       </div>{% endfor %}
     </div>
     <div class="sheet__say">
-      <p class="eyebrow {{ tclass }}">{{ home.label or 'What we make' }}</p>
+      <p class="eyebrow {{ tclass }}">{{ home.label or t('nav_services') }}</p>
       <h1 class="{{ hclass }}">{{ site_title }}</h1>
       {% if home.subtitle or tagline %}
       <p class="hero-sub">{{ home.subtitle or tagline }}</p>{% endif %}
@@ -85,7 +85,7 @@
     <div class="section-head reveal">
       <div>
         <span class="eyebrow">{{ home.label or 'The collection' }}</span>
-        <h2>{{ home.title or 'What we make' }}</h2>
+        <h2>{{ home.title or t('nav_services') }}</h2>
       </div>
     </div>
     <div class="cards reveal">
@@ -150,7 +150,7 @@
       <li>
         {% if _g and loop.index0 < _g | length %}
         <figure class="work-shot"><img src="{{ _g[loop.index0] }}" alt="{{ p.title }}"></figure>{% endif %}
-        <span class="tag">{{ p.tag or 'Piece' }}</span>
+        <span class="tag">{{ p.tag or t('tag_piece') }}</span>
         <h3>{{ p.title }}</h3>
         <p>{{ p.description }}{% if p.outcome %} &mdash; {{ p.outcome }}{% endif %}</p>
       </li>
@@ -161,6 +161,7 @@
 {% endif %}
 
 {% include "packs/_pages/_feature.html" %}
+{% include "packs/_pages/_specs.html" %}
 {% include "packs/_pages/_reviews.html" %}
 
 {% if contact %}
@@ -168,16 +169,16 @@
   <div class="wrap">
     <div class="shout reveal">
       <div>
-        <h2>{{ contact.title or 'Get in touch' }}</h2>
+        <h2>{{ contact.title or t('nav_contact') }}</h2>
         <p>{{ contact.description }}</p>
       </div>
-      {% if wa %}<a class="cta" href="https://wa.me/{{ wa }}?text={{ site_name }}">{{ home.cta or 'Message us' }}</a>
-      {% elif contact.email %}<a class="cta" href="mailto:{{ contact.email }}">{{ home.cta or 'Email us' }}</a>{% endif %}
+      {% if wa %}<a class="cta" href="https://wa.me/{{ wa }}?text={{ site_name }}">{{ home.cta or t('contact_message') }}</a>
+      {% elif contact.email %}<a class="cta" href="mailto:{{ contact.email }}">{{ home.cta or t('contact_email_us') }}</a>{% endif %}
     </div>
     <div class="contact-grid reveal">
-      {% if contact.phone %}<div><span>Phone</span><b>{{ contact.phone }}</b></div>{% endif %}
-      {% if contact.email %}<div><span>Email</span><b>{{ contact.email }}</b></div>{% endif %}
-      {% if contact.address %}<div><span>Where</span><b>{{ contact.address }}</b></div>{% endif %}
+      {% if contact.phone %}<div><span>{{ t('contact_phone') }}</span><b>{{ contact.phone }}</b></div>{% endif %}
+      {% if contact.email %}<div><span>{{ t('contact_email') }}</span><b>{{ contact.email }}</b></div>{% endif %}
+      {% if contact.address %}<div><span>{{ t('contact_where') }}</span><b>{{ contact.address }}</b></div>{% endif %}
     </div>
   </div>
 </section>

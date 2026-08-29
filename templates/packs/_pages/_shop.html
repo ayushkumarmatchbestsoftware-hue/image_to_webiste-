@@ -21,7 +21,7 @@
 #}
 <div id="shopRoot" hidden>
   <button id="cartFab" class="shop-fab" type="button" aria-haspopup="dialog">
-    <span class="shop-fab__label">Cart</span>
+    <span class="shop-fab__label">{{ t('cart') }}</span>
     <span class="shop-fab__count" id="cartCount">0</span>
   </button>
 
@@ -30,7 +30,7 @@
   <aside class="shop-panel" id="shopPanel" role="dialog" aria-modal="true"
          aria-labelledby="shopTitle" hidden>
     <header class="shop-panel__head">
-      <h2 id="shopTitle">Your order</h2>
+      <h2 id="shopTitle">{{ t('cart_title') }}</h2>
       <button class="shop-x" id="shopClose" type="button" aria-label="Close">&times;</button>
     </header>
 
@@ -38,51 +38,50 @@
       <!-- cart -->
       <section class="shop-step" data-step="cart">
         <ul class="shop-lines" id="shopLines"></ul>
-        <p class="shop-empty" id="shopEmpty">Nothing here yet.</p>
+        <p class="shop-empty" id="shopEmpty">{{ t('cart_empty') }}</p>
         <div class="shop-total" id="shopTotal" hidden>
-          <span>Total</span><b id="shopTotalValue"></b>
+          <span>{{ t('cart_total') }}</span><b id="shopTotalValue"></b>
         </div>
-        <button class="shop-go" id="toCheckout" type="button" disabled>Checkout</button>
+        <button class="shop-go" id="toCheckout" type="button" disabled>{{ t('cart_checkout') }}</button>
       </section>
 
       <!-- details -->
       <section class="shop-step" data-step="details" hidden>
-        <label class="shop-field">Name
+        <label class="shop-field">{{ t('field_name') }}
           <input id="cName" autocomplete="name" required></label>
-        <label class="shop-field">Phone
+        <label class="shop-field">{{ t('contact_phone') }}
           <input id="cPhone" autocomplete="tel" inputmode="tel"></label>
-        <label class="shop-field">Email
+        <label class="shop-field">{{ t('contact_email') }}
           <input id="cEmail" autocomplete="email" inputmode="email"></label>
-        <label class="shop-field">Delivery address
+        <label class="shop-field">{{ t('field_address') }}
           <textarea id="cAddress" rows="3" autocomplete="street-address"></textarea></label>
-        <label class="shop-field">Anything the seller should know
+        <label class="shop-field">{{ t('field_note') }}
           <textarea id="cNote" rows="2"></textarea></label>
 
         <fieldset class="shop-methods" id="shopMethods">
-          <legend>How would you like to pay?</legend>
+          <legend>{{ t('pay_how') }}</legend>
         </fieldset>
 
         <p class="shop-error" id="shopError" hidden></p>
-        <button class="shop-go" id="placeOrder" type="button">Place order</button>
-        <button class="shop-back" id="backToCart" type="button">Back to cart</button>
+        <button class="shop-go" id="placeOrder" type="button">{{ t('pay_place_order') }}</button>
+        <button class="shop-back" id="backToCart" type="button">{{ t('cart_back') }}</button>
       </section>
 
       <!-- done -->
       <section class="shop-step" data-step="done" hidden>
-        <p class="shop-done-id">Order <b id="doneId"></b></p>
+        <p class="shop-done-id">{{ t('cta_order') }} <b id="doneId"></b></p>
         <h3 id="doneHead"></h3>
         <p id="doneBody"></p>
 
         <div id="upiBox" hidden>
-          <a class="shop-go" id="upiPay" href="#">Open UPI app</a>
-          <p class="shop-vpa">or send to <b id="upiVpa"></b>
-            <button class="shop-copy" id="upiCopy" type="button">copy</button></p>
-          <label class="shop-field">Reference / UTR from your payment app
+          <a class="shop-go" id="upiPay" href="#">{{ t('pay_open_upi') }}</a>
+          <p class="shop-vpa">{{ t('pay_or_send_to') }} <b id="upiVpa"></b>
+            <button class="shop-copy" id="upiCopy" type="button">{{ t('pay_copy') }}</button></p>
+          <label class="shop-field">{{ t('pay_reference') }}
             <input id="upiRef" inputmode="latin"></label>
           <p class="shop-error" id="upiError" hidden></p>
-          <button class="shop-go" id="upiConfirm" type="button">I have paid</button>
-          <p class="shop-fine">The seller will confirm once the payment shows in
-            their account.</p>
+          <button class="shop-go" id="upiConfirm" type="button">{{ t('pay_i_have_paid') }}</button>
+          <p class="shop-fine">{{ t('pay_seller_confirms') }}</p>
         </div>
         <p class="shop-fine" id="doneFine" hidden></p>
       </section>
@@ -280,7 +279,7 @@
     $("upiConfirm").onclick = confirmPaid;
     $("upiCopy").onclick = function(){
       navigator.clipboard && navigator.clipboard.writeText($("upiVpa").textContent);
-      this.textContent = "copied";
+      this.textContent = "{{ t('pay_copied') }}";
     };
   }
 
@@ -326,7 +325,7 @@
       })
       .catch(function(){
         $("placeOrder").disabled = false;
-        err.textContent = "could not reach the shop — please try again";
+        err.textContent = "{{ t('pay_unreachable') }}";
         err.hidden = false;
       });
   }
@@ -356,9 +355,9 @@
       .then(function(d){
         if (d.error){ e.textContent = d.error; e.hidden = false; return; }
         $("upiBox").hidden = true;
-        $("doneHead").textContent = "Thank you";
+        $("doneHead").textContent = "{{ t('pay_thanks') }}";
         $("doneBody").textContent =
-          "The seller will confirm your payment and get in touch.";
+          "{{ t('pay_will_contact') }}";
       });
   }
 })();

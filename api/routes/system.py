@@ -40,6 +40,7 @@ async def health():
     from core.llm import api_dead, provider_info
     from core import artdirector as _ad, skills as _skills
     from core import bgremover as _bg
+    from core import i18n as _i18n
     from core.offline import api_available
     _dead, why = api_dead()
     info = provider_info()
@@ -65,6 +66,9 @@ async def health():
         # Imagery follows the text provider unless IMAGE_PROVIDER overrides it,
         # so a key swap is visible here in one place.
         "background_replace": _bg.info(),
+        # Cached languages. Any other code still works — it is
+        # translated once on first use and cached beside these.
+        "languages": _i18n.available(),
         "art_director": {
             "enabled": _ad.ENABLED,
             "can_direct": bool(_ad.ENABLED and _skills.load("art-direction")

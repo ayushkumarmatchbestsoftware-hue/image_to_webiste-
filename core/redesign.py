@@ -18,6 +18,8 @@ light Pack produces mud.
 import json
 import logging
 
+from core import i18n as _i18n
+
 logger = logging.getLogger("redesign")
 
 
@@ -93,12 +95,13 @@ def render(website_id: str, pack_slug: str) -> dict:
         image_map={}, image_count=1 if clean_shots else 0,
         has_images=bool(clean_shots), logo=None,
         favicon_url=None, favicon_apple_url=None, favicon_sized=False,
-        share_card_url=None, story_card_url=None, site_url="", site_lang="en",
+        share_card_url=None, story_card_url=None, site_url="",
         services_img=None, testimonials_img=None, overflow_imgs=[],
         images=[clean_shots.get("hero")] if clean_shots.get("hero") else [],
         shots=clean_shots, is_cutout=bool(shots.get("_is_cutout")),
         shot_cap=int(min(widths) * 1.25) if widths else 0,
         price=price, asset_base=pack["asset_base"], pack=pack,
+        **_i18n.context(doc.get('language') or 'en'),
         comp=comp, sect=make_sect(comp),
     )
     body = dict(

@@ -347,9 +347,9 @@ def describe_scene(spec: dict) -> str:
     if not bits:
         return ""
     try:
-        import asyncio
+        from core.i18n import _run
         from core.llm import chat_json, MODEL_FAST
-        out = asyncio.run(chat_json(
+        out = _run(chat_json(
             system=_SCENE_SYSTEM, text=json.dumps(bits, ensure_ascii=False),
             model=MODEL_FAST, temperature=0.6, max_tokens=200))
         scene = ((out or {}).get("scene") or "").strip()

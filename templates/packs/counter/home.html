@@ -35,7 +35,7 @@
       {% endfor %}
     </ul>
     <div class="buy">
-      <a class="cta {{ tclass }}" href="{{ _cta_href }}">{{ home.cta or 'Order' }}</a>
+      <a class="cta {{ tclass }}" href="{{ _cta_href }}">{{ home.cta or t('cta_order') }}</a>
       {% if contact.address %}<span class="board__where">{{ contact.address }}</span>{% endif %}
     </div>
   </div>
@@ -86,7 +86,21 @@
 {% endif %}
 
 {% include "packs/_pages/_feature.html" %}
-{% include "packs/_pages/_reviews.html" %}
+{% include "packs/_pages/_specs.html" %}
+{% if testimonials %}
+<section {{ sect(8, 'board') }}>
+  <div class="wrap">
+    <h2 class="{{ hclass }}">{{ t('sec_reviews') }}</h2><hr class="rule">
+    <ul class="regulars">
+      {% for r in testimonials[:4] %}
+      <li><span class="regulars__stars">{% for _ in range(r.rating | default(5) | int) %}&#9733;{% endfor %}</span>
+          <span class="regulars__text">{{ r.text }}</span>
+          <span class="regulars__who">{{ r.name }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
 
 {% if contact %}
 <section {{ sect(3, 'band') }}>
@@ -94,9 +108,9 @@
     <h2>Find us</h2><hr class="rule">
     <p class="lede">{{ contact.description }}</p>
     <ul class="notes">
-      {% if contact.address %}<li><b>Where</b> {{ contact.address }}</li>{% endif %}
+      {% if contact.address %}<li><b>{{ t('contact_where') }}</b> {{ contact.address }}</li>{% endif %}
       {% if contact.phone %}<li><b>Call</b> {{ contact.phone }}</li>{% endif %}
-      {% if contact.email %}<li><b>Email</b> {{ contact.email }}</li>{% endif %}
+      {% if contact.email %}<li><b>{{ t('contact_email') }}</b> {{ contact.email }}</li>{% endif %}
     </ul>
   </div>
 </section>

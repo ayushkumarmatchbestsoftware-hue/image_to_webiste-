@@ -2,7 +2,11 @@
 {% set tclass = '' %}
 {% set has_rule = False %}
 {% set split_headline = False %}
-{% set meta_description = (home.subtitle or tagline or site_title) | striptags | truncate(155) %}
+{# The SEO description is written to be a search snippet; the subtitle is
+   written to be read on the page. Prefer the one written for the job. #}
+{% set meta_description = (seo.description if seo and seo.description
+     else (home.subtitle or tagline or site_title)) | striptags | truncate(155) %}
+{% set head_title = seo.title if seo and seo.title else page_title %}
 {% set _sn = site_name | striptags %}
 {% set social_title = site_title if (_sn | lower) in (site_title | lower) else (_sn ~ ' | ' ~ site_title) %}
 {% set A = asset_base %}
@@ -27,18 +31,23 @@
     Layout  Vertically centred, generous, one thing at a time. A soft radial
             pool of light sits behind the product instead of a card.
 #}
-<html lang="{{ site_lang | default('en') }}">
+<html lang="{{ lang | default('en') }}" dir="{{ dir | default('ltr') }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ page_title }}</title>
+<title>{{ head_title }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Jost:wght@300;400;500&display=swap">
+{# A Latin-only face renders Devanagari, Arabic or CJK as empty
+   boxes, so a script that needs its own font gets one loaded here
+   and applied below. Latin languages keep this Pack's own type. #}
+{% if lang_body_font %}<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ lang_display_font | replace(' ', '+') }}:wght@400;600&family={{ lang_body_font | replace(' ', '+') }}:wght@400;500;700&display=swap">{% endif %}
 <meta name="description" content="{{ meta_description }}">
 {% if favicon_url %}<link rel="icon" href="{{ favicon_url }}">{% endif %}
 {% if favicon_apple_url %}<link rel="apple-touch-icon" href="{{ favicon_apple_url }}">{% endif %}
-<meta property="og:type" content="website">
+{% if seo and seo.keywords %}<meta name="keywords" content="{{ seo.keywords | join(', ') }}">{% endif %}
+<meta property="og:type" content="product">
 <meta property="og:site_name" content="{{ site_name }}">
 <meta property="og:title" content="{{ social_title }}">
 <meta property="og:description" content="{{ meta_description }}">
@@ -248,8 +257,45 @@
 
 .hero-vitrine .wrap{display:block;max-width:640px;text-align:center}
 
+  {% if lang_body_font %}
+  /* The Pack's own faces cannot render this script. Only the family is
+     overridden — every size, weight and spacing decision the design made is
+     left exactly as it was. */
+  :root{
+    --display:'{{ lang_display_font }}', Georgia, serif;
+    --body:'{{ lang_body_font }}', system-ui, sans-serif;
+    --cond:'{{ lang_display_font }}', system-ui, sans-serif;
+    --mono:'{{ lang_body_font }}', ui-monospace, monospace;
+    --label:'{{ lang_body_font }}', system-ui, sans-serif;
+  }
+  {% endif %}
+  {% if is_rtl %}
+  /* Right-to-left is not a translation detail; without it the page is simply
+     wrong. Logical properties do most of the work, so only what was written
+     with a physical side needs flipping. */
+  body{direction:rtl}
+  .wrap,.feature__wrap{direction:rtl}
+  section.t-offset > .wrap:has(> h2) > h2{position:sticky}
+  .shop-panel{left:0;right:auto;box-shadow:8px 0 40px rgba(0,0,0,.28)}
+  .shop-fab{left:20px;right:auto}
+  .shop-line__amt,.board__price{text-align:left}
+  .perf__row,.care__strip{direction:rtl}
+  {% endif %}
+
+  /* One buyer, quoted at length. A house selling one expensive object does not
+     advertise that four other people also bought one. */
+  .said{padding:104px 0;border-top:1px solid var(--hair)}
+  .said__wrap{max-width:760px;text-align:center}
+  .said__quote{margin:0 0 26px;font:300 clamp(21px,2.6vw,33px)/1.5 var(--display);
+    letter-spacing:.01em;color:var(--ink);text-wrap:balance}
+  .said__quote::before{content:open-quote;color:var(--gold);margin-right:.1em}
+  .said__quote::after{content:close-quote;color:var(--gold)}
+  .said__who{margin:0;font:400 11px/1 var(--body);letter-spacing:.22em;
+    text-transform:uppercase;color:var(--soft)}
+
   {% include "packs/_pages/_composition.css" %}
 </style>
+{% include "packs/_pages/_structured.html" %}
 </head>
 <body>
 
@@ -259,11 +305,11 @@
       {% if logo %}<img src="{{ logo }}" alt="{{ site_name }}">{% else %}{{ site_name }}{% endif %}
     </a>
     <nav>
-      <a href="home.html" class="{% if _cur == 'home.html' %}on{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>The Piece</a>
-      {% if 'portfolio' in layout %}<a href="portfolio.html" class="{% if _cur == 'portfolio.html' %}on{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>Collection</a>{% endif %}
-      {% if 'services' in layout %}<a href="services.html" class="{% if _cur == 'services.html' %}on{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>Craft</a>{% endif %}
-      {% if 'about' in layout %}<a href="about.html" class="{% if _cur == 'about.html' %}on{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>Maison</a>{% endif %}
-      {% if 'contact' in layout %}<a href="contact.html" class="{% if _cur == 'contact.html' %}on{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>Enquire</a>{% endif %}
+      <a href="home.html" class="{% if _cur == 'home.html' %}on{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>{{ t('nav_home') }}</a>
+      {% if 'portfolio' in layout %}<a href="portfolio.html" class="{% if _cur == 'portfolio.html' %}on{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>{{ t('nav_work') }}</a>{% endif %}
+      {% if 'services' in layout %}<a href="services.html" class="{% if _cur == 'services.html' %}on{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>{{ t('nav_services') }}</a>{% endif %}
+      {% if 'about' in layout %}<a href="about.html" class="{% if _cur == 'about.html' %}on{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>{{ t('sec_about') }}</a>{% endif %}
+      {% if 'contact' in layout %}<a href="contact.html" class="{% if _cur == 'contact.html' %}on{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>{{ t('nav_contact') }}</a>{% endif %}
     </nav>
   </div>
 </header>

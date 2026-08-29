@@ -31,6 +31,7 @@ from core.design import derive_design
 from core.packs import (select_pack, get_pack, pack_layout, score_packs,
                         NoPacksInstalled, packs_installed, PACKS)
 from core.composition import plan_composition, make_sect
+from core import i18n as _i18n
 from core.design import select_hero_variant
 from core.artdirector import (direct as ad_direct, shoot as ad_shoot,
                               critique as ad_critique, apply_repairs,
@@ -71,6 +72,8 @@ Return a JSON object with EXACTLY this shape:
   "testimonials": [{"text": "...", "name": "...", "role": "...", "rating": 4}],
   "faq": [{"question": "...", "answer": "..."}],
   "stats": [{"label": "...", "number": "..."}],
+  "specifications": [{"label": "...", "value": "..."}],
+  "seo": {"title": "...", "description": "...", "keywords": ["...", "..."]},
   "contact": {"title": "...", "description": "...", "email": "...", "phone": "...", "address": "...", "label": "..."},
   "footer": {"copyright": "...", "address": "..."}
 }
@@ -94,7 +97,21 @@ HARD RULES
    a page of nothing but five stars reads as fabricated. Use 4 sometimes, and
    a 3 with a mild, fair reservation is more convincing than another 5.
 6. Every field listed above is rendered UI text. Never leave one blank or generic.
-7. LENGTH. A small seller's page should be read in under a minute, so keep it
+7. SPECIFICATIONS are what a buyer checks before paying: material, finish,
+   dimensions, weight, what is included, care. Take them from the Product Spec
+   and the seller's own words ONLY. Four to six rows. If you know three, give
+   three - an invented measurement is the one lie a buyer can catch by holding
+   the thing, and it is the one that gets refunded.
+
+8. SEO. "title" is what shows in a search result and a browser tab: the product
+   and the brand, under 60 characters, no tagline padding. "description" is the
+   snippet under it, 140-155 characters, written to be read by a person rather
+   than stuffed. "keywords" are 6-10 phrases someone would actually type into a
+   search box to find THIS product - real search language, not adjectives from
+   the copy. Include the plain generic term even when the brand has a fancier
+   name for it.
+
+9. LENGTH. A small seller's page should be read in under a minute, so keep it
    tight and cut anything that is not doing work:
    - site_title       at most 8 words
    - home.subtitle    ONE sentence, at most 20 words
@@ -129,9 +146,24 @@ def _strip_regulated(obj, active: bool):
 
 async def generate_copy(spec: dict, genre: dict, layout: list,
                         brand_name: str = "", price: str = "",
-                        seller_facts: str = "") -> Optional[dict]:
+                        seller_facts: str = "",
+                        language: str = "en") -> Optional[dict]:
     """FR-15: all site copy, written from the Product Spec — never the photo."""
     geo = spec.get("geometry") or {}
+    # The language instruction is stated once, plainly, and repeated at the end
+    # of the prompt. Models drift back to English over a long JSON schema, and
+    # a site whose headline is translated but whose FAQ is not looks broken in
+    # a way a seller cannot fix.
+    from core.i18n import normalise as _norm
+    _lang = _norm(language)
+    _lang_name = ("English" if _lang == "en" else
+                  f"the language with IETF code '{_lang}'")
+    _lang_note = ("" if _lang == "en" else
+                  "Every string you return must be in that language - headline, "
+                  "descriptions, FAQ answers, review text, button labels, all of "
+                  "it. Do not leave any field in English. Write as a native "
+                  "speaker selling this product would, not as a translation of "
+                  "English marketing copy. Keep the brand name exactly as given.")
     prompt = f"""PRODUCT SPEC (derived from the seller's photograph):
 - category:            {spec.get('category')}
 - sub-type:            {spec.get('sub_type')}
@@ -142,6 +174,9 @@ async def generate_copy(spec: dict, genre: dict, layout: list,
 - implied price band:  {spec.get('implied_price_band')}
 - geometry:            {geo.get('orientation')} / {geo.get('shape')}
 - visible text on it:  {spec.get('visible_text') or '(none)'}
+
+WRITE IN: {_lang_name}
+{_lang_note}
 
 SELLER SUPPLIED:
 - brand name:  {brand_name or '(none given — invent one that suits the product)'}
@@ -156,6 +191,10 @@ SECTIONS TO WRITE (generate complete content for every one, in this order):
 {', '.join(layout)}
 
 Write the JSON object now."""
+
+    if _lang != "en":
+        prompt += ("\n\nREMINDER: every value in the JSON you return "
+                   f"must be written in '{_lang}', not English.")
 
     data = await chat_json(
         system=COPY_SYSTEM, text=prompt,
@@ -237,6 +276,7 @@ async def run_photo_generation_job(
     image_url: str, extra_paths: Optional[list] = None,
     brand_name: str = "", price: str = "",
     seller_facts: str = "", density: str = "generous", spin: int = 0,
+    language: str = "en",
     override_triage: bool = False, spec_override: Optional[dict] = None,
     user_category: str = "", user_sub_type: str = "",
 ) -> None:
@@ -424,14 +464,14 @@ async def run_photo_generation_job(
         await report(job_id, "copy")
         if offline:
             data = offline_copy(spec, design["genre"], layout,
-                                brand_name, price, seller_facts)
+                                brand_name, price, seller_facts, language)
             await _make_assets()
         else:
             # The copy call dominates the wall clock; the Share Cards cost
             # under a second of CPU. Running them together hides that entirely.
             data, _ = await asyncio.gather(
                 generate_copy(spec, design["genre"], layout,
-                              brand_name, price, seller_facts),
+                              brand_name, price, seller_facts, language),
                 _make_assets(),
             )
         await report(job_id, "copy_done")
@@ -446,6 +486,10 @@ async def run_photo_generation_job(
                      else data.get("site_info", {}).get("display_name", "My Brand"))
         image_map = build_image_map_logic([image_url] if image_url else [], layout)
 
+        from core.commerce import parse_price as _pp
+        _minor, _currency = _pp(price)
+        _price_amount = f"{_minor // 100}.{_minor % 100:02d}" if _minor else ""
+
         base_ctx = dict(
             site_name=site_name,
             site_title=data.get("site_info", {}).get("site_title", site_name),
@@ -457,7 +501,7 @@ async def run_photo_generation_job(
             logo=None, favicon_url=favicon_url, favicon_apple_url=favicon_apple_url,
             favicon_sized=bool(favicon_url),
             share_card_url=share_card_url, story_card_url=story_card_url,
-            site_url="", site_lang="en",
+            site_url="",
             services_img=image_map.get("services"),
             testimonials_img=image_map.get("testimonials"),
             overflow_imgs=image_map.get("overflow", []),
@@ -480,6 +524,21 @@ async def run_photo_generation_job(
             price=price,
             asset_base=pack["asset_base"],
             pack=pack,
+            # Step 3's own fields. seo_title and meta_description are what a
+            # search result actually shows; the site title is a brand line and
+            # usually the wrong thing to put there.
+            seo=data.get("seo") or {},
+            # Structured data needs a NUMBER and a currency, not "Rs 1,450".
+            # core/commerce.py already parses seller price text properly, so
+            # the schema markup and the checkout cannot disagree about cost.
+            price_amount=_price_amount, currency_code=_currency,
+            specifications=[sp for sp in (data.get("specifications") or [])
+                            if isinstance(sp, dict) and sp.get("label")],
+            # Language reaches the templates as `t`, `dir` and a script-aware
+            # font pair. Without the last two a Hindi site renders as boxes and
+            # an Arabic one runs the wrong way — neither is a translation
+            # problem, both are a broken page.
+            **_i18n.context(language),
         )
 
         stats = [{"label": s.get("label", ""), "number": s.get("number", "")}
@@ -655,6 +714,7 @@ async def run_photo_generation_job(
                     "spin": spin,
                     "density": density,
                     "pack": pack_slug,
+                    "language": language,
                 }, ensure_ascii=False).encode("utf-8"),
                 "application/json", f"websites/{website_id}", "content.json")
         except Exception as e:

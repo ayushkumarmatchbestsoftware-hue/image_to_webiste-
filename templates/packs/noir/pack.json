@@ -10,7 +10,6 @@
   "heading_font": "'Cormorant Garamond', Georgia, serif",
   "use_case": "jewellery, watches, perfume, anything sold on desire",
   "categories": {
-    "other": 2.4,
     "apparel": 2.0,
     "food": 0.6,
     "toys": 0.3

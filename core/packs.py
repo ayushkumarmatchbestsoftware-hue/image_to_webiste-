@@ -23,6 +23,10 @@ import os
 import re
 from typing import Optional
 
+# The Spec's value for "no category I recognise". It is deliberately NOT a key
+# a Pack can claim a weight for - see score_packs.
+UNCATEGORISED = "other"
+
 logger = logging.getLogger("packs")
 
 # ---------------------------------------------------------------------------
@@ -43,7 +47,7 @@ logger = logging.getLogger("packs")
 #       "ink":       "#rrggbb",     default text colour
 #       "paper":     "#rrggbb",     default ground
 #       "heading_font": "CSS font stack",
-#       "categories": {"toys": 3.0, "food": 0.5, "apparel": 1.0, "other": 1.2},
+#       "categories": {"toys": 3.0, "food": 0.5, "apparel": 1.0},
 #       "keywords":   {"word": weight, ...},   whole-word matches that pull toward it
 #       "against":    {"word": weight, ...},   words that push away from it
 #       "sections":   ["hero", "about", "services", "portfolio", "contact"],
@@ -70,7 +74,7 @@ BUILTIN_PACKS = {
         "paper": "#0e0d0c",
         "heading_font": "'Cormorant Garamond', Georgia, serif",
         "use_case": "jewellery, watches, perfume, anything sold on desire",
-        "categories": {"other": 2.4, "apparel": 2.0, "food": 0.6, "toys": 0.3},
+        "categories": {"apparel": 2.0, "food": 0.6, "toys": 0.3},
         "keywords": {
             "jewellery": 3.0, "jewelry": 3.0, "ring": 2.5, "necklace": 3.0,
             "earring": 3.0, "bracelet": 2.5, "gold": 2.5, "silver": 2.5,
@@ -93,7 +97,7 @@ BUILTIN_PACKS = {
         "paper": "#0d0f12",
         "heading_font": "'Archivo Black', 'Arial Black', sans-serif",
         "use_case": "streetwear, sneakers, gadgets, gear, anything with a drop",
-        "categories": {"apparel": 2.4, "other": 2.2, "toys": 1.2, "food": 0.5},
+        "categories": {"apparel": 2.4, "toys": 1.2, "food": 0.5},
         "keywords": {
             "sneaker": 3.0, "streetwear": 3.0, "hoodie": 3.0, "tshirt": 2.5,
             "tee": 2.5, "cap": 2.5, "jersey": 2.5, "merch": 3.0,
@@ -116,7 +120,7 @@ BUILTIN_PACKS = {
         "heading_font": "'Oswald', 'Arial Narrow', sans-serif",
         "mode": "light",
         "use_case": "food sold over a counter — stalls, cafes, tiffin, sweets",
-        "categories": {"food": 3.0, "other": 1.4, "apparel": 0.6, "toys": 0.6},
+        "categories": {"food": 3.0, "apparel": 0.6, "toys": 0.6},
         "keywords": {
             "biryani": 3.0, "curry": 2.5, "thali": 3.0, "snack": 2.5,
             "chaat": 3.0, "samosa": 3.0, "roll": 2.0, "kebab": 2.5,
@@ -140,7 +144,7 @@ BUILTIN_PACKS = {
         "paper": "#efe9da",
         "heading_font": "'Fraunces', Georgia, serif",
         "use_case": "studios and makers who sell a craft as much as a product",
-        "categories": {"other": 2.2, "toys": 1.6, "apparel": 1.6, "food": 0.9},
+        "categories": {"toys": 1.6, "apparel": 1.6, "food": 0.9},
         "keywords": {
             "studio": 3.0, "atelier": 3.0, "workshop": 2.5, "maker": 3.0,
             "craft": 2.5, "handmade": 2.0, "artisan": 2.5, "bespoke": 3.0,
@@ -165,7 +169,7 @@ BUILTIN_PACKS = {
         "heading_font": "'Baloo 2', 'Segoe UI', sans-serif",
         "use_case": "family shops selling a small range - toys, kids goods, "
                     "games, party and craft supplies",
-        "categories": {"toys": 2.8, "other": 1.7, "food": 1.2, "apparel": 1.2},
+        "categories": {"toys": 2.8, "food": 1.2, "apparel": 1.2},
         "keywords": {
             "toy": 3.0, "game": 2.5, "puzzle": 3.0, "block": 2.5,
             "plush": 2.5, "doll": 2.5, "rattle": 2.5, "stacker": 3.0,
@@ -189,7 +193,7 @@ BUILTIN_PACKS = {
         "heading_font": "'Fraunces', Georgia, serif",
         "mode": "light",
         "use_case": "soft goods and gifting — toys, knits, candles, babywear",
-        "categories": {"toys": 2.6, "other": 1.9, "apparel": 1.6, "food": 1.2},
+        "categories": {"toys": 2.6, "apparel": 1.6, "food": 1.2},
         "keywords": {
             "toy": 2.5, "doll": 3.0, "plush": 3.0, "soft": 2.5,
             "baby": 3.0, "child": 2.5, "children": 2.5, "kids": 2.5,
@@ -256,6 +260,16 @@ def _read_manifest(slug: str, folder: str):
             logger.warning(f"pack '{slug}': '{table}' must map names to numbers; "
                            "using the built-in definition")
             return None
+    # A Pack cannot claim the uncategorised case for itself. Left in, it would
+    # be silently ignored by the scorer, so say so rather than let an author
+    # tune a number that does nothing.
+    if UNCATEGORISED in (body.get("categories") or {}):
+        logger.warning(f"pack '{slug}': '{UNCATEGORISED}' is not a category and "
+                       "is ignored - products with no category are decided by "
+                       "'keywords' and by the photo")
+        body["categories"] = {k: v for k, v in body["categories"].items()
+                              if k != UNCATEGORISED}
+
     if not isinstance(body.get("sections"), list) or not body["sections"]:
         logger.warning(f"pack '{slug}': 'sections' must be a non-empty list; "
                        "using the built-in definition")
@@ -386,17 +400,22 @@ def _tiebreak(spec: dict) -> dict:
     n["noir"] += (0.40 - sat) * 1.4 + (0.45 - light) * 2.0
     n["pulse"] += (sat - 0.42) * 1.8 + (0.48 - light) * 1.6
     n["binder"] += (0.44 - sat) * 1.8 + (light - 0.50) * 0.8
-    # A premium or luxury band suits the quieter, editorial Pack.
+    # A premium or luxury band suits the quieter, editorial Pack; a budget one
+    # suits the loud and the friendly. These were authored at roughly three
+    # times the weight of the colour terms above, which made the band the whole
+    # decision rather than one signal in it: every muted premium product - a
+    # candle, a notebook, a bottle - went to noir on the +1.4 alone. Scaled
+    # into the same range as colour so the three signals actually compete.
+    BAND_WEIGHT = 0.45
+    band_shift = {}
     if band in ("premium", "luxury"):
-        n["noir"] += 1.4
-        n["binder"] += 0.5
-        n["counter"] -= 0.8
+        band_shift = {"noir": 1.4, "binder": 0.5, "counter": -0.8}
     elif band == "budget":
-        n["counter"] += 0.9
-        n["bloom"] += 0.3
-        n["tumble"] += 0.6
-        n["noir"] -= 0.9
-        n["pulse"] += 0.4
+        band_shift = {"counter": 0.9, "bloom": 0.3, "tumble": 0.6,
+                      "noir": -0.9, "pulse": 0.4}
+    for slug, shift in band_shift.items():
+        if slug in n:
+            n[slug] += shift * BAND_WEIGHT
     # Wide objects sit well in the full-bleed athletic hero.
     if orient == "wide":
         n["counter"] += 0.3
@@ -412,19 +431,39 @@ def score_packs(spec: dict, explain: bool = False):
     Exposed (and logged per job) so the reason a Pack won is inspectable rather
     than magic. With explain=True, returns the per-Pack breakdown instead.
     """
-    category = (spec.get("category") or "other").lower()
+    category = (spec.get("category") or UNCATEGORISED).lower()
     text = _haystack(spec)
     nudge = _tiebreak(spec)
 
+    hits = {slug: _hits(text, pack["keywords"]) for slug, pack in PACKS.items()}
+    miss = {slug: _hits(text, pack["against"]) for slug, pack in PACKS.items()}
+
+    # The tiebreak reads the photo to separate products nothing else
+    # recognised. Applied at full strength it also overturns the signals that
+    # DID fire: a cotton kurta carries category=apparel, which pulse wins 2.4
+    # to noir's 2.0, and a 0.36 colour nudge handed it to noir anyway. So it is
+    # damped whenever the Spec actually said something, and left at full
+    # strength only for the case it was written for.
+    recognised = category != UNCATEGORISED or any(hits.values())
+    damp = 0.3 if recognised else 1.0
+
     scores, detail = {}, {}
     for slug, pack in PACKS.items():
-        base = pack["categories"].get(category, 0.5)
-        pos = _hits(text, pack["keywords"])
-        neg = _hits(text, pack["against"])
-        total = base + sum(w for _k, w in pos) - sum(w for _k, w in neg) + nudge[slug]
+        # "other" is not a category, it is the absence of one. Giving every
+        # Pack a weight for it turned the fallback into the decision: noir
+        # carried the highest "other" weight and so won products no keyword had
+        # recognised - a linen cushion, letterpress cards, a scented candle -
+        # by a fixed margin the photo-derived tiebreak could not close. With no
+        # category, no Pack gets a category bonus, and the keywords and the
+        # photo decide. That is what they are for.
+        base = (0.0 if category == UNCATEGORISED
+                else pack["categories"].get(category, 0.5))
+        pos, neg = hits[slug], miss[slug]
+        tie = round(nudge[slug] * damp, 2)
+        total = base + sum(w for _k, w in pos) - sum(w for _k, w in neg) + tie
         scores[slug] = round(total, 2)
         detail[slug] = {"category": base, "matched": pos, "against": neg,
-                        "tiebreak": nudge[slug], "total": round(total, 2)}
+                        "tiebreak": tie, "total": round(total, 2)}
     return detail if explain else scores
 
 

@@ -18,7 +18,7 @@
 
     {% elif f.kind == 'price' %}
       <p class="feature__big">{{ f.big }}</p>
-      <a class="feature__label" href="{% if contact %}contact.html{% else %}#{% endif %}">{{ f.label or 'Enquire' }}</a>
+      <a class="feature__label" href="{% if contact %}contact.html{% else %}#{% endif %}">{{ f.label or t('cta_enquire') }}</a>
 
     {% else %}{# stat and headline share the shape: big thing, small label #}
       <p class="feature__big">{{ f.big }}</p>

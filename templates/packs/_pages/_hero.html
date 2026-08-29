@@ -71,8 +71,8 @@
 {% set _buy %}
 <div class="buy">
   {% if price %}<span class="price {{ tclass }}">{{ price }}</span>{% endif %}
-  {% if wa %}<a class="cta {{ tclass }}" href="https://wa.me/{{ wa }}?text={{ site_name }}">{{ home.cta or 'Enquire' }}</a>
-  {% elif contact.email %}<a class="cta {{ tclass }}" href="mailto:{{ contact.email }}">{{ home.cta or 'Enquire' }}</a>{% endif %}
+  {% if wa %}<a class="cta {{ tclass }}" href="https://wa.me/{{ wa }}?text={{ site_name }}">{{ home.cta or t('cta_enquire') }}</a>
+  {% elif contact.email %}<a class="cta {{ tclass }}" href="mailto:{{ contact.email }}">{{ home.cta or t('cta_enquire') }}</a>{% endif %}
 </div>
 {% endset %}
 

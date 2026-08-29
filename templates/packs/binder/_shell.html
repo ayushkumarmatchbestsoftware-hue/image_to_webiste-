@@ -2,7 +2,11 @@
 {% set tclass = '' %}
 {% set has_rule = False %}
 {% set split_headline = False %}
-{% set meta_description = (home.subtitle or tagline or site_title) | striptags | truncate(155) %}
+{# The SEO description is written to be a search snippet; the subtitle is
+   written to be read on the page. Prefer the one written for the job. #}
+{% set meta_description = (seo.description if seo and seo.description
+     else (home.subtitle or tagline or site_title)) | striptags | truncate(155) %}
+{% set head_title = seo.title if seo and seo.title else page_title %}
 {% set _sn = site_name | striptags %}
 {% set social_title = site_title if (_sn | lower) in (site_title | lower) else (_sn ~ ' | ' ~ site_title) %}
 {% set A = asset_base %}
@@ -30,18 +34,23 @@
     - our content schema and the shared sub-page classes are supported, so
       About / Work / Services / Contact inherit this design for free
 #}
-<html lang="{{ site_lang | default('en') }}">
+<html lang="{{ lang | default('en') }}" dir="{{ dir | default('ltr') }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ page_title }}</title>
+<title>{{ head_title }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+{# A Latin-only face renders Devanagari, Arabic or CJK as empty
+   boxes, so a script that needs its own font gets one loaded here
+   and applied below. Latin languages keep this Pack's own type. #}
+{% if lang_body_font %}<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ lang_display_font | replace(' ', '+') }}:wght@400;600&family={{ lang_body_font | replace(' ', '+') }}:wght@400;500;700&display=swap">{% endif %}
 <meta name="description" content="{{ meta_description }}">
 {% if favicon_url %}<link rel="icon" href="{{ favicon_url }}">{% endif %}
 {% if favicon_apple_url %}<link rel="apple-touch-icon" href="{{ favicon_apple_url }}">{% endif %}
-<meta property="og:type" content="website">
+{% if seo and seo.keywords %}<meta name="keywords" content="{{ seo.keywords | join(', ') }}">{% endif %}
+<meta property="og:type" content="product">
 <meta property="og:site_name" content="{{ site_name }}">
 <meta property="og:title" content="{{ social_title }}">
 <meta property="og:description" content="{{ meta_description }}">
@@ -278,19 +287,60 @@
     gap:clamp(28px,5vw,68px);align-items:start}
   .file__plate img{max-height:clamp(300px,42vh,440px);object-fit:contain}
 
+  {% if lang_body_font %}
+  /* The Pack's own faces cannot render this script. Only the family is
+     overridden — every size, weight and spacing decision the design made is
+     left exactly as it was. */
+  :root{
+    --display:'{{ lang_display_font }}', Georgia, serif;
+    --body:'{{ lang_body_font }}', system-ui, sans-serif;
+    --cond:'{{ lang_display_font }}', system-ui, sans-serif;
+    --mono:'{{ lang_body_font }}', ui-monospace, monospace;
+    --label:'{{ lang_body_font }}', system-ui, sans-serif;
+  }
+  {% endif %}
+  {% if is_rtl %}
+  /* Right-to-left is not a translation detail; without it the page is simply
+     wrong. Logical properties do most of the work, so only what was written
+     with a physical side needs flipping. */
+  body{direction:rtl}
+  .wrap,.feature__wrap{direction:rtl}
+  section.t-offset > .wrap:has(> h2) > h2{position:sticky}
+  .shop-panel{left:0;right:auto;box-shadow:8px 0 40px rgba(0,0,0,.28)}
+  .shop-fab{left:20px;right:auto}
+  .shop-line__amt,.board__price{text-align:left}
+  .perf__row,.care__strip{direction:rtl}
+  {% endif %}
+
+  /* References, filed. Each on its own sheet with a tab, the way a studio
+     keeps them - which is the whole metaphor this design runs on. */
+  .refs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
+  .ref{margin:0;position:relative;background:var(--paper-hi);
+    border:1px solid var(--line);padding:26px 22px 20px}
+  .ref__tab{position:absolute;top:-1px;left:20px;background:var(--ink);
+    color:var(--paper);font:700 10px/1 var(--mono);letter-spacing:.14em;
+    padding:5px 9px}
+  .ref blockquote{margin:0 0 14px;font-size:15px;line-height:1.6}
+  .ref figcaption{font:700 10px/1 var(--mono);letter-spacing:.14em;
+    text-transform:uppercase;color:var(--brass);border-top:1px solid var(--line);
+    padding-top:12px}
+
+  .refbay{padding:60px 0}
+
   {% include "packs/_pages/_composition.css" %}
 </style>
+{% include "packs/_pages/_structured.html" %}
 </head>
 <body>
 
 <nav class="tabstrip" aria-label="Sections">
   <a href="home.html" class="tabstrip__mark">{{ site_name }}</a>
   <div class="tabstrip__list">
-    <a href="home.html" class="tabstrip__tab{% if _cur == 'home.html' %} is-active{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>Index</a>
-    {% if 'services' in layout %}<a href="services.html" class="tabstrip__tab{% if _cur == 'services.html' %} is-active{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>Work we do</a>{% endif %}
-    {% if 'portfolio' in layout %}<a href="portfolio.html" class="tabstrip__tab{% if _cur == 'portfolio.html' %} is-active{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>Selected</a>{% endif %}
-    {% if 'about' in layout %}<a href="about.html" class="tabstrip__tab{% if _cur == 'about.html' %} is-active{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>Studio</a>{% endif %}
-    {% if 'contact' in layout %}<a href="contact.html" class="tabstrip__tab{% if _cur == 'contact.html' %} is-active{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>Contact</a>{% endif %}
+    <a href="home.html" class="tabstrip__tab{% if _cur == 'home.html' %} is-active{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>{{ t('nav_home') }}</a>
+    {% if 'services' in layout %}<a href="services.html" class="tabstrip__tab{% if _cur == 'services.html' %} is-active{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>{{ t('nav_services') }}</a>{% endif %}
+    {% if 'portfolio' in layout %}<a href="portfolio.html" class="tabstrip__tab{% if _cur == 'portfolio.html' %} is-active{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>{{ t('nav_work') }}</a>{% endif %}
+    {% if 'about' in layout %}<a href="about.html" class="tabstrip__tab{% if _cur == 'about.html' %} is-active{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>{{ t('sec_about') }}</a>{% endif %}
+    {% if 'contact' in layout %}<a href="contact.html" class="tabstrip__tab{% if _cur == 'contact.html' %} is-active{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>{{ t('nav_contact') }}</a>{% endif %}
   </div>
   <span class="tabstrip__foot">{{ footer.copyright or site_name }}</span>
 </nav>
