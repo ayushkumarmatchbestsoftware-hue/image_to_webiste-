@@ -1,0 +1,29 @@
+{#
+  THE FEATURE — one oversized moment per page.
+
+  What gets this treatment is decided in core/composition.py from the content
+  that actually exists: a real figure beats a bland quote, a short quote beats
+  a long one, and if nothing scores the block is simply not emitted. That is
+  deliberate — an arbitrary sentence blown up to 13rem looks worse than no
+  feature at all.
+#}
+{% if comp and comp.feature and comp.feature.big %}
+{% set f = comp.feature %}
+<section class="feature feature--{{ f.kind }} reveal">
+  <div class="feature__wrap">
+    {% if f.kind == 'quote' %}
+      <span class="feature__mark" aria-hidden="true">&ldquo;</span>
+      <blockquote class="feature__big">{{ f.big }}</blockquote>
+      {% if f.label %}<cite class="feature__label">{{ f.label }}</cite>{% endif %}
+
+    {% elif f.kind == 'price' %}
+      <p class="feature__big">{{ f.big }}</p>
+      <a class="feature__label" href="{% if contact %}contact.html{% else %}#{% endif %}">{{ f.label or 'Enquire' }}</a>
+
+    {% else %}{# stat and headline share the shape: big thing, small label #}
+      <p class="feature__big">{{ f.big }}</p>
+      {% if f.label %}<span class="feature__label">{{ f.label }}</span>{% endif %}
+    {% endif %}
+  </div>
+</section>
+{% endif %}

@@ -1,0 +1,272 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   COMPOSITION — the layer that stops a page reading as "a template with the
+   photos dropped in".
+
+   Before this, every section was a <section> or a <section class="band">: the
+   same width, the same padding, the same left-aligned heading, all the way
+   down. Change the words and the colours and you still recognise the skeleton,
+   which is exactly what the seller could see.
+
+   Three things are added, all driven by core/composition.py:
+
+     rhythm    sections alternate between contained / bleed / offset / inset,
+               so the eye gets a beat instead of a uniform stack
+     invert    one section flips to an ink ground, which gives the page a
+               centre of gravity
+     feature   ONE element per page is set enormous — a real figure, a short
+               quote, the price. A page where everything shouts is a page
+               where nothing does, so there is never more than one.
+
+   Written entirely against bridge tokens (--c-*) which each Pack maps from its
+   own palette, so all six get this without duplicating a line.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* ── Bridge tokens ────────────────────────────────────────────────────────
+   The six Packs name their palettes differently (--gold, --hot, --brass,
+   --marigold, --petal...). Rather than write this stylesheet six times, each
+   Pack's colours are re-published here under one neutral set, straight from
+   the Grade.
+
+   The invert/feature pair is mode-aware, and that matters: on a LIGHT Pack the
+   dramatic move is an ink panel, but running the same tokens on a DARK Pack
+   would put dark text on a dark ground. So dark Packs flip it — a light panel
+   on a dark page — which is the same gesture the other way up. */
+:root{
+{% if pack and pack.mode == 'dark' %}
+  --c-deep:{{ theme.text_main }};
+  --c-on-deep:{{ theme.bg }};
+  --c-accent:{{ theme.primary_dark }};
+{% else %}
+  --c-deep:{{ theme.primary_dark }};
+  --c-on-deep:{{ theme.bg }};
+  --c-accent:{{ theme.accent }};
+{% endif %}
+  --c-ground:{{ theme.bg }};
+  --c-tint:{{ theme.bg_alt }};
+  --c-ink:{{ theme.text_main }};
+  --c-soft:{{ theme.text_muted }};
+  --c-line:color-mix(in srgb, {{ theme.text_main }} 15%, transparent);
+  --c-display:var(--display, var(--cond, inherit));
+}
+
+/* ── Rhythm ───────────────────────────────────────────────────────────────
+   Specificity note: the Packs set a bare `section{padding:…}`. These are
+   written as `section.t-*` (0,1,1) so they win over that (0,0,1) without
+   needing !important anywhere. */
+
+section.t-bleed{
+  position:relative;
+  background:var(--c-tint);
+  padding-block:clamp(58px,7vw,104px);
+}
+
+/* Offset — the heading sits in a narrow left rail and the content runs wide
+   beside it. This is the single biggest departure from the stacked look. */
+section.t-offset > .wrap:has(> h2){
+  display:grid;
+  grid-template-columns:minmax(140px,1fr) minmax(0,2.6fr);
+  gap:clamp(24px,4vw,64px);
+  align-items:start;
+}
+section.t-offset > .wrap:has(> h2) > h2{
+  grid-column:1;margin:0;
+  position:sticky;top:84px;
+  font-size:clamp(1.1rem,1.6vw,1.5rem);
+  line-height:1.15;
+  text-wrap:balance;
+}
+/* Everything after the heading occupies the wide column. */
+section.t-offset > .wrap:has(> h2) > *:not(h2){grid-column:2}
+section.t-offset > .wrap > .rule{display:none}
+
+/* Inset — the content lifts off the ground on its own panel. */
+section.t-inset > .wrap{
+  background:var(--c-tint);
+  border:1px solid var(--c-line);
+  border-radius:var(--c-radius,3px);
+  padding:clamp(30px,4.4vw,60px);
+  max-width:min(1040px,calc(100% - 48px));
+}
+
+/* Invert — one section on an ink ground.
+
+   The naive version of this rule recoloured every descendant and produced
+   white text on white: the Packs build list items and cards that carry their
+   OWN light background, so those kept their fill and got the inverted text
+   colour on top of it. Measured on a live render:
+
+     <B> color=rgb(247,247,245) on bg=rgb(247,247,245)   "Paper Selection"
+
+   So two things happen here, and both need enough specificity to beat a Pack's
+   own per-element rules — hence the :not() chains rather than !important.
+
+     1. every descendant background is cleared, so a card sits ON the ink
+        ground as an outline instead of as a light slab
+     2. every descendant colour is set from the inverted token
+
+   Buttons, tags and images are exempt: they are meant to keep their fill. */
+
+section.invert{
+  background:var(--c-deep);
+  color:var(--c-on-deep);
+}
+section.invert *:not(img):not(svg):not(picture):not(.tag):not(.cta):not(.btn):not(button){
+  background-color:transparent;
+  border-color:color-mix(in srgb,var(--c-on-deep) 26%,transparent);
+}
+/* Hierarchy inside the inverted section comes from size and weight, not tint.
+   A single colour is what keeps it legible whatever the Pack does. */
+section.invert,
+section.invert *:not(.tag):not(.cta):not(.btn):not(button):not(img):not(svg){
+  color:var(--c-on-deep);
+}
+section.invert .rule{background:var(--c-accent);opacity:1}
+section.invert .tag{background:var(--c-accent);color:var(--c-deep)}
+
+/* ── The feature ──────────────────────────────────────────────────────────
+   One moment per page, set at display size. */
+
+.feature{
+  padding-block:clamp(70px,9vw,140px);
+  background:var(--c-deep);
+  color:var(--c-on-deep);
+  position:relative;
+  overflow:hidden;
+}
+.feature__wrap{
+  max-width:1100px;margin:0 auto;
+  padding-inline:clamp(24px,5vw,46px);
+  position:relative;z-index:1;
+}
+
+/* A stat: the number is the design. */
+.feature--stat .feature__big{
+  font-family:var(--c-display);
+  font-size:clamp(4.5rem,17vw,13rem);
+  line-height:.82;
+  letter-spacing:-.045em;
+  margin:0;
+  color:var(--c-accent);
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.feature--stat .feature__label{
+  display:block;margin-top:clamp(14px,2vw,26px);
+  font-size:clamp(.95rem,1.5vw,1.35rem);
+  letter-spacing:.14em;text-transform:uppercase;
+  color:color-mix(in srgb,var(--c-on-deep) 80%,transparent);
+  max-width:32ch;
+}
+
+/* A quote: set large, with the mark hung outside the measure. */
+.feature--quote .feature__big{
+  font-family:var(--c-display);
+  font-size:clamp(1.6rem,4.2vw,3.4rem);
+  line-height:1.16;
+  letter-spacing:-.02em;
+  margin:0;max-width:20ch;
+  text-wrap:balance;
+  color:var(--c-on-deep);
+}
+.feature--quote .feature__mark{
+  position:absolute;top:-.34em;left:-.44em;
+  font-family:var(--c-display);
+  font-size:clamp(7rem,20vw,17rem);line-height:1;
+  color:var(--c-accent);opacity:.22;
+  pointer-events:none;user-select:none;
+}
+.feature--quote .feature__label{
+  display:block;margin-top:clamp(20px,2.4vw,32px);
+  font-size:.92rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--c-accent);
+}
+
+/* A price: the figure a buyer is scanning for. */
+.feature--price .feature__big{
+  font-family:var(--c-display);
+  font-size:clamp(3.4rem,12vw,9rem);
+  line-height:.9;margin:0;letter-spacing:-.03em;
+  color:var(--c-accent);font-variant-numeric:tabular-nums;
+}
+.feature--price .feature__label{
+  display:inline-block;margin-top:clamp(20px,2.6vw,34px);
+  padding:14px 30px;border:1.5px solid var(--c-accent);
+  color:var(--c-accent);text-decoration:none;
+  font-size:.9rem;letter-spacing:.14em;text-transform:uppercase;
+  border-radius:var(--c-radius,2px);
+  transition:background .18s ease,color .18s ease;
+}
+.feature--price .feature__label:hover{
+  background:var(--c-accent);color:var(--c-deep);
+}
+
+/* A headline: the name at poster size. */
+.feature--headline .feature__big{
+  font-family:var(--c-display);
+  font-size:clamp(2.6rem,10vw,8rem);
+  line-height:.92;margin:0;letter-spacing:-.035em;
+  text-wrap:balance;color:var(--c-on-deep);
+}
+.feature--headline .feature__label{
+  display:block;margin-top:clamp(16px,2vw,28px);
+  font-size:.9rem;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--c-accent);
+}
+
+/* A single soft wash keyed to the accent, so the block is not a flat slab. */
+.feature::after{
+  content:"";position:absolute;z-index:0;
+  width:min(62vw,760px);aspect-ratio:1;
+  right:-14%;top:-32%;border-radius:50%;
+  background:radial-gradient(circle,
+    color-mix(in srgb,var(--c-accent) 26%,transparent),transparent 68%);
+  pointer-events:none;
+}
+
+/* ── Band heroes holding a composed plate ─────────────────────────────────
+   .hero-under and .hero-plate are full-width frames with a capped height, so
+   their shape follows the viewport: about 3.0 on a desktop, under 1.0 on a
+   phone. No single composed aspect can match that, and object-fit:cover then
+   throws the difference away — measured 43% of a 1.70 plate lost inside a 3.01
+   frame, taking the product's edges with it.
+
+   When the frame holds a cut-out plate the answer is to letterbox rather than
+   crop: the plate's own ground is the Grade's bg_alt, which is exactly what
+   --c-tint holds, so the fill and the plate meet with no visible seam and the
+   band reads as one continuous surface with the product centred in it.
+
+   A real (uncropped) photo keeps cover — letterboxing a photograph against a
+   flat colour looks worse than trimming it. */
+figure.plate-fit img{
+  object-fit:contain;
+  background:var(--c-tint);
+}
+
+/* ── Motion ───────────────────────────────────────────────────────────────
+   Sections rise a little as they arrive. Staggered by child index so a grid
+   of cards resolves in sequence rather than all at once. */
+
+@media (prefers-reduced-motion:no-preference){
+  html.js-reveal .reveal{opacity:0;transform:translateY(18px);
+          transition:opacity .62s cubic-bezier(.22,.61,.36,1),
+                     transform .62s cubic-bezier(.22,.61,.36,1)}
+  html.js-reveal .reveal.is-in{opacity:1;transform:none}
+  .reveal.is-in .card,
+  .reveal.is-in .pillar,
+  .reveal.is-in .work li,
+  .reveal.is-in .tile{animation:comp-rise .5s cubic-bezier(.22,.61,.36,1) both}
+  .reveal.is-in :is(.card,.pillar,.work li,.tile):nth-child(2){animation-delay:.07s}
+  .reveal.is-in :is(.card,.pillar,.work li,.tile):nth-child(3){animation-delay:.14s}
+  .reveal.is-in :is(.card,.pillar,.work li,.tile):nth-child(4){animation-delay:.21s}
+  @keyframes comp-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+}
+
+@media (max-width:820px){
+  /* The offset rail collapses — a sticky heading in a narrow column is
+     unusable on a phone. */
+  section.t-offset > .wrap:has(> h2){grid-template-columns:1fr;gap:18px}
+  section.t-offset > .wrap:has(> h2) > h2{position:static;grid-column:1}
+  section.t-offset > .wrap:has(> h2) > *:not(h2){grid-column:1}
+  .feature--quote .feature__mark{display:none}
+  section.t-inset > .wrap{max-width:100%;padding:26px 22px}
+}

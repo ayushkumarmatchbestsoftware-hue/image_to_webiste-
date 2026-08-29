@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Designs</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#161920; --line:#252a33; --ink:#e9ebf0; --soft:#98a1b0;
+    --accent:#6f9bff;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--font)}
+  header{padding:26px 30px;border-bottom:1px solid var(--line)}
+  h1{margin:0 0 4px;font-size:1.25rem;letter-spacing:-.015em}
+  header p{margin:0;color:var(--soft);font-size:.9rem;max-width:70ch}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;padding:16px 30px;
+       border-bottom:1px solid var(--line);align-items:center}
+  .bar button{background:none;border:1px solid var(--line);color:var(--soft);
+       border-radius:100px;padding:7px 15px;font:600 .82rem var(--font);cursor:pointer}
+  .bar button.on{background:var(--ink);color:#0e1014;border-color:var(--ink)}
+  .bar span{color:var(--soft);font-size:.8rem;margin-left:auto}
+  main{display:grid;gap:22px;padding:22px 30px 60px;
+       grid-template-columns:repeat(auto-fit,minmax(430px,1fr))}
+  main.one{grid-template-columns:1fr}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+        overflow:hidden;display:flex;flex-direction:column}
+  .card__head{display:flex;align-items:baseline;gap:10px;padding:14px 16px;
+        border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .card__head b{font-size:.98rem}
+  .card__head .use{color:var(--soft);font-size:.8rem}
+  .card__head .mode{margin-left:auto;color:var(--soft);font-size:.7rem;
+        text-transform:uppercase;letter-spacing:.09em;border:1px solid var(--line);
+        border-radius:100px;padding:2px 9px}
+  .card__char{padding:10px 16px 0;color:var(--soft);font-size:.84rem}
+  .frame{position:relative;margin:14px 16px 16px;border:1px solid var(--line);
+        border-radius:8px;overflow:hidden;background:#fff;height:520px}
+  .frame iframe{position:absolute;top:0;left:0;width:1400px;height:1733px;border:0;
+        transform:scale(.371);transform-origin:top left}
+  main.one .frame{height:900px}
+  main.one .frame iframe{width:1400px;height:2400px;transform:scale(.64)}
+  .card__foot{padding:0 16px 16px;display:flex;gap:10px}
+  .card__foot a{color:var(--accent);font-size:.84rem;text-decoration:none}
+  .card__foot a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<header>
+  <h1>Designs</h1>
+  <p>Every design, rendered live with a seller of the kind it was built for.
+     A design can only be judged on content it was made to carry, so each one
+     gets its own — not the same demo six times.</p>
+</header>
+
+<div class="bar">
+  <button data-cols="2" class="on">Grid</button>
+  <button data-cols="1">Large</button>
+  <span id="count"></span>
+</div>
+
+<main id="grid"></main>
+
+<script>
+(function(){
+  "use strict";
+  fetch("/packs-info").then(function(r){ return r.json(); }).then(function(d){
+    var packs = d.packs || [];
+    document.getElementById("count").textContent = packs.length + " designs installed";
+    var grid = document.getElementById("grid");
+    packs.forEach(function(p){
+      var card = document.createElement("div");
+      card.className = "card";
+
+      var head = document.createElement("div");
+      head.className = "card__head";
+      var b = document.createElement("b"); b.textContent = p.title || p.slug;
+      var use = document.createElement("span"); use.className = "use";
+      use.textContent = p.use_case || "";
+      var mode = document.createElement("span"); mode.className = "mode";
+      mode.textContent = p.mode || "light";
+      head.appendChild(b); head.appendChild(use); head.appendChild(mode);
+
+      var ch = document.createElement("p");
+      ch.className = "card__char"; ch.textContent = p.character || "";
+
+      var fr = document.createElement("div"); fr.className = "frame";
+      var f = document.createElement("iframe");
+      f.src = "/templates/" + p.slug;
+      f.loading = "lazy";
+      f.setAttribute("title", (p.title || p.slug) + " design preview");
+      fr.appendChild(f);
+
+      var foot = document.createElement("div"); foot.className = "card__foot";
+      var open = document.createElement("a");
+      open.href = "/templates/" + p.slug; open.target = "_blank";
+      open.rel = "noopener"; open.textContent = "Open full size →";
+      foot.appendChild(open);
+
+      card.appendChild(head); card.appendChild(ch);
+      card.appendChild(fr); card.appendChild(foot);
+      grid.appendChild(card);
+    });
+  });
+
+  document.querySelectorAll(".bar button").forEach(function(btn){
+    btn.onclick = function(){
+      document.querySelectorAll(".bar button").forEach(function(b){ b.classList.remove("on"); });
+      btn.classList.add("on");
+      document.getElementById("grid").classList.toggle("one", btn.dataset.cols === "1");
+    };
+  });
+})();
+</script>
+</body>
+</html>

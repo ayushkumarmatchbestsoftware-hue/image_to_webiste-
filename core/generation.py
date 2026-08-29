@@ -63,6 +63,18 @@ import jinja2
 template_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates")
 jinja_env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
 
+# The Pack home templates ask `sect(i)` for each section's class attribute.
+# Registering a default here means any render path that has not planned a
+# composition still produces a page instead of dying on
+#     UndefinedError: 'sect' is undefined
+# and losing the whole site. That is not hypothetical: a server holding an
+# older photo_pipeline in memory while Jinja re-read the new templates from
+# disk failed exactly this way. A `sect` passed in the render context still
+# overrides this, so the planned composition is unaffected.
+from core.composition import make_sect as _make_sect
+jinja_env.globals["sect"] = _make_sect({})
+jinja_env.globals.setdefault("comp", {})
+
 from core.utils import (
     generate_website_content_logic,
     build_image_map_logic,

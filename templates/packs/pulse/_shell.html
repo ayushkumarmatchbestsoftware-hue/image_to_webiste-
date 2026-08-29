@@ -1,0 +1,354 @@
+{% set hclass = '' %}
+{% set tclass = '' %}
+{% set has_rule = False %}
+{% set split_headline = False %}
+{% set meta_description = (home.subtitle or tagline or site_title) | striptags | truncate(155) %}
+{% set _sn = site_name | striptags %}
+{% set social_title = site_title if (_sn | lower) in (site_title | lower) else (_sn ~ ' | ' ~ site_title) %}
+{% set A = asset_base %}
+{% set shots = shots | default({}) %}
+{% set hero_img = shots.get('hero') or image_map.get('hero') or (images[0] if images else None) %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{# Which page is being rendered, so the nav can mark it. Every shell used to
+   hardcode the active class on the home link, which left every sub-page
+   showing Home as current. #}
+{% set _cur = current_page | default('home.html') %}
+<!DOCTYPE html>
+{#
+  PULSE — dark, loud. For streetwear, gear, gadgets, anything sold to people
+  under thirty who scroll fast.
+
+  Nothing like NOIR despite both being dark: NOIR is quiet, centred and
+  serif; this is off-grid, uppercase and shouting. Same darkness, opposite
+  temperament — which is the point of having two.
+
+  Plan
+    Colour  the product's hue at 8% lightness, but the accent runs hot and is
+            used at full strength on rules, numerals and the CTA.
+    Type    Archivo Black for display at tight negative tracking, Space Mono
+            for the numerals and tags so figures read as data, not decoration.
+    Layout  Content is deliberately off-centre — a 2fr/5fr split with a live
+            index rail down the left. Sections are separated by full-width
+            accent rules rather than whitespace.
+#}
+<html lang="{{ site_lang | default('en') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=Archivo:wght@400;600&display=swap">
+<meta name="description" content="{{ meta_description }}">
+{% if favicon_url %}<link rel="icon" href="{{ favicon_url }}">{% endif %}
+{% if favicon_apple_url %}<link rel="apple-touch-icon" href="{{ favicon_apple_url }}">{% endif %}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:title" content="{{ social_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+{% if share_card_url %}<meta property="og:image" content="{{ share_card_url }}">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">{% endif %}
+<meta name="twitter:card" content="{% if share_card_url %}summary_large_image{% else %}summary{% endif %}">
+<meta name="twitter:title" content="{{ social_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
+{% if share_card_url %}<meta name="twitter:image" content="{{ share_card_url }}">{% endif %}
+<meta name="theme-color" content="{{ theme.bg }}">
+<style>
+  /* ───────────────────────────────────────────────────────────────────────
+     PULSE — "release slip"
+
+     The old version was near-black with a hot vermilion accent, which is one
+     of the three looks AI design currently defaults to. It also duplicated
+     noir: two dark packs each carrying a single bright accent is not two
+     designs, it is the same idea twice.
+
+     The subject here is a drop — sneakers, gear, a limited run. Its real world
+     is not a dark website; it is the PAPERWORK of a release: the slip in the
+     box, the lot number, the size run, the shipping label. That is where this
+     takes its direction.
+
+       ground   concrete, not cream and not near-black
+       slip     the paper the product is specified on
+       stamp    the Grade's own colour, used as ink pressed onto paper —
+                a stamp has edges, unlike a glow
+       type     Archivo Black for the shout, Space Mono for everything that
+                behaves like data, which is what carries the personality
+
+     Signature: the perforated tear-edge under the hero, with the lot and drop
+     stamped along it. One memorable thing; everything else stays disciplined.
+     ─────────────────────────────────────────────────────────────────────── */
+  :root{
+    --ink:{{ theme.text_main }};
+    --soft:{{ theme.text_muted }};
+    /* The Grade still decides the hue — the page belongs to the product — but
+       it is pulled most of the way to concrete so it cannot land on the warm
+       cream that every generated page seems to arrive at. */
+    --ground:color-mix(in srgb, {{ theme.bg }} 34%, #e7e8e4);
+    --slip:color-mix(in srgb, {{ theme.bg }} 55%, #ffffff);
+    --stamp:{{ theme.accent }};
+    --deep:{{ theme.primary_dark }};
+    --rule:color-mix(in srgb, {{ theme.text_main }} 20%, transparent);
+    --hair:color-mix(in srgb, {{ theme.text_main }} 12%, transparent);
+    --display:'Archivo Black', 'Arial Black', sans-serif;
+    --mono:'Space Mono', ui-monospace, Consolas, monospace;
+    --body:'Archivo', system-ui, 'Segoe UI', Helvetica, sans-serif;
+    /* kept so older rules that still name --hot resolve to the stamp */
+    --hot:{{ theme.accent }};
+    --tint:var(--slip);
+  }
+  *{box-sizing:border-box} html,body{margin:0;padding:0}
+  body{background:var(--ground);color:var(--ink);font:400 16px/1.6 var(--body);
+       -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 30px}
+  a{color:var(--ink)}
+  ::selection{background:var(--stamp);color:var(--slip)}
+  :focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+
+  /* Header reads as the top of a docket: a rule, a code, no chrome. */
+  header{background:var(--slip);border-bottom:1px solid var(--rule)}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;
+               gap:20px;flex-wrap:wrap;padding:16px 30px}
+  .brand{font:400 20px/1 var(--display);letter-spacing:-.04em;text-transform:uppercase;
+         text-decoration:none;color:var(--ink)}
+  .brand img{max-height:34px;display:block}
+  nav{display:flex;gap:22px;flex-wrap:wrap}
+  nav a{text-decoration:none;font:700 11px/1 var(--mono);letter-spacing:.1em;
+        text-transform:uppercase;color:var(--soft);padding-bottom:2px}
+  nav a:hover{color:var(--ink)}
+  nav a.on{color:var(--ink);border-bottom:2px solid var(--stamp)}
+
+  .hero{padding:44px 0 0;position:relative}
+  .hero .wrap{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,4fr);
+              gap:52px;align-items:center}
+  .hero-split.rev .wrap>.shot{order:-1}
+  .hero-inset .wrap{grid-template-columns:minmax(0,6fr) minmax(0,3fr)}
+  .hero-stack .wrap{grid-template-columns:1fr;max-width:900px}
+
+  /* The eyebrow is a rubber stamp: ink on paper, slightly off-square. */
+  .eyebrow{display:inline-block;font:700 11px/1 var(--mono);letter-spacing:.16em;
+           text-transform:uppercase;color:var(--stamp);
+           border:2px solid var(--stamp);padding:7px 12px;margin:0 0 24px;
+           transform:rotate(-1.4deg);transform-origin:left center}
+  h1{font:400 clamp(40px,7vw,86px)/.9 var(--display);letter-spacing:-.05em;
+     text-transform:uppercase;margin:0 0 22px;text-wrap:balance;max-width:12ch}
+  .hero-sub{font-size:17px;color:var(--soft);margin:0 0 30px;max-width:40ch}
+
+  /* The product sits ON the slip, not floating on the page. */
+  .shot{margin:0;position:relative;background:var(--slip);
+        border:1px solid var(--rule);padding:22px}
+  .shot img{width:100%;height:auto;display:block;
+        max-height:clamp(340px,46vh,520px);object-fit:contain}
+  .shot::after{content:none}
+  .hero-under img,.hero-plate img{width:100%;max-height:460px;object-fit:cover;
+        display:block;border:1px solid var(--rule);background:var(--slip)}
+  .hero-bleed{position:relative;min-height:500px;display:flex;align-items:flex-end;padding:0}
+  .hero-bleed .hero-bg{position:absolute;inset:0;width:100%;height:100%;
+        object-fit:cover;opacity:.5}
+  .hero-bleed::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(100deg,var(--ground) 26%,transparent 78%)}
+  .hero-bleed .wrap{position:relative;z-index:1;padding-block:60px}
+
+  .buy{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .price{font:700 24px/1 var(--mono);letter-spacing:-.03em}
+  .cta{display:inline-block;background:var(--ink);color:var(--slip);text-decoration:none;
+       font:700 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+       padding:16px 30px;border:2px solid var(--ink)}
+  .cta:hover{background:var(--stamp);border-color:var(--stamp);color:var(--slip)}
+
+  /* ── Signature: the tear-edge ──────────────────────────────────────────
+     A real perforation across the page under the hero, with the lot and drop
+     stamped along it. The dashes are drawn, not an image, so they stay crisp
+     at any width. This is the one loud thing on the page. */
+  .perf{position:relative;margin-top:54px;padding:0;
+        border-top:2px dashed var(--rule);background:transparent}
+  .perf__row{display:flex;gap:30px;flex-wrap:wrap;justify-content:space-between;
+        padding:16px 30px 20px;max-width:1180px;margin:0 auto;
+        font:700 11px/1.6 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+        color:var(--soft)}
+  .perf__row b{color:var(--ink);font-weight:700}
+
+  section{padding:58px 0;border-top:1px solid var(--rule)}
+  .band{background:var(--tint)}
+  h2{font:400 clamp(26px,4vw,42px)/1 var(--display);letter-spacing:-.04em;
+     text-transform:uppercase;margin:0 0 30px}
+  .rule{display:none}
+  .lede{font-size:17px;color:var(--soft);max-width:58ch;margin:0 0 14px}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:26px}
+  .card{border:1px solid var(--hair);padding:26px 24px;position:relative}
+  .card::before{content:"";position:absolute;left:0;top:0;width:34px;height:3px;background:var(--hot)}
+  .card h3{font:400 17px/1.2 var(--display);letter-spacing:-.025em;text-transform:uppercase;
+           margin:14px 0 10px}
+  .card p{margin:0;font-size:15px;color:var(--soft)}
+
+  .pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:30px}
+  .pillar h3{font:400 17px/1.2 var(--display);letter-spacing:-.025em;text-transform:uppercase;
+             margin:0 0 10px;padding-top:14px;border-top:3px solid var(--hot)}
+  .pillar p{margin:0;font-size:15px;color:var(--soft)}
+
+  .work{list-style:none;padding:0;margin:0}
+  .work li{padding:26px 0;border-bottom:1px solid var(--hair);display:grid;
+           grid-template-columns:minmax(0,160px) minmax(0,1fr);gap:32px;align-items:start}
+  .work .tag{font:700 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--hot)}
+  .work h3{font:400 19px/1.15 var(--display);letter-spacing:-.03em;text-transform:uppercase;margin:0 0 8px}
+  .work p{margin:0;font-size:15px;color:var(--soft)}
+  .work-shot{margin:0 0 14px}
+  .work-shot img{width:100%;max-height:230px;object-fit:cover;display:block}
+
+  .quote{border-left:3px solid var(--hot);padding-left:22px;margin:0 0 30px;max-width:60ch}
+  .quote p{font-size:19px;line-height:1.55;margin:0 0 10px}
+  .quote span{font:700 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+
+  .faq{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:32px}
+  .faq h3{font:400 15px/1.25 var(--display);letter-spacing:-.02em;text-transform:uppercase;margin:0 0 9px}
+  .faq p{margin:0;font-size:15px;color:var(--soft)}
+
+  .contact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:26px;margin-top:32px}
+  .contact-grid div{border:1px solid var(--hair);padding:22px}
+  .contact-grid span{display:block;font:700 11px/1 var(--mono);letter-spacing:.12em;
+                     text-transform:uppercase;color:var(--hot);margin-bottom:9px}
+  .contact-grid b{font:400 17px/1.4 var(--body);font-weight:600}
+
+  .shot-detail img,.shot-wide img{width:100%;height:auto;display:block}
+  .shot-wide{margin:30px 0 0}
+  .with-shot{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:44px;align-items:start}
+  .with-shot>.shot-detail{order:2}
+
+  footer{border-top:3px solid var(--hot);padding:34px 0;
+         font:700 11px/1.8 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+  footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+
+  @media(max-width:860px){
+    .hero .wrap,.hero-inset .wrap{grid-template-columns:1fr;gap:32px}
+    .hero-split.rev .wrap>.shot{order:0}
+    .shot::after{display:none}
+    section{padding:42px 0}
+    .work li{grid-template-columns:1fr;gap:10px}
+    .with-shot{grid-template-columns:1fr;gap:26px}
+    .with-shot>.shot-detail{order:0}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* ticker, left rail, numbered drop index */
+  .ticker{overflow:hidden;white-space:nowrap;border-block:3px solid var(--hot);
+          padding:11px 0;font:400 14px/1 var(--display);letter-spacing:-.02em;
+          text-transform:uppercase;color:var(--hot)}
+  .ticker span{display:inline-block;animation:slide 22s linear infinite}
+  @keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @media(prefers-reduced-motion:reduce){.ticker span{animation:none}}
+  .railed{display:grid;grid-template-columns:110px minmax(0,1fr);gap:34px;align-items:start}
+  .rail{font:700 11px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;
+        color:var(--hot);writing-mode:vertical-rl;transform:rotate(180deg);
+        border-right:3px solid var(--hot);padding-right:12px;justify-self:start}
+  .drops{list-style:none;padding:0;margin:0;counter-reset:d}
+  .drops li{display:grid;grid-template-columns:78px minmax(0,1fr);gap:22px;
+            padding:22px 0;border-bottom:1px solid var(--hair);align-items:start}
+  .drops .no{font:400 34px/1 var(--display);letter-spacing:-.05em;color:var(--hot)}
+  .drops h3{font:400 19px/1.15 var(--display);letter-spacing:-.03em;
+            text-transform:uppercase;margin:0 0 7px}
+  .drops p{margin:0;font-size:15px;color:var(--soft)}
+  .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:3px}
+  .strip figure{margin:0}
+  .strip img{width:100%;height:250px;object-fit:cover;display:block}
+  @media(max-width:760px){
+    .railed{grid-template-columns:1fr;gap:14px}
+    .rail{writing-mode:horizontal-tb;transform:none;border-right:0;
+          border-bottom:3px solid var(--hot);padding:0 0 8px}
+    .drops li{grid-template-columns:56px minmax(0,1fr);gap:14px}
+    .drops .no{font-size:26px}
+  }
+
+  /* reviews — hard-edged blocks, rating as a big mono figure */
+  .rating-summary{display:flex;align-items:center;gap:22px;border:1px solid var(--hair);
+                  padding:22px 26px;margin:0 0 26px}
+  .rating-summary__num{font:400 44px/1 var(--display);letter-spacing:-.05em;color:var(--hot)}
+  .rating-summary__meta{display:flex;flex-direction:column;gap:5px}
+  .stars,.review__stars{font:700 14px/1 var(--mono);letter-spacing:2px;color:var(--hot)}
+  .rating-summary__count{font:700 11px/1 var(--mono);letter-spacing:.12em;
+                         text-transform:uppercase;color:var(--soft)}
+  .reviews{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:3px}
+  .review{background:var(--tint);padding:26px 24px;border-top:3px solid var(--hot)}
+  .review__text{font-size:15.5px;line-height:1.62;margin:14px 0 18px;color:var(--ink)}
+  .review__who{display:flex;align-items:center;gap:12px}
+  .avatar{width:34px;height:34px;display:grid;place-items:center;background:var(--hot);
+          color:var(--ground);font:700 13px/1 var(--mono)}
+  .review__name{display:block;font:700 12px/1.5 var(--mono);text-transform:uppercase;
+                letter-spacing:.08em}
+  .review__role{display:block;font:400 11px/1.4 var(--mono);color:var(--soft);font-style:normal}
+
+  .reviews-section{}
+  .rev-dots{display:none}
+
+  /* Cards in a row line up even when only some of them carry a photo:
+     the card is a column, the copy block grows, so titles and text sit on the
+     same line across the row instead of drifting. */
+  .work li{display:flex;flex-direction:column}
+  .work li>div{flex:1;display:flex;flex-direction:column}
+  .work-shot img{width:100%;display:block;aspect-ratio:1.7/1;object-fit:cover}
+  .card{display:flex;flex-direction:column}
+  .card__photo img{width:100%;display:block;aspect-ratio:1.7/1;object-fit:cover}
+{% include "packs/_pages/_composition.css" %}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a href="home.html" class="brand">
+      {% if logo %}<img src="{{ logo }}" alt="{{ site_name }}">{% else %}{{ site_name }}{% endif %}
+    </a>
+    <nav>
+      <a href="home.html" class="{% if _cur == 'home.html' %}on{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>Drop</a>
+      {% if 'services' in layout %}<a href="services.html" class="{% if _cur == 'services.html' %}on{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>Specs</a>{% endif %}
+      {% if 'portfolio' in layout %}<a href="portfolio.html" class="{% if _cur == 'portfolio.html' %}on{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>Gallery</a>{% endif %}
+      {% if 'about' in layout %}<a href="about.html" class="{% if _cur == 'about.html' %}on{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>Story</a>{% endif %}
+      {% if 'contact' in layout %}<a href="contact.html" class="{% if _cur == 'contact.html' %}on{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>Get it</a>{% endif %}
+    </nav>
+  </div>
+</header>
+
+{% block main %}{% endblock %}
+
+<footer>
+  <div class="wrap">
+    <span>{{ footer.copyright or site_name }}</span>
+    {% if footer.address %}<span>{{ footer.address }}</span>{% endif %}
+  </div>
+</footer>
+
+<script>
+/* Arrival motion. The hidden state lives behind html.js-reveal, which is only
+   ever set here — so a page whose JS is blocked or errors renders every section
+   fully visible instead of blank. */
+(function(){
+  var root=document.documentElement;
+  if(!('IntersectionObserver' in window)) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.classList.add('js-reveal');
+  var els=[].slice.call(document.querySelectorAll('.reveal'));
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('is-in'); io.unobserve(e.target); }
+    });
+  },{rootMargin:'0px 0px -8% 0px',threshold:0.06});
+  var above=[],below=[];
+  els.forEach(function(el){
+    (el.getBoundingClientRect().top < window.innerHeight*0.92 ? above : below).push(el);
+  });
+  below.forEach(function(el){ io.observe(el); });
+  /* Safety net. Anything still hidden after 2.5s is shown regardless — if the
+     observer never fires (throttled tab, print, an odd viewport, a headless
+     capture) the content must not stay at opacity 0 permanently. */
+  setTimeout(function(){
+    els.forEach(function(el){ el.classList.add('is-in'); });
+  }, 2500);
+  /* Two frames, so the transition actually plays on what is already on screen
+     rather than being collapsed into the first paint. */
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    above.forEach(function(el,i){ setTimeout(function(){ el.classList.add('is-in'); }, i*70); });
+  });});
+})();
+</script>
+{% include "packs/_pages/_shop.html" %}
+</body>
+</html>

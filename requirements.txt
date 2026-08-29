@@ -34,3 +34,18 @@ bcrypt==4.1.2
 pydantic==2.5.3
 pydantic-settings==2.1.0
 itsdangerous==2.1.2
+
+# Model access. Every supported provider speaks the OpenAI wire format, so this
+# is one client pointed at a different base_url (see core/llm.py).
+openai==2.46.0
+
+# Image treatment. rembg carries the background-removal model and runs it on
+# onnxruntime, entirely offline — no API call and no key. numpy backs the
+# connected-component despeckle in core/imagedirector.py.
+rembg==2.0.81
+onnxruntime==1.29.0
+numpy==2.5.1
+
+# Jinja's escaping primitives, used directly by core/composition.py.
+markupsafe==3.0.3
+

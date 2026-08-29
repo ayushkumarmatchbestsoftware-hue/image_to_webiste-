@@ -1,0 +1,37 @@
+{% extends "packs/" + pack.slug + "/_shell.html" %}
+{# This page declares what it is, so the shell can mark the nav without
+   depending on the renderer to pass it. A context value alone was fragile:
+   a server holding older Python while Jinja re-read the new templates from
+   disk rendered every page with Home marked. #}
+{% set current_page = 'services.html' %}
+{% block main %}
+<section>
+  <div class="wrap">
+    <h2 class="{{ hclass }}">{{ home.label or 'What we make' }}</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    <p class="lede">{{ home.subtitle or tagline }}</p>
+    {% set _g = shots.get('gallery') or [] %}
+    {% if _g|length > 1 %}
+    <figure class="shot-wide"><img src="{{ _g[1] }}" alt="{{ home.label }}"></figure>
+    {% endif %}
+    <div class="cards" style="margin-top:30px">
+      {% for s in services %}
+      <article class="card">
+                <h3 class="{{ hclass }}">{{ s.title }}</h3><p>{{ s.description }}</p></article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if faq %}
+<section class="band">
+  <div class="wrap">
+    <h2 class="{{ hclass }}">Questions</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    <div class="faq">
+      {% for f in faq %}<div><h3 class="{{ hclass }}">{{ f.question }}</h3><p>{{ f.answer }}</p></div>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

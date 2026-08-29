@@ -32,6 +32,7 @@ vercel_out.html
 /*.html
 
 # Internal documentation (not for production codebase)
+prd.md
 R_AND_D.md
 FLOW_OVERVIEW.md
 FRONTEND_DEVELOPMENT_GUIDE.*
@@ -42,3 +43,17 @@ check_credits.py
 check_models.py
 fix_*.py
 list_clean.py
+
+# ── Runtime data, never source ────────────────────────────────────────────
+# Generated sites, uploaded photos, published storefronts and the order store
+# are what this service PRODUCES. They are per-install state, they are large,
+# and orders contain customers' names and addresses — none of it belongs in a
+# repository.
+local_store/
+_archive/
+
+# Credentials. The key files live beside the code during local work and must
+# never travel with it.
+local_test/1.md
+local_test/2.MD
+*.key

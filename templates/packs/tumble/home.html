@@ -1,0 +1,150 @@
+{% extends "packs/tumble/_shell.html" %}
+{% set current_page = 'home.html' %}
+{% block main %}
+{#
+  The original's own running order: hero with the 2x2 tiles, the dark trust
+  strip, the shelf, stat tiles, about, the reviews carousel, then the dark
+  card. The tiles take the seller's real photos, which is why this Pack wants
+  a multi-photo upload more than the others do.
+#}
+{% set _g = shots.get('gallery') or [] %}
+{% set _tiles = ([shots.get('hero')] if shots.get('hero') else []) + _g + ([shots.get('square')] if shots.get('square') else []) %}
+
+{% if _tiles | length >= 2 %}
+<section class="hero">
+  <div class="wrap">
+    <div>
+      {% if home.label %}<span class="eyebrow">{{ home.label }}</span>{% endif %}
+      <h1>{{ site_title }}</h1>
+      <p class="hero-sub">{{ home.subtitle or tagline }}</p>
+      <div class="buy">
+        {% if price %}<span class="price">{{ price }}</span>{% endif %}
+        {% if wa %}<a class="cta" href="https://wa.me/{{ wa }}?text={{ site_name }}">{{ home.cta or 'Enquire' }} &rarr;</a>
+        {% elif contact.email %}<a class="cta" href="mailto:{{ contact.email }}">{{ home.cta or 'Enquire' }} &rarr;</a>{% endif %}
+        {% if 'about' in layout %}<a class="btn btn--ghost" href="about.html">Our story</a>{% endif %}
+      </div>
+    </div>
+    <div class="tiles" aria-hidden="true">
+      {% for n in range(4) %}
+      <div class="tile">{% if n < _tiles | length %}<img src="{{ _tiles[n] }}" alt="">{% endif %}</div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% else %}
+{% include "packs/_pages/_hero.html" %}
+{% endif %}
+
+<div class="trust">
+  <div class="wrap">
+    {% if home.pillar1_title %}<span>&check; {{ home.pillar1_title }}</span>{% endif %}
+    {% if home.pillar2_title %}<span>&check; {{ home.pillar2_title }}</span>{% endif %}
+    {% if contact.address %}<span>&check; Ships from {{ contact.address }}</span>{% endif %}
+    {% if price %}<span>&check; From {{ price }}</span>{% endif %}
+  </div>
+</div>
+
+{% if services %}
+<section {{ sect(0) }}>
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow">{{ home.label or 'The collection' }}</span>
+        <h2>{{ home.title or 'What we make' }}</h2>
+      </div>
+    </div>
+    <div class="cards reveal">
+      {% for s in services %}
+      <article class="card">
+        {% if _g and loop.index0 < _g | length %}
+        <div class="card__photo"><img src="{{ _g[loop.index0] }}" alt="{{ s.title }}"></div>{% endif %}
+        <span class="card__tag">{{ home.label or 'Made by us' }}</span>
+        <h3>{{ s.title }}</h3><p>{{ s.description }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if stats %}
+<section {{ sect(1, 'band') }}>
+  <div class="wrap">
+    <div class="stats reveal">
+      {% for st in stats[:4] %}
+      <div class="stat-tile">
+        <div class="stat-num">{{ st.number }}</div>
+        <div class="stat-label">{{ st.label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if about and about.description %}
+<section {{ sect(2) }}>
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow">About {{ site_name }}</span>
+        <h2>{{ about.heading or 'Our story' }}</h2>
+      </div>
+    </div>
+    <div class="with-shot reveal">
+      <div>
+        <p class="lede">{{ about.description }}</p>
+        {% if about.mission %}<p class="lede">{{ about.mission }}</p>{% endif %}
+      </div>
+      {% if shots.get('square') %}
+      <figure class="shot-detail"><img src="{{ shots.square }}" alt="{{ about.heading }}"></figure>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if portfolio %}
+<section {{ sect(3, 'band') }}>
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div><span class="eyebrow">Made so far</span><h2>Recent pieces</h2></div>
+    </div>
+    <ul class="work reveal">
+      {% for p in portfolio %}
+      <li>
+        {% if _g and loop.index0 < _g | length %}
+        <figure class="work-shot"><img src="{{ _g[loop.index0] }}" alt="{{ p.title }}"></figure>{% endif %}
+        <span class="tag">{{ p.tag or 'Piece' }}</span>
+        <h3>{{ p.title }}</h3>
+        <p>{{ p.description }}{% if p.outcome %} &mdash; {{ p.outcome }}{% endif %}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
+{% include "packs/_pages/_feature.html" %}
+{% include "packs/_pages/_reviews.html" %}
+
+{% if contact %}
+<section {{ sect(4) }} style="border-bottom:none">
+  <div class="wrap">
+    <div class="shout reveal">
+      <div>
+        <h2>{{ contact.title or 'Get in touch' }}</h2>
+        <p>{{ contact.description }}</p>
+      </div>
+      {% if wa %}<a class="cta" href="https://wa.me/{{ wa }}?text={{ site_name }}">{{ home.cta or 'Message us' }}</a>
+      {% elif contact.email %}<a class="cta" href="mailto:{{ contact.email }}">{{ home.cta or 'Email us' }}</a>{% endif %}
+    </div>
+    <div class="contact-grid reveal">
+      {% if contact.phone %}<div><span>Phone</span><b>{{ contact.phone }}</b></div>{% endif %}
+      {% if contact.email %}<div><span>Email</span><b>{{ contact.email }}</b></div>{% endif %}
+      {% if contact.address %}<div><span>Where</span><b>{{ contact.address }}</b></div>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

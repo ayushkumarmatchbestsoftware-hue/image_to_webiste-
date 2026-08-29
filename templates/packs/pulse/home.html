@@ -1,0 +1,91 @@
+{% extends "packs/pulse/_shell.html" %}
+{% set current_page = 'home.html' %}
+{% block main %}
+{#
+  PULSE is a drop page. A ticker, then the release as a numbered index — here
+  the numerals ARE meaningful, they are the order of a listing — then oversized
+  figures, then a hard contact strip. Left-rail, off-centre throughout.
+#}
+{% include "packs/_pages/_hero.html" %}
+
+{#
+  Signature: the tear-edge.
+
+  Everything stamped along it is TRUE — the price the seller set, their first
+  real figure, where they actually make the thing. A slip carrying invented lot
+  numbers would be decoration pretending to be information, which is the exact
+  habit that makes a page read as generated.
+
+  Each field is dropped when its content does not exist, so the row is never
+  padded out with placeholders.
+#}
+<div class="perf" aria-hidden="true"></div>
+{% if price or stats or contact.address %}
+<div class="perf__row">
+  {% if price %}<span>Price <b>{{ price }}</b></span>{% endif %}
+  {% if stats and stats[0].number %}
+    <span>{{ stats[0].label }} <b>{{ stats[0].number }}</b></span>{% endif %}
+  {% if contact.address %}<span>Made in <b>{{ contact.address }}</b></span>{% endif %}
+  {% if home.label %}<span><b>{{ home.label }}</b></span>{% endif %}
+</div>
+{% endif %}
+
+{% if services or portfolio %}
+<section {{ sect(0) }}>
+  <div class="wrap">
+    <div class="railed">
+      <div class="rail">{{ home.label or 'INDEX' }}</div>
+      <ol class="drops">
+        {% for s in services %}
+        <li><span class="no">{{ '%02d' % loop.index }}</span>
+            <div><h3>{{ s.title }}</h3><p>{{ s.description }}</p></div></li>
+        {% endfor %}
+        {% for p in portfolio %}
+        <li><span class="no">{{ '%02d' % (loop.index + (services|length)) }}</span>
+            <div><h3>{{ p.title }}</h3><p>{{ p.description }}</p></div></li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% set _g = shots.get('gallery') or [] %}
+{% if _g %}
+<section {{ sect(1, 'band') }}>
+  <div class="wrap">
+    <div class="strip">
+      {% for g in _g[:3] %}<figure><img src="{{ g }}" alt="{{ site_title }}"></figure>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if about and about.description %}
+<section {{ sect(2) }}>
+  <div class="wrap">
+    <div class="railed">
+      <div class="rail">STORY</div>
+      <div><h2>{{ about.heading or 'The story' }}</h2>
+        <p class="lede">{{ about.description }}</p></div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% include "packs/_pages/_feature.html" %}
+{% include "packs/_pages/_reviews.html" %}
+
+{% if contact %}
+<section {{ sect(3, 'band') }}>
+  <div class="wrap">
+    <h2>{{ contact.title or 'Get it' }}</h2>
+    <div class="contact-grid">
+      {% if contact.phone %}<div><span>Phone</span><b>{{ contact.phone }}</b></div>{% endif %}
+      {% if contact.email %}<div><span>Email</span><b>{{ contact.email }}</b></div>{% endif %}
+      {% if contact.address %}<div><span>Where</span><b>{{ contact.address }}</b></div>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

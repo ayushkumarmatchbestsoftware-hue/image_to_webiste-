@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orders</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --line:#262b35; --ink:#e8eaef; --soft:#9aa3b2;
+    --accent:#5b8cff; --good:#3ecf8e; --warn:#e8b44a; --bad:#e5604d;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--font)}
+  header{padding:22px 28px;border-bottom:1px solid var(--line);display:flex;
+    align-items:baseline;gap:16px;flex-wrap:wrap}
+  h1{margin:0;font-size:1.2rem;letter-spacing:-.01em}
+  .site{color:var(--soft);font-size:.85rem;font-family:ui-monospace,Consolas,monospace}
+  main{padding:24px 28px;max-width:1100px}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:14px;margin-bottom:26px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .tile b{display:block;font-size:1.7rem;font-variant-numeric:tabular-nums;
+    letter-spacing:-.02em;margin-bottom:2px}
+  .tile span{color:var(--soft);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}
+  h2{font-size:.82rem;text-transform:uppercase;letter-spacing:.1em;color:var(--soft);
+    margin:28px 0 12px}
+  table{width:100%;border-collapse:collapse;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);
+    vertical-align:top;font-size:.9rem}
+  th{color:var(--soft);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em}
+  tr:last-child td{border-bottom:0}
+  td.amt{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pill{display:inline-block;padding:3px 9px;border-radius:100px;font-size:.72rem;
+    text-transform:uppercase;letter-spacing:.06em;border:1px solid currentColor}
+  .s-pending{color:var(--warn)} .s-confirmed{color:var(--accent)}
+  .s-packed{color:var(--accent)} .s-shipped{color:var(--accent)}
+  .s-delivered{color:var(--good)} .s-cancelled{color:var(--soft)}
+  .p-unpaid{color:var(--soft)} .p-pending{color:var(--warn)}
+  .p-paid{color:var(--good)} .p-failed{color:var(--bad)} .p-refunded{color:var(--soft)}
+  select,input{background:#0c0e12;color:var(--ink);border:1px solid var(--line);
+    border-radius:6px;padding:7px 9px;font:inherit;font-size:.85rem}
+  button{background:var(--accent);color:#08111f;border:0;border-radius:6px;
+    padding:8px 14px;font:600 .85rem var(--font);cursor:pointer}
+  button.ghost{background:none;color:var(--soft);border:1px solid var(--line)}
+  .settings{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:18px;display:grid;gap:12px;max-width:520px}
+  .settings label{display:grid;gap:5px;font-size:.78rem;color:var(--soft);
+    text-transform:uppercase;letter-spacing:.06em}
+  .muted{color:var(--soft)}
+  .note{color:var(--soft);font-size:.85rem;margin:8px 0 0}
+  .err{color:var(--bad);font-size:.85rem}
+  .empty{padding:30px;text-align:center;color:var(--soft);background:var(--panel);
+    border:1px solid var(--line);border-radius:10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Orders</h1>
+  <span class="site" id="siteId"></span>
+  <a class="site" id="storeLink" href="#" target="_blank" rel="noopener">open storefront &rarr;</a>
+</header>
+
+<main>
+  <div class="tiles" id="tiles"></div>
+
+  <h2>Orders</h2>
+  <div id="orders"></div>
+
+  <h2>Your website</h2>
+  <div class="settings">
+    <div id="pubState" class="muted">checking…</div>
+    <div>
+      <button id="pubBtn">Publish</button>
+      <button id="unpubBtn" class="ghost" hidden>Take offline</button>
+    </div>
+    <p class="note">Publishing puts your site on a short public link you can
+      share on WhatsApp or Instagram. Re-publishing keeps the same link, so
+      anything you have already shared keeps working.</p>
+  </div>
+
+  <h2>What you sell</h2>
+  <div class="settings">
+    <div id="priceState" class="muted">checking…</div>
+    <label>Price
+      <input id="price" placeholder="Rs 1,450" autocomplete="off"></label>
+    <div>
+      <button id="savePrice">Save price</button>
+      <span class="err" id="priceErr"></span>
+    </div>
+    <p class="note">Without a price the site takes enquiries only and no cart
+      appears. Set one and the shop opens on the next page load.</p>
+  </div>
+
+  <h2>Payment settings</h2>
+  <div class="settings">
+    <label>UPI ID
+      <input id="vpa" placeholder="name@bank" autocomplete="off"></label>
+    <label>Name shown in the payment app
+      <input id="payee" placeholder="Your shop name" autocomplete="off"></label>
+    <label>Order alerts — webhook URL
+      <input id="hook" placeholder="https://hooks.zapier.com/..." autocomplete="off"></label>
+    <label>Order alerts — email
+      <input id="mail" placeholder="you@example.com" autocomplete="off"></label>
+    <div>
+      <button id="saveSettings">Save</button>
+      <span class="err" id="setErr"></span>
+    </div>
+    <p class="note">Leave the UPI ID blank to take cash on delivery only.
+      A UPI payment cannot be confirmed automatically — the buyer sends a
+      reference, and you mark it paid once it reaches your account.</p>
+  </div>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var SITE = location.pathname.split("/").filter(Boolean).pop();
+  var API = "/api/" + SITE;
+  document.getElementById("siteId").textContent = SITE;
+  document.getElementById("storeLink").href = "/preview/" + SITE + "/home.html";
+
+  var NEXT = {                       // mirrors the server's state machine
+    pending:["confirmed","cancelled"], confirmed:["packed","cancelled"],
+    packed:["shipped","cancelled"], shipped:["delivered"],
+    delivered:[], cancelled:[]
+  };
+  var PAYNEXT = ["unpaid","pending","paid","failed","refunded"];
+
+  function el(tag, cls, text){
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function load(){
+    fetch(API + "/orders").then(function(r){ return r.json(); }).then(function(d){
+      paintTiles(d.summary);
+      paintOrders(d.orders || []);
+    });
+    fetch(API + "/shop").then(function(r){ return r.json(); }).then(function(){});
+  }
+
+  function paintTiles(s){
+    var t = document.getElementById("tiles");
+    t.innerHTML = "";
+    [["Orders", s.orders], ["Open", s.open],
+     ["Received", s.revenue_display || "-"],
+     ["Committed", s.committed_display || "-"]].forEach(function(p){
+      var d = el("div","tile");
+      d.appendChild(el("b", null, String(p[1])));
+      d.appendChild(el("span", null, p[0]));
+      t.appendChild(d);
+    });
+  }
+
+  function paintOrders(list){
+    var wrap = document.getElementById("orders");
+    wrap.innerHTML = "";
+    if (!list.length){
+      wrap.appendChild(el("div","empty","No orders yet."));
+      return;
+    }
+    var tb = el("table");
+    tb.innerHTML = "<thead><tr><th>Order</th><th>Customer</th><th>Items</th>" +
+      "<th>Total</th><th>Status</th><th>Payment</th></tr></thead>";
+    var body = el("tbody");
+    list.forEach(function(o){
+      var tr = el("tr");
+
+      var c1 = el("td");
+      c1.appendChild(el("div", null, o.id));
+      c1.appendChild(el("div","muted", (o.created_at||"").replace("T"," ").replace("Z","")));
+      tr.appendChild(c1);
+
+      var c2 = el("td");
+      c2.appendChild(el("div", null, o.customer.name));
+      c2.appendChild(el("div","muted", o.customer.phone || o.customer.email || ""));
+      if (o.customer.address) c2.appendChild(el("div","muted", o.customer.address));
+      if (o.customer.note) c2.appendChild(el("div","muted", "“" + o.customer.note + "”"));
+      // Opens WhatsApp with a message to the BUYER ready to send. No API and
+      // no business account needed — the seller just taps it.
+      if (o.customer.phone){
+        var wa = el("a", "muted", "message on WhatsApp");
+        wa.href = "https://wa.me/" + o.customer.phone.replace(/\D/g,"") +
+          "?text=" + encodeURIComponent("Hello " + o.customer.name +
+            ", about your order " + o.id + " (" + o.total_display + ") — ");
+        wa.target = "_blank"; wa.rel = "noopener";
+        c2.appendChild(el("div")).appendChild(wa);
+      }
+      tr.appendChild(c2);
+
+      var c3 = el("td");
+      o.lines.forEach(function(l){ c3.appendChild(el("div", null, l.qty + " x " + l.name)); });
+      tr.appendChild(c3);
+
+      tr.appendChild(el("td","amt", o.total_display));
+
+      var c5 = el("td");
+      c5.appendChild(el("span","pill s-" + o.status, o.status));
+      var opts = NEXT[o.status] || [];
+      if (opts.length){
+        var sel = el("select");
+        sel.appendChild(new Option("move to…",""));
+        opts.forEach(function(s){ sel.appendChild(new Option(s, s)); });
+        sel.onchange = function(){ if (sel.value) patch(o.id, {status: sel.value}); };
+        c5.appendChild(el("div"));
+        c5.appendChild(sel);
+      }
+      tr.appendChild(c5);
+
+      var c6 = el("td");
+      c6.appendChild(el("span","pill p-" + o.payment_status, o.payment_status));
+      c6.appendChild(el("div","muted", o.payment_method +
+        (o.payment_reference ? " · " + o.payment_reference : "")));
+      var psel = el("select");
+      psel.appendChild(new Option("mark…",""));
+      PAYNEXT.filter(function(s){ return s !== o.payment_status; })
+             .forEach(function(s){ psel.appendChild(new Option(s, s)); });
+      psel.onchange = function(){ if (psel.value) patch(o.id, {payment_status: psel.value}); };
+      c6.appendChild(psel);
+      tr.appendChild(c6);
+
+      body.appendChild(tr);
+    });
+    tb.appendChild(body);
+    wrap.appendChild(tb);
+  }
+
+  function patch(id, body){
+    fetch(API + "/orders/" + id, {method:"PATCH",
+      headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.error) alert(d.error);
+        function pubState(){
+    fetch(API + "/publish").then(function(r){ return r.json(); }).then(function(d){
+      var el = document.getElementById("pubState");
+      if (d.published){
+        el.innerHTML = "";
+        var a = document.createElement("a");
+        a.href = d.url; a.target = "_blank"; a.rel = "noopener";
+        a.textContent = location.origin + d.url;
+        el.appendChild(document.createTextNode("Live at "));
+        el.appendChild(a);
+        document.getElementById("pubBtn").textContent = "Re-publish";
+        document.getElementById("unpubBtn").hidden = false;
+      } else {
+        el.textContent = "Not published yet.";
+        document.getElementById("pubBtn").textContent = "Publish";
+        document.getElementById("unpubBtn").hidden = true;
+      }
+    });
+  }
+  document.getElementById("pubBtn").onclick = function(){
+    this.disabled = true;
+    fetch(API + "/publish", {method:"POST"}).then(function(r){ return r.json(); })
+      .then(function(d){
+        document.getElementById("pubBtn").disabled = false;
+        if (d.error) alert(d.error); else pubState();
+      });
+  };
+  document.getElementById("unpubBtn").onclick = function(){
+    fetch(API + "/publish", {method:"DELETE"}).then(function(){ pubState(); });
+  };
+
+  function priceState(){
+    fetch(API + "/shop").then(function(r){ return r.json(); }).then(function(d){
+      var el = document.getElementById("priceState");
+      var it = (d.items || [])[0];
+      if (d.orderable && it){
+        el.textContent = "Selling " + it.name + " at " + it.price_display + ".";
+        document.getElementById("price").value = it.price_display;
+      } else {
+        el.textContent = "No price set — enquiries only, no cart on the site.";
+      }
+    });
+  }
+  document.getElementById("savePrice").onclick = function(){
+    var e = document.getElementById("priceErr"); e.textContent = "";
+    fetch(API + "/price", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({price: document.getElementById("price").value})})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.error){ e.textContent = d.error; return; }
+        e.textContent = d.orderable ? "saved" : "no number found — still enquiry only";
+        priceState();
+        setTimeout(function(){ e.textContent = ""; }, 2500);
+      });
+  };
+
+  priceState();
+  pubState();
+  load();
+      });
+  }
+
+  document.getElementById("saveSettings").onclick = function(){
+    var e = document.getElementById("setErr"); e.textContent = "";
+    fetch(API + "/settings", {method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({upi_vpa: document.getElementById("vpa").value,
+                            upi_name: document.getElementById("payee").value,
+                            notify_webhook: document.getElementById("hook").value,
+                            notify_email: document.getElementById("mail").value})})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.error){ e.textContent = d.error; return; }
+        e.textContent = "saved";
+        setTimeout(function(){ e.textContent = ""; }, 1500);
+      });
+  };
+
+  load();
+  // A shop is watched while it is open; new orders should appear without a
+  // manual refresh, but not so often that it hammers the box.
+  setInterval(load, 15000);
+})();
+</script>
+</body>
+</html>

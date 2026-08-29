@@ -1,0 +1,314 @@
+{% set hclass = '' %}
+{% set tclass = '' %}
+{% set has_rule = False %}
+{% set split_headline = False %}
+{% set meta_description = (home.subtitle or tagline or site_title) | striptags | truncate(155) %}
+{% set _sn = site_name | striptags %}
+{% set social_title = site_title if (_sn | lower) in (site_title | lower) else (_sn ~ ' | ' ~ site_title) %}
+{% set A = asset_base %}
+{% set shots = shots | default({}) %}
+{% set hero_img = shots.get('hero') or image_map.get('hero') or (images[0] if images else None) %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{# Which page is being rendered, so the nav can mark it. Every shell used to
+   hardcode the active class on the home link, which left every sub-page
+   showing Home as current. #}
+{% set _cur = current_page | default('home.html') %}
+<!DOCTYPE html>
+{#
+  BINDER — adapted from the Atelier & Co design supplied in local_test/2.MD.
+
+  What was kept: the binder metaphor. A dark spine runs the full height of the
+  left edge carrying vertical tabs, and the content sits on a paper sheet that
+  is visibly lifted off it by a shadow. Fraunces display over Inter, Space Mono
+  for every label, brass rules, a stamped CTA.
+
+  What was changed for us:
+    - every colour now comes from the Grade derived from the seller's photo,
+      so the paper warms or cools with the product instead of being fixed
+    - the original switched panels with JS inside one document; we have real
+      pages, so the tabs are links and the current one is marked server-side
+    - our content schema and the shared sub-page classes are supported, so
+      About / Work / Services / Contact inherit this design for free
+#}
+<html lang="{{ site_lang | default('en') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+<meta name="description" content="{{ meta_description }}">
+{% if favicon_url %}<link rel="icon" href="{{ favicon_url }}">{% endif %}
+{% if favicon_apple_url %}<link rel="apple-touch-icon" href="{{ favicon_apple_url }}">{% endif %}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:title" content="{{ social_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+{% if share_card_url %}<meta property="og:image" content="{{ share_card_url }}">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">{% endif %}
+<meta name="twitter:card" content="{% if share_card_url %}summary_large_image{% else %}summary{% endif %}">
+<meta name="twitter:title" content="{{ social_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
+{% if share_card_url %}<meta name="twitter:image" content="{{ share_card_url }}">{% endif %}
+<meta name="theme-color" content="{{ theme.primary_dark }}">
+<style>
+  :root{
+    --ink:{{ theme.primary_dark }};
+    --ink-soft:{{ theme.primary }};
+    --paper:{{ theme.bg_alt }};
+    --paper-hi:{{ theme.bg }};
+    --text:{{ theme.text_main }};
+    --text-muted:{{ theme.text_muted }};
+    --brass:{{ theme.accent }};
+    --line:color-mix(in srgb, {{ theme.text_main }} 15%, transparent);
+    --line-light:color-mix(in srgb, {{ theme.bg }} 20%, transparent);
+    --display:'Fraunces', Georgia, serif;
+    --body:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono:'Space Mono', ui-monospace, Consolas, monospace;
+    --tab-w:64px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--body);background:var(--ink);color:var(--text);
+       -webkit-font-smoothing:antialiased;min-height:100vh}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%;display:block}
+  ul{list-style:none}
+  ::selection{background:var(--brass);color:var(--ink)}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+  @media(prefers-reduced-motion:reduce){*{transition-duration:.001ms!important}}
+
+  /* ---- the spine: fixed vertical tabs down the left edge ---- */
+  .tabstrip{position:fixed;top:0;left:0;bottom:0;width:var(--tab-w);background:var(--ink);
+            border-right:1px solid var(--line-light);z-index:100;
+            display:flex;flex-direction:column;align-items:center;padding:22px 0}
+  .tabstrip__mark{font-family:var(--display);font-weight:600;font-size:1.15rem;
+                  color:var(--paper-hi);writing-mode:vertical-rl;letter-spacing:.04em;
+                  margin-bottom:32px;max-height:42vh;overflow:hidden}
+  .tabstrip__list{display:flex;flex-direction:column;gap:6px;flex:1}
+  .tabstrip__tab{writing-mode:vertical-rl;transform:rotate(180deg);
+                 font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;
+                 text-transform:uppercase;color:color-mix(in srgb,{{ theme.bg }} 55%,transparent);
+                 padding:16px 10px;border-radius:3px 0 0 3px;position:relative;
+                 transition:color .2s,background .2s}
+  .tabstrip__tab:hover{color:var(--paper-hi);background:var(--ink-soft)}
+  .tabstrip__tab.is-active{color:var(--ink);background:var(--paper)}
+  .tabstrip__foot{font-family:var(--mono);font-size:.6rem;writing-mode:vertical-rl;
+                  color:color-mix(in srgb,{{ theme.bg }} 34%,transparent);letter-spacing:.14em}
+
+  /* ---- the sheet, lifted off the spine ---- */
+  .page{margin-left:var(--tab-w);background:var(--paper);min-height:100vh;
+        box-shadow:-18px 0 40px rgba(0,0,0,.28)}
+  .wrap{max-width:980px;margin:0 auto;padding:0 46px}
+
+  .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;
+           text-transform:uppercase;color:var(--brass);margin:0 0 20px}
+  h1{font:500 clamp(38px,5.4vw,64px)/1.06 var(--display);color:var(--text);
+     letter-spacing:-.018em;margin:0 0 20px;text-wrap:balance;max-width:16ch}
+  h1 em{font-style:italic;color:var(--brass);font-weight:400}
+  h2{font:500 clamp(26px,3.4vw,38px)/1.12 var(--display);letter-spacing:-.015em;
+     margin:0 0 10px;text-wrap:balance}
+  h3{font:500 20px/1.3 var(--display);letter-spacing:-.01em;margin:0 0 9px}
+  .lede{font-size:17px;line-height:1.72;color:var(--text-muted);max-width:60ch;margin:0 0 14px}
+  .rule{display:none}
+
+  .hero{padding:88px 0 70px;border-bottom:1px solid var(--line)}
+  .hero .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,380px);
+              gap:56px;align-items:center}
+  .hero-split.rev .wrap>.shot{order:-1}
+  .hero-inset .wrap{grid-template-columns:minmax(0,1fr) minmax(0,250px)}
+  .hero-stack .wrap{grid-template-columns:1fr;max-width:720px}
+  .hero-sub{font-size:17.5px;line-height:1.72;color:var(--text-muted);margin:0 0 32px;max-width:44ch}
+  .shot{margin:0;border:1px solid var(--line);padding:10px;background:var(--paper-hi)}
+  .shot img{width:100%;height:auto}
+  .hero-under img,.hero-plate img{width:100%;max-height:420px;object-fit:cover;
+                                  border-block:1px solid var(--line)}
+  .hero-bleed{position:relative;min-height:460px;display:flex;align-items:flex-end;padding:0}
+  .hero-bleed .hero-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .hero-bleed::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(to top,var(--paper) 8%,transparent 68%)}
+  .hero-bleed .wrap{position:relative;z-index:1;padding-block:56px}
+
+  .buy{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+  .price{font:700 20px/1 var(--mono);letter-spacing:-.02em}
+  /* the stamped CTA — ink block with a brass offset behind it */
+  .cta{display:inline-block;background:var(--ink);color:var(--paper-hi);
+       font-family:var(--mono);font-size:.76rem;letter-spacing:.12em;text-transform:uppercase;
+       padding:15px 28px;position:relative;border-radius:2px}
+  .cta::after{content:"";position:absolute;inset:5px -5px -5px 5px;border:1px solid var(--brass);
+              border-radius:2px;z-index:-1}
+  .cta:hover{background:var(--ink-soft)}
+
+  section{padding:66px 0;border-bottom:1px solid var(--line)}
+  .band{background:var(--paper-hi)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;margin-top:26px}
+  .card{background:var(--paper-hi);border:1px solid var(--line);padding:32px 26px;
+        border-radius:3px;transition:border-color .2s,transform .2s}
+  .band .card{background:var(--paper)}
+  .card:hover{border-color:var(--brass);transform:translateY(-2px)}
+  .card p{margin:0;font-size:15.5px;line-height:1.68;color:var(--text-muted)}
+
+  .pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:22px}
+  .pillar{border-top:2px solid var(--brass);padding-top:16px}
+  .pillar p{margin:0;font-size:15.5px;color:var(--text-muted)}
+
+  /* the dark ledger strip — the one block that stays ink on the paper page */
+  .ledger{background:var(--ink);border-radius:3px;padding:34px 30px;margin-top:26px;
+          display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:22px}
+  .ledger div{color:var(--paper-hi)}
+  .ledger dt{font-family:var(--mono);font-size:.66rem;letter-spacing:.16em;
+             text-transform:uppercase;color:var(--brass);margin-bottom:9px}
+  .ledger dd{margin:0;font:500 17px/1.5 var(--display)}
+
+  .work{padding:0;margin:26px 0 0}
+  .work li{padding:24px 0;border-top:1px solid var(--line);display:grid;
+           grid-template-columns:minmax(0,150px) minmax(0,1fr);gap:28px;align-items:start}
+  .work .tag{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;
+             text-transform:uppercase;color:var(--brass)}
+  .work p{margin:0;font-size:15.5px;color:var(--text-muted)}
+  .work-shot{margin:0 0 14px;border:1px solid var(--line);padding:8px;background:var(--paper-hi)}
+  .work-shot img{width:100%;max-height:220px;object-fit:cover}
+
+  .quote{border-left:2px solid var(--brass);padding-left:20px;margin:0 0 24px;max-width:62ch}
+  .quote p{font:italic 400 19px/1.6 var(--display);margin:0 0 10px}
+  .quote span{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;
+              text-transform:uppercase;color:var(--text-muted)}
+
+  .faq{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:26px;margin-top:24px}
+  .faq p{margin:0;font-size:15.5px;color:var(--text-muted)}
+
+  .contact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+                gap:24px;margin-top:28px}
+  .contact-grid span{display:block;font-family:var(--mono);font-size:.68rem;
+                     letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin-bottom:8px}
+  .contact-grid b{font:500 17px/1.5 var(--display);font-weight:500}
+
+  .shot-detail,.shot-wide{margin:0;border:1px solid var(--line);padding:8px;background:var(--paper-hi)}
+  .shot-wide{margin-top:26px}
+  .shot-detail img,.shot-wide img{width:100%;height:auto}
+  .with-shot{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:44px;align-items:start}
+  .with-shot>.shot-detail{order:2}
+
+  .foot{padding:34px 0;font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;
+        text-transform:uppercase;color:var(--text-muted)}
+  .foot .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+
+  @media(max-width:860px){
+    :root{--tab-w:0px}
+    .tabstrip{position:static;width:auto;height:auto;flex-direction:row;flex-wrap:wrap;
+              align-items:center;gap:4px;padding:12px 16px;border-right:0;
+              border-bottom:1px solid var(--line-light)}
+    .tabstrip__mark{writing-mode:horizontal-tb;margin:0 14px 0 0;font-size:1rem}
+    .tabstrip__list{flex-direction:row;flex-wrap:wrap;gap:4px;flex:0}
+    .tabstrip__tab{writing-mode:horizontal-tb;transform:none;padding:8px 12px;border-radius:3px}
+    .tabstrip__foot{display:none}
+    .page{margin-left:0;box-shadow:none}
+    .wrap{padding:0 22px}
+    .hero{padding:44px 0 36px}
+    .hero .wrap,.hero-inset .wrap{grid-template-columns:1fr;gap:30px}
+    .hero-split.rev .wrap>.shot{order:0}
+    section{padding:44px 0}
+    .work li{grid-template-columns:1fr;gap:8px}
+    .with-shot{grid-template-columns:1fr;gap:26px}
+    .with-shot>.shot-detail{order:0}
+  }
+
+  /* reviews — ruled cards on the sheet, one featured in ink */
+  .rating-summary{display:flex;align-items:center;gap:26px;background:var(--paper-hi);
+                  border:1px solid var(--line);border-radius:3px;padding:24px 28px;margin:0 0 24px}
+  .rating-summary__num{font:400 italic 46px/1 var(--display);color:var(--ink)}
+  .rating-summary__meta{display:flex;flex-direction:column;gap:6px}
+  .stars,.review__stars{font-family:var(--mono);color:var(--brass);letter-spacing:2px;font-size:.9rem}
+  .rating-summary__count{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;
+                         text-transform:uppercase;color:var(--text-muted)}
+  .reviews{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px}
+  .review{background:var(--paper-hi);border:1px solid var(--line);border-radius:3px;padding:30px 28px}
+  .band .review{background:var(--paper)}
+  .review:first-child{grid-column:span 2;background:var(--ink);color:var(--paper-hi)}
+  .review:first-child .review__text{color:var(--paper-hi)}
+  .review__text{font-size:16px;line-height:1.7;margin:16px 0 20px;color:var(--text)}
+  .review__who{display:flex;align-items:center;gap:12px}
+  .avatar{width:38px;height:38px;border-radius:50%;background:var(--ink);color:var(--paper-hi);
+          display:grid;place-items:center;font-family:var(--mono);font-size:.82rem}
+  .review:first-child .avatar{background:var(--brass);color:var(--ink)}
+  .review__name{display:block;font:500 15px/1.4 var(--display)}
+  .review__role{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;
+                text-transform:uppercase;color:var(--text-muted);font-style:normal}
+  .review:first-child .review__role{color:var(--brass)}
+  @media(max-width:760px){.review:first-child{grid-column:auto}}
+
+  .reviews-section{}
+  .rev-dots{display:none}
+
+  /* Cards in a row line up even when only some of them carry a photo:
+     the card is a column, the copy block grows, so titles and text sit on the
+     same line across the row instead of drifting. */
+  .work li{display:flex;flex-direction:column}
+  .work li>div{flex:1;display:flex;flex-direction:column}
+  .work-shot img{width:100%;display:block;aspect-ratio:1.7/1;object-fit:cover}
+  .card{display:flex;flex-direction:column}
+  .card__photo img{width:100%;display:block;aspect-ratio:1.7/1;object-fit:cover}
+{% include "packs/_pages/_composition.css" %}
+</style>
+</head>
+<body>
+
+<nav class="tabstrip" aria-label="Sections">
+  <a href="home.html" class="tabstrip__mark">{{ site_name }}</a>
+  <div class="tabstrip__list">
+    <a href="home.html" class="tabstrip__tab{% if _cur == 'home.html' %} is-active{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>Index</a>
+    {% if 'services' in layout %}<a href="services.html" class="tabstrip__tab{% if _cur == 'services.html' %} is-active{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>Work we do</a>{% endif %}
+    {% if 'portfolio' in layout %}<a href="portfolio.html" class="tabstrip__tab{% if _cur == 'portfolio.html' %} is-active{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>Selected</a>{% endif %}
+    {% if 'about' in layout %}<a href="about.html" class="tabstrip__tab{% if _cur == 'about.html' %} is-active{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>Studio</a>{% endif %}
+    {% if 'contact' in layout %}<a href="contact.html" class="tabstrip__tab{% if _cur == 'contact.html' %} is-active{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>Contact</a>{% endif %}
+  </div>
+  <span class="tabstrip__foot">{{ footer.copyright or site_name }}</span>
+</nav>
+
+<main class="page">
+  {% block main %}{% endblock %}
+  <div class="foot">
+    <div class="wrap">
+      <span>{{ footer.copyright or site_name }}</span>
+      {% if footer.address %}<span>{{ footer.address }}</span>{% endif %}
+    </div>
+  </div>
+</main>
+
+<script>
+/* Arrival motion. The hidden state lives behind html.js-reveal, which is only
+   ever set here — so a page whose JS is blocked or errors renders every section
+   fully visible instead of blank. */
+(function(){
+  var root=document.documentElement;
+  if(!('IntersectionObserver' in window)) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.classList.add('js-reveal');
+  var els=[].slice.call(document.querySelectorAll('.reveal'));
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('is-in'); io.unobserve(e.target); }
+    });
+  },{rootMargin:'0px 0px -8% 0px',threshold:0.06});
+  var above=[],below=[];
+  els.forEach(function(el){
+    (el.getBoundingClientRect().top < window.innerHeight*0.92 ? above : below).push(el);
+  });
+  below.forEach(function(el){ io.observe(el); });
+  /* Safety net. Anything still hidden after 2.5s is shown regardless — if the
+     observer never fires (throttled tab, print, an odd viewport, a headless
+     capture) the content must not stay at opacity 0 permanently. */
+  setTimeout(function(){
+    els.forEach(function(el){ el.classList.add('is-in'); });
+  }, 2500);
+  /* Two frames, so the transition actually plays on what is already on screen
+     rather than being collapsed into the first paint. */
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    above.forEach(function(el,i){ setTimeout(function(){ el.classList.add('is-in'); }, i*70); });
+  });});
+})();
+</script>
+{% include "packs/_pages/_shop.html" %}
+</body>
+</html>

@@ -1,0 +1,63 @@
+{% extends "packs/noir/_shell.html" %}
+{% set current_page = 'home.html' %}
+{% block main %}
+{#
+  NOIR shows ONE thing at a time. No card grid, no pillar row — a full hero,
+  then a single centred statement, then the making set as a quiet definition
+  list, then the pieces. Sparse on purpose: this is how an expensive object is
+  presented in a room.
+#}
+{% include "packs/_pages/_hero.html" %}
+
+{% if about and about.description %}
+<section {{ sect(0) }}>
+  <div class="wrap">
+    <p class="statement">{{ about.description }}</p>
+    {% if about.mission %}<p class="attrib">{{ about.mission }}</p>{% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if services %}
+<section {{ sect(1) }}>
+  <div class="wrap">
+    <h2>{{ home.label or 'The making' }}</h2>
+    <dl class="spec">
+      {% for s in services %}
+      <dt>{{ s.title }}</dt><dd>{{ s.description }}</dd>
+      {% endfor %}
+      {% if home.pillar1_title %}<dt>{{ home.pillar1_title }}</dt><dd>{{ home.pillar1_desc }}</dd>{% endif %}
+      {% if home.pillar2_title %}<dt>{{ home.pillar2_title }}</dt><dd>{{ home.pillar2_desc }}</dd>{% endif %}
+    </dl>
+  </div>
+</section>
+{% endif %}
+
+{% set _g = shots.get('gallery') or [] %}
+{% if _g %}
+<section {{ sect(2) }}>
+  <div class="wrap">
+    <div class="plate-row">
+      {% for g in _g[:3] %}<figure><img src="{{ g }}" alt="{{ site_title }}"></figure>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% include "packs/_pages/_feature.html" %}
+{% include "packs/_pages/_reviews.html" %}
+
+{% if contact %}
+<section {{ sect(3) }}>
+  <div class="wrap contact-quiet">
+    <h2>{{ contact.title or 'Enquire' }}</h2>
+    <p class="lede">{{ contact.description }}</p>
+    <p class="lines">
+      {% if contact.phone %}{{ contact.phone }}{% endif %}
+      {% if contact.email %}<br>{{ contact.email }}{% endif %}
+      {% if contact.address %}<br>{{ contact.address }}{% endif %}
+    </p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

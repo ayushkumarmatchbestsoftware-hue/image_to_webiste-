@@ -1,0 +1,49 @@
+{#
+  Reviews. Shared markup, styled by each Pack in its own voice — the same
+  approach as _hero.html, so adding a Pack gets this for free.
+
+  The stars are driven by a real `rating` on each review, not printed five
+  times as decoration. The summary averages the ratings actually present, so
+  the number under it is arithmetic rather than a claim.
+
+  Every text node here is marked data-edit, so edit mode picks them up and the
+  seller can rewrite a review, change a name, or drop one entirely.
+#}
+{% set _revs = testimonials | default([]) %}
+{% if _revs %}
+{% set _rated = _revs | selectattr('rating') | list %}
+{% set _avg = ((_rated | sum(attribute='rating')) / (_rated | length)) if _rated else 5 %}
+<section class="reviews-section {{ reviews_band | default('band') }} reveal">
+  <div class="wrap">
+    <p class="eyebrow {{ tclass }}">What buyers say</p>
+    <h2 class="{{ hclass }}">Reviews</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+
+    <div class="rating-summary" data-eb-keep>
+      <span class="rating-summary__num">{{ '%.1f' % _avg }}</span>
+      <div class="rating-summary__meta">
+        <span class="stars" aria-label="{{ '%.1f' % _avg }} out of 5">
+          {%- for i in range(5) -%}{{ '★' if i < (_avg | round | int) else '☆' }}{%- endfor -%}
+        </span>
+        <span class="rating-summary__count">{{ _revs | length }} review{{ 's' if _revs | length != 1 }}</span>
+      </div>
+    </div>
+
+    <div class="reviews" id="eb-reviews">
+      {% for t in _revs %}
+      <article class="review" data-eb-item="review">
+        <span class="review__stars" aria-label="{{ t.rating | default(5) }} out of 5">
+          {%- for i in range(5) -%}{{ '★' if i < (t.rating | default(5)) else '☆' }}{%- endfor -%}
+        </span>
+        <p class="review__text">{{ t.text }}</p>
+        <div class="review__who">
+          <span class="avatar" aria-hidden="true">{{ (t.name or 'A')[0] | upper }}</span>
+          <span><b class="review__name">{{ t.name }}</b>{% if t.role %}<em class="review__role">{{ t.role }}</em>{% endif %}</span>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    <div class="rev-dots" id="rev-dots"></div>
+  </div>
+</section>
+{% endif %}

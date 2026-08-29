@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Image to Website</title>
+<style>
+  :root{
+    --bg:#0f1115;--panel:#171a21;--panel2:#1e222b;--sunk:#12151b;--line:#2a2f3a;
+    --text:#e6e9ef;--muted:#9aa3b2;--dim:#5f6875;
+    --accent:#5b8cff;--ok:#3ecf8e;--warn:#f5a623;--err:#ff5c5c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+       background:var(--bg);color:var(--text)}
+
+  header{padding:12px 18px;border-bottom:1px solid var(--line);display:flex;
+         align-items:center;gap:10px;background:var(--panel);flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:-.01em}
+  .pill{font-size:11px;padding:3px 9px;border-radius:99px;background:var(--panel2);
+        color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+  .pill.ok{color:var(--ok);border-color:#1f4d3a;background:rgba(62,207,142,.08)}
+  .pill.warn{color:var(--warn);border-color:#6b4d15;background:rgba(245,166,35,.08)}
+  .pill.err{color:var(--err);border-color:#5b2626;background:rgba(255,92,92,.08)}
+
+  main{display:grid;grid-template-columns:404px 1fr;height:calc(100vh - 49px)}
+  .side{border-right:1px solid var(--line);overflow-y:auto;padding:16px;background:var(--panel)}
+  .view{display:flex;flex-direction:column;min-width:0}
+
+  .step{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:11px;
+        background:var(--panel2);transition:opacity .18s}
+  .step.off{opacity:.4;pointer-events:none}
+  .step h3{margin:0 0 4px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;
+           color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px}
+  .step h3 b{width:19px;height:19px;border-radius:99px;background:var(--accent);color:#fff;
+             font-size:11px;display:grid;place-items:center;font-weight:700;flex:none}
+  .step h3 .tick{background:var(--ok)}
+  .hint{font-size:11.5px;color:var(--dim);margin:0 0 10px 27px}
+
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px}
+  label .req{color:var(--warn)}
+  input[type=text],textarea,select{width:100%;padding:9px 11px;background:var(--sunk);
+    border:1px solid var(--line);border-radius:7px;color:var(--text);font:inherit;outline:none}
+  input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+  textarea{min-height:58px;resize:vertical}
+  input[type=file]{width:100%;font-size:12px;color:var(--muted);padding:6px 0}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+
+  button{width:100%;margin-top:12px;padding:10px;border:0;border-radius:7px;
+         background:var(--accent);color:#fff;font:600 13.5px/1 inherit;cursor:pointer}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.ghost{background:var(--sunk);border:1px solid var(--line);color:var(--text);font-weight:500}
+
+  .verdict{border-radius:8px;padding:10px 12px;margin-top:11px;font-size:13px;display:none}
+  .verdict.pass{background:rgba(62,207,142,.09);border:1px solid #1f4d3a}
+  .verdict.warn{background:rgba(245,166,35,.09);border:1px solid #6b4d15}
+  .verdict.fail{background:rgba(255,92,92,.09);border:1px solid #5b2626}
+  .verdict .hd{font-weight:600}
+  .verdict.pass .hd{color:var(--ok)} .verdict.warn .hd{color:var(--warn)} .verdict.fail .hd{color:var(--err)}
+  .verdict .g{color:var(--text);margin-top:5px;font-size:12.5px;line-height:1.5}
+
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:9px;display:none}
+  .metrics div{background:var(--sunk);border:1px solid var(--line);border-radius:6px;
+               padding:6px 7px;text-align:center}
+  .metrics b{display:block;font:11px ui-monospace,monospace;color:var(--text)}
+  .metrics span{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+
+  .spec{margin-top:9px;font:11.5px/1.6 ui-monospace,monospace;color:var(--muted);
+        background:#0b0d11;border:1px solid var(--line);border-radius:7px;padding:9px 11px;display:none}
+  .spec .k{color:var(--dim)} .spec .v{color:var(--text)}
+  .sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:3px;
+      vertical-align:-2px;border:1px solid rgba(255,255,255,.22)}
+
+  .bar{display:flex;align-items:center;gap:8px;padding:8px 13px;border-bottom:1px solid var(--line);
+       background:var(--panel);min-height:45px;flex-wrap:wrap}
+  .bar .sp{flex:1}
+  .bar a,.bar button{width:auto;margin:0;padding:6px 12px;font-size:12.5px;border-radius:6px;
+    text-decoration:none;background:var(--panel2);border:1px solid var(--line);
+    color:var(--text);font-weight:500;cursor:pointer}
+  .bar button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .status{font-size:12.5px;color:var(--muted);font-family:ui-monospace,monospace}
+  .status.run{color:var(--warn)}.status.done{color:var(--ok)}.status.fail{color:var(--err)}
+
+  iframe{flex:1;width:100%;border:0;background:#fff}
+  .empty{flex:1;display:grid;place-content:center;color:var(--muted);text-align:center;
+         gap:8px;padding:30px}
+  .empty .big{font-size:15px;color:var(--text)}
+  .empty .d{color:var(--dim);font-size:12.5px}
+
+  .log{max-height:150px;overflow-y:auto;background:#0b0d11;border:1px solid var(--line);
+       border-radius:7px;padding:8px 10px;font:11.5px/1.6 ui-monospace,monospace;
+       color:var(--muted);margin-top:11px;white-space:pre-wrap;display:none}
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));
+          gap:6px;margin-top:9px}
+  .thumbs figure{margin:0;position:relative}
+  .thumbs img{width:100%;height:74px;object-fit:cover;border-radius:6px;
+              border:1px solid var(--line);background:var(--sunk);display:block}
+  .thumbs .lead{outline:2px solid var(--accent);outline-offset:1px}
+  .thumbs figcaption{position:absolute;left:4px;bottom:4px;font-size:9px;
+    background:rgba(0,0,0,.7);color:#fff;padding:2px 5px;border-radius:3px;
+    letter-spacing:.04em}
+  .note{font-size:11.5px;line-height:1.5;color:var(--warn);background:rgba(245,166,35,.07);
+        border:1px solid #6b4d15;border-radius:7px;padding:8px 10px;margin-bottom:11px;display:none}
+
+  /* generation progress — driven by the pipeline, not a timer */
+  .prog{margin-top:14px;display:none}
+  .prog .track{height:8px;border-radius:99px;background:var(--sunk);
+               border:1px solid var(--line);overflow:hidden}
+  .prog .fill{height:100%;width:0;border-radius:99px;background:var(--accent);
+              transition:width .45s cubic-bezier(.4,0,.2,1)}
+  .prog.done .fill{background:var(--ok)}
+  .prog.fail .fill{background:var(--err)}
+  .prog .meta{display:flex;justify-content:space-between;gap:12px;margin-top:7px;
+              font-size:12px;color:var(--muted)}
+  .prog .pct{font-family:ui-monospace,monospace;color:var(--text);
+             font-variant-numeric:tabular-nums}
+  .prog .track{position:relative}
+  .prog.run .track::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);
+    background-size:180px 100%;background-repeat:no-repeat;
+    animation:sweep 1.5s linear infinite}
+  @keyframes sweep{from{background-position:-180px 0}to{background-position:calc(100% + 180px) 0}}
+  @media(prefers-reduced-motion:reduce){.prog.run .track::after{animation:none}}
+  @media(max-width:900px){main{grid-template-columns:1fr;height:auto}iframe{height:70vh}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Image to Website</h1>
+  <span class="pill" id="mode">checking…</span>
+  <span class="pill" id="mdl"></span>
+  <span class="pill" id="packpill" style="display:none"></span>
+</header>
+
+<main>
+  <div class="side">
+
+    <div class="note" id="offnote"></div>
+
+    <div class="step" id="s1">
+      <h3><b id="n1">1</b> Photograph the product</h3>
+      <p class="hint">Add up to 5. The best one leads; the rest fill your other pages.</p>
+      <input type="file" id="photo" accept="image/*" multiple>
+      <div class="thumbs" id="thumbs"></div>
+      <button id="go1">Check this photo</button>
+      <div class="verdict" id="verdict"></div>
+      <div class="metrics" id="metrics"></div>
+      <div class="spec" id="spec"></div>
+    </div>
+
+    <div class="step off" id="s2">
+      <h3><b id="n2">2</b> Your details</h3>
+      <p class="hint" id="s2hint">Unlocks once the photo has been checked.</p>
+
+      <div class="row">
+        <div>
+          <label>What is it? <span class="req" id="catreq"></span></label>
+          <select id="category">
+            <option value="">detected automatically</option>
+            <option value="apparel">apparel / clothing</option>
+            <option value="food">food</option>
+            <option value="toys">toys / books / craft</option>
+            <option value="other">something else</option>
+          </select>
+        </div>
+        <div>
+          <label>In a few words <span class="req" id="subreq"></span></label>
+          <input type="text" id="subtype" placeholder="wooden toy duck">
+        </div>
+      </div>
+
+      <label>Brand name</label>
+      <input type="text" id="brand" placeholder="Channapatna Toys">
+
+      <div class="row">
+        <div><label>Price</label><input type="text" id="price" placeholder="&#8377;450"></div>
+        <div><label>Spacing</label>
+          <select id="density">
+            <option value="generous">generous</option>
+            <option value="dense">dense</option>
+          </select>
+        </div>
+      </div>
+
+      <label>Anything else worth saying</label>
+      <textarea id="facts" placeholder="Made in Channapatna from mango wood and natural lacquer."></textarea>
+
+      <button id="go2">Build my website</button>
+      <div class="prog" id="prog">
+        <div class="track"><div class="fill" id="progFill"></div></div>
+        <div class="meta"><span id="progStage">Getting ready</span><span class="pct" id="progPct">0%</span></div>
+      </div>
+      <button class="ghost" id="spin" style="display:none">Try a different design</button>
+    </div>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="view">
+    <div class="bar">
+      <span class="status" id="status">idle</span>
+      <span class="sp"></span>
+      <button id="editBtn" style="display:none">Edit page</button>
+      <a id="open" href="#" target="_blank" style="display:none">Open in tab</a>
+      <a id="dl1" href="#" style="display:none">Download .html</a>
+      <a id="dl" href="#" style="display:none">Download .zip</a>
+    </div>
+    <div class="empty" id="empty">
+      <div class="big">Upload a product photo to begin.</div>
+      <div class="d">Your photo decides the design &mdash; colours, type and layout.</div>
+      <div class="d">Nothing from the template appears on your page. Only your image.</div>
+    </div>
+    <iframe id="frame" style="display:none"></iframe>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let TOKEN=null, EXTRA=[], SPIN=0, OVERRIDE=false, WID=null, URLBASE=null, poll=null;
+let OFFLINE=false, EDITING=false;
+
+function log(m,c){ const e=$("log"); e.style.display="block";
+  e.innerHTML += '<span style="color:#5f6875">'+new Date().toLocaleTimeString()+'</span>  '+
+                 '<span style="color:'+(c||'inherit')+'">'+m+'</span>\n';
+  e.scrollTop=e.scrollHeight; }
+function showProgress(pct, stage, cls){
+  const p=$("prog");
+  p.style.display="block";
+  p.className="prog "+(cls||"");
+  $("progFill").style.width=Math.max(2,Math.min(100,pct))+"%";
+  $("progStage").textContent=stage;
+  $("progPct").textContent=Math.round(pct)+"%";
+}
+function setStatus(t,c){ const e=$("status"); e.textContent=t; e.className="status "+(c||""); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+
+// ---- mode banner ---------------------------------------------------------
+fetch("/health").then(r=>r.json()).then(d=>{
+  OFFLINE = !!d.offline;
+  $("mode").textContent = OFFLINE ? "offline mode" : (d.provider+" connected");
+  $("mode").className = "pill " + (OFFLINE ? "warn" : "ok");
+  $("mdl").textContent = OFFLINE ? "no model calls" : d.model_fast;
+  if(!OFFLINE && d.vision === false){
+    $("offnote").style.display="block";
+    $("offnote").innerHTML =
+      "<b>"+esc(d.provider)+" cannot see photographs.</b> It will write your text, "+
+      "but it cannot identify the product. Colours and shape still come from your "+
+      "image &mdash; you just need to say what it is.";
+    $("catreq").textContent="(required)"; $("subreq").textContent="(required)";
+  }
+  if(OFFLINE){
+    $("offnote").style.display="block";
+    $("offnote").innerHTML =
+      "<b>Running without AI.</b> " + esc(d.offline_reason||"no usable API key") + ".<br>" +
+      "Colours, shape and photo quality are still read from your image, and the " +
+      "design is still chosen for you. But you need to say what the product is, " +
+      "and the text will be placeholder for you to edit.";
+    $("catreq").textContent = "(required)";
+    $("subreq").textContent = "(required)";
+  }
+}).catch(()=>{ $("mode").textContent="server unreachable"; $("mode").className="pill err"; });
+
+fetch("/packs-info").then(r=>r.json()).then(d=>{
+  log("designs available: " + d.packs.map(p=>p.slug).join(", "));
+}).catch(()=>{});
+
+// ---- photo preview -------------------------------------------------------
+$("photo").addEventListener("change", e=>{
+  const fs=[...e.target.files].slice(0,5);
+  $("thumbs").innerHTML = fs.map((f,i)=>
+    '<figure><img src="'+URL.createObjectURL(f)+'">'+
+    (i===0?'<figcaption>main</figcaption>':'')+'</figure>').join("");
+  if(fs.length>5) log("only the first 5 photos are used","#f5a623");
+});
+
+// ---- STEP 1 : review the photo ------------------------------------------
+$("go1").addEventListener("click", async ()=>{
+  const fs=[...$("photo").files].slice(0,5);
+  if(!fs.length){ log("pick at least one photo","#ff5c5c"); return; }
+  $("go1").disabled=true; setStatus("reviewing photo…","run"); log("POST /triage");
+
+  const fd=new FormData();
+  fd.append("photo", fs[0]);
+  fs.slice(1).forEach(x=>fd.append("photos", x));
+  let r;
+  try{ r = await (await fetch("/triage",{method:"POST",body:fd})).json(); }
+  catch(err){ setStatus("failed","fail"); log(String(err),"#ff5c5c"); $("go1").disabled=false; return; }
+  if(r.error){ setStatus("failed","fail"); log(r.error,"#ff5c5c"); $("go1").disabled=false; return; }
+
+  TOKEN = r.photo_token;
+  EXTRA = (r.extra_photos||[]).map(x=>x.token);
+  if(r.photo_count > 1){
+    log(r.photo_count+" photos accepted - "+EXTRA.length+" will fill your other pages","#3ecf8e");
+    (r.extra_photos||[]).forEach((x,i)=>{
+      if((x.defects||[]).length) log("  photo "+(i+2)+": "+x.defects.join(", "),"#f5a623");
+    });
+  }
+  const q = r.quality||{};
+
+  // metrics strip
+  $("metrics").style.display="grid";
+  $("metrics").innerHTML =
+    '<div><b>'+(q.long_edge||"?")+'px</b><span>size</span></div>'+
+    '<div><b>'+(q.mean||"?")+'</b><span>brightness</span></div>'+
+    '<div><b>'+(q.focus_var||"?")+'</b><span>sharpness</span></div>'+
+    '<div><b>'+(q.cast_ratio||"?")+'</b><span>colour cast</span></div>';
+
+  // verdict
+  const v=$("verdict"); v.className="verdict "+r.verdict; v.style.display="block";
+  const head={pass:"Good photo.",warn:"Usable, but it could be better.",
+              fail:"This photo will hold your page back."}[r.verdict]||"Checked.";
+  v.innerHTML='<div class="hd">'+head+'</div>'+(r.guidance?'<div class="g">'+esc(r.guidance)+'</div>':'');
+  log("defects: "+((r.defects||[]).join(", ")||"none"));
+
+  // product spec
+  if(r.spec){
+    const s=r.spec;
+    const sw=(s.dominant_colours||[]).map(c=>'<span class="sw" style="background:'+esc(c)+'"></span>').join("");
+    const row=(k,val)=> val ? '<span class="k">'+k.padEnd(11)+'</span><span class="v">'+esc(val)+'</span>\n' : '';
+    $("spec").style.display="block";
+    $("spec").innerHTML =
+      '<span class="v">What we can tell from your photo</span>\n\n'+
+      row("category", s.category + (s.low_confidence?"  (unsure)":"")) +
+      row("type", s.sub_type!=="product"?s.sub_type:"") +
+      row("material", s.material) + row("finish", s.finish) + row("mood", s.mood) +
+      row("shape", (s.geometry||{}).orientation) +
+      row("audience", s.implied_audience) + row("price band", s.implied_price_band) +
+      '<span class="k">colours    </span>'+sw;
+
+    if(s.category && s.category!=="other") $("category").value=s.category;
+    if(s.sub_type && s.sub_type!=="product") $("subtype").value=s.sub_type;
+    if(s.implied_price_band) $("price").placeholder=s.implied_price_band+" range";
+  }
+
+  // The circuit breaker only trips on the first real call, so /health can
+  // still have said "connected" when the page loaded. Correct the header the
+  // moment we actually know.
+  if(r.offline){
+    OFFLINE=true;
+    $("mode").textContent="offline mode"; $("mode").className="pill warn";
+    $("mdl").textContent="no model calls";
+    $("catreq").textContent="(required)"; $("subreq").textContent="(required)";
+    $("offnote").style.display="block";
+    $("offnote").innerHTML =
+      "<b>Running without AI.</b> " + esc(r.offline_reason||"no usable API key") + ".<br>" +
+      "Colours, shape and photo quality still come from your image, and the " +
+      "design is still chosen for you. But you need to say what the product is, " +
+      "and the text will be placeholder for you to edit.";
+    log("offline: "+(r.offline_reason||"no model")+" — tell us what the product is","#f5a623");
+  }
+
+  if(r.verdict==="fail"){
+    setStatus("photo: needs work","fail");
+    $("go2").textContent="Use this photo anyway"; OVERRIDE=true;
+  } else {
+    setStatus("photo: "+r.verdict, r.verdict==="pass"?"done":"run");
+    $("go2").textContent="Build my website"; OVERRIDE=false;
+  }
+
+  $("n1").classList.add("tick"); $("n1").textContent="✓";
+  $("s2").classList.remove("off");
+  $("s2hint").textContent = OFFLINE
+    ? "We could not identify the product automatically — please say what it is."
+    : "Checked against your photo. Correct anything that looks wrong.";
+  $("go1").disabled=false;
+});
+
+// ---- STEP 2 : build ------------------------------------------------------
+async function build(){
+  if(!TOKEN){ log("review the photo first","#ff5c5c"); return; }
+  if(OFFLINE && !$("category").value){
+    log("pick what the product is — required without AI","#ff5c5c");
+    $("category").focus(); return;
+  }
+  if(poll) clearInterval(poll);
+  $("go2").disabled=true; $("spin").disabled=true;
+
+  const fd=new FormData();
+  fd.append("photo_token",TOKEN);
+  fd.append("extra_tokens",EXTRA.join(","));
+  fd.append("brand_name",$("brand").value);
+  fd.append("price",$("price").value);
+  fd.append("seller_facts",$("facts").value);
+  fd.append("density",$("density").value);
+  fd.append("spin",SPIN);
+  fd.append("override_triage",OVERRIDE);
+  fd.append("category",$("category").value);
+  fd.append("sub_type",$("subtype").value);
+
+  setStatus("starting…","run"); log("POST /generate-from-photo (spin "+SPIN+")");
+  showProgress(0, "Getting ready", "run");
+  let r;
+  try{ r = await (await fetch("/generate-from-photo",{method:"POST",body:fd})).json(); }
+  catch(err){ setStatus("failed","fail"); log(String(err),"#ff5c5c");
+              $("go2").disabled=false; $("spin").disabled=false; return; }
+  if(!r.success){ setStatus("failed","fail"); log(r.error||"unknown","#ff5c5c");
+                  $("go2").disabled=false; $("spin").disabled=false; return; }
+
+  log("job "+r.job_id.slice(0,8)+" queued");
+  const t0=Date.now();
+  poll=setInterval(async ()=>{
+    const secs=Math.round((Date.now()-t0)/1000);
+    let s; try{ s = await (await fetch("/job-status/"+r.job_id)).json(); }catch{ return; }
+
+    if(typeof s.progress === "number"){
+      showProgress(s.progress, s.stage || "Working", "run");
+    }
+    if(s.status==="completed"){
+      clearInterval(poll); poll=null;
+      WID=r.website_id; URLBASE="/preview/"+WID+"/home.html";
+      EDITING=false;
+      showProgress(100, "Ready", "done");
+      setStatus("done in "+secs+"s","done"); log("completed in "+secs+"s","#3ecf8e");
+      $("n2").classList.add("tick"); $("n2").textContent="✓";
+      $("empty").style.display="none"; $("frame").style.display="block";
+      $("frame").src=URLBASE+"?t="+Date.now();
+      $("open").href=URLBASE; $("open").style.display="inline-block";
+      $("dl").href="/download/"+WID; $("dl").style.display="inline-block";
+      $("dl1").href="/download/"+WID+"?single=1"; $("dl1").style.display="inline-block";
+      $("editBtn").style.display="inline-block"; $("editBtn").textContent="Edit page";
+      $("editBtn").classList.remove("on");
+      $("spin").style.display="block"; $("spin").disabled=false; $("go2").disabled=false;
+      fetch("/history").then(x=>x.json()).then(h=>{
+        const me=(h.items||[]).find(i=>i.website_id===WID);
+        if(me && me.pack){ $("packpill").style.display="inline-block";
+          $("packpill").textContent="design: "+me.pack; log("design chosen: "+me.pack,"#3ecf8e"); }
+      }).catch(()=>{});
+    } else if(s.status==="failed"){
+      clearInterval(poll); poll=null;
+      showProgress(100, "Failed", "fail");
+      setStatus("failed","fail"); log("FAILED: "+(s.error||"unknown"),"#ff5c5c");
+      $("go2").disabled=false; $("spin").disabled=false;
+    } else setStatus(s.status+"… "+secs+"s","run");
+  },2500);
+}
+
+$("go2").addEventListener("click", ()=>{ SPIN=0; build(); });
+$("spin").addEventListener("click", ()=>{ SPIN+=1; log("spin -> "+SPIN); build(); });
+
+// ---- edit toggle ---------------------------------------------------------
+$("editBtn").addEventListener("click", function(){
+  if(!URLBASE) return;
+  EDITING = !EDITING;
+  $("frame").src = URLBASE + (EDITING ? "?edit=1&t=" : "?t=") + Date.now();
+  this.textContent = EDITING ? "Done editing" : "Edit page";
+  this.classList.toggle("on", EDITING);
+  setStatus(EDITING ? "edit mode — click any text, then Save" : "viewing",
+            EDITING ? "run" : "done");
+});
+</script>
+</body>
+</html>

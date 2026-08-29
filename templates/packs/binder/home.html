@@ -1,0 +1,99 @@
+{% extends "packs/binder/_shell.html" %}
+{% set current_page = 'home.html' %}
+{% block main %}
+{#
+  The binder's index page, following the supplied design's own rhythm: hero,
+  a card grid of what we do, the dark ledger strip, selected work as a ruled
+  list, then contact. The ledger is the only ink block on the paper sheet,
+  which is what gives the page its one moment of contrast.
+#}
+{% include "packs/_pages/_hero.html" %}
+
+{% if services %}
+<section {{ sect(0) }}>
+  <div class="wrap">
+    <p class="eyebrow">{{ home.label or 'What we do' }}</p>
+    <h2>{{ home.title or site_title }}</h2>
+    <div class="cards">
+      {% for s in services %}
+      <article class="card"><h3>{{ s.title }}</h3><p>{{ s.description }}</p></article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if home.pillar1_title or home.pillar2_title or price %}
+<section {{ sect(1, 'band') }}>
+  <div class="wrap">
+    <p class="eyebrow">At a glance</p>
+    <dl class="ledger">
+      {% if home.pillar1_title %}<div><dt>{{ home.pillar1_title }}</dt><dd>{{ home.pillar1_desc }}</dd></div>{% endif %}
+      {% if home.pillar2_title %}<div><dt>{{ home.pillar2_title }}</dt><dd>{{ home.pillar2_desc }}</dd></div>{% endif %}
+      {% if price %}<div><dt>From</dt><dd>{{ price }}</dd></div>{% endif %}
+      {% if contact.address %}<div><dt>Based in</dt><dd>{{ contact.address }}</dd></div>{% endif %}
+    </dl>
+  </div>
+</section>
+{% endif %}
+
+{% if portfolio %}
+<section {{ sect(2) }}>
+  <div class="wrap">
+    <p class="eyebrow">Selected</p>
+    <h2>Recent work</h2>
+    {% set _g = shots.get('gallery') or [] %}
+    <ul class="work">
+      {% for p in portfolio %}
+      <li>
+        <span class="tag">{{ p.tag or 'Project' }}</span>
+        <div>
+          {% if _g and loop.index0 < _g|length %}
+          <figure class="work-shot"><img src="{{ _g[loop.index0] }}" alt="{{ p.title }}"></figure>
+          {% endif %}
+          <h3>{{ p.title }}</h3>
+          <p>{{ p.description }}{% if p.outcome %} &mdash; {{ p.outcome }}{% endif %}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
+{% if about and about.description %}
+<section {{ sect(3, 'band') }}>
+  <div class="wrap">
+    <p class="eyebrow">The studio</p>
+    <h2>{{ about.heading or 'About' }}</h2>
+    <div class="with-shot">
+      <div>
+        <p class="lede">{{ about.description }}</p>
+        {% if about.mission %}<p class="lede">{{ about.mission }}</p>{% endif %}
+      </div>
+      {% if shots.get('square') %}
+      <figure class="shot-detail"><img src="{{ shots.square }}" alt="{{ about.heading }}"></figure>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% include "packs/_pages/_feature.html" %}
+{% include "packs/_pages/_reviews.html" %}
+
+{% if contact %}
+<section {{ sect(4) }}>
+  <div class="wrap">
+    <p class="eyebrow">Contact</p>
+    <h2>{{ contact.title or 'Start a conversation' }}</h2>
+    <p class="lede">{{ contact.description }}</p>
+    <div class="contact-grid">
+      {% if contact.phone %}<div><span>Phone</span><b>{{ contact.phone }}</b></div>{% endif %}
+      {% if contact.email %}<div><span>Email</span><b>{{ contact.email }}</b></div>{% endif %}
+      {% if contact.address %}<div><span>Studio</span><b>{{ contact.address }}</b></div>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

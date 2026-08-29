@@ -1,0 +1,289 @@
+{% set hclass = '' %}
+{% set tclass = '' %}
+{% set has_rule = False %}
+{% set split_headline = False %}
+{% set meta_description = (home.subtitle or tagline or site_title) | striptags | truncate(155) %}
+{% set _sn = site_name | striptags %}
+{% set social_title = site_title if (_sn | lower) in (site_title | lower) else (_sn ~ ' | ' ~ site_title) %}
+{% set A = asset_base %}
+{% set shots = shots | default({}) %}
+{% set hero_img = shots.get('hero') or image_map.get('hero') or (images[0] if images else None) %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{# Which page is being rendered, so the nav can mark it. Every shell used to
+   hardcode the active class on the home link, which left every sub-page
+   showing Home as current. #}
+{% set _cur = current_page | default('home.html') %}
+<!DOCTYPE html>
+{#
+  COUNTER — a menu board, for things sold over one.
+
+  Plan
+    Colour  the Grade's darkest tone becomes the board; the ground is a warm
+            off-tint. Reversed out — dark board, light type — because that is
+            what a counter above a stall actually looks like.
+    Type    Oswald condensed for the board and every heading (it exists to fit
+            a lot of words into a narrow column, which is the whole job), with
+            Public Sans for running text. Tabular numerals throughout so prices
+            align down the column.
+    Layout  A single narrow column, like a printed menu. Items are rows with
+            dot leaders running to a right-aligned price. Nothing is centred
+            except the board itself.
+#}
+<html lang="{{ site_lang | default('en') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;600&family=Public+Sans:wght@400;600&display=swap">
+<meta name="description" content="{{ meta_description }}">
+{% if favicon_url %}<link rel="icon" href="{{ favicon_url }}">{% endif %}
+{% if favicon_apple_url %}<link rel="apple-touch-icon" href="{{ favicon_apple_url }}">{% endif %}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:title" content="{{ social_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+{% if share_card_url %}<meta property="og:image" content="{{ share_card_url }}">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">{% endif %}
+<meta name="twitter:card" content="{% if share_card_url %}summary_large_image{% else %}summary{% endif %}">
+<meta name="twitter:title" content="{{ social_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
+{% if share_card_url %}<meta name="twitter:image" content="{{ share_card_url }}">{% endif %}
+<meta name="theme-color" content="{{ theme.primary_dark }}">
+<style>
+  :root{
+    --board:{{ theme.primary_dark }}; --chalk:{{ theme.bg }};
+    --ink:{{ theme.text_main }}; --soft:{{ theme.text_muted }};
+    --ground:{{ theme.bg }}; --tint:{{ theme.bg_alt }};
+    --hot:{{ theme.accent }};
+    --line:color-mix(in srgb, {{ theme.text_main }} 22%, transparent);
+    --cond:'Oswald', 'Haettenschweiler', 'Arial Narrow', sans-serif;
+    --body:'Public Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box} html,body{margin:0;padding:0}
+  body{background:var(--ground);color:var(--ink);font:400 16px/1.66 var(--body);
+       font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:0 26px}
+  a{color:var(--ink)}
+  :focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+
+  /* --- the board --- */
+  header{background:var(--board);color:var(--chalk)}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;
+               gap:20px;flex-wrap:wrap;padding-top:22px;padding-bottom:22px}
+  .brand{font:600 26px/1 var(--cond);letter-spacing:.03em;text-transform:uppercase;
+         color:var(--chalk);text-decoration:none}
+  .brand img{max-height:40px;display:block}
+  nav{display:flex;gap:22px;flex-wrap:wrap}
+  nav a{color:color-mix(in srgb, {{ theme.bg }} 68%, transparent);text-decoration:none;
+        font:400 13px/1 var(--cond);letter-spacing:.14em;text-transform:uppercase}
+  nav a:hover,nav a.on{color:var(--hot)}
+
+  .hero{padding:44px 0 38px}
+  .hero .wrap{display:grid;grid-template-columns:1fr;gap:26px}
+  .hero-split .wrap,.hero-inset .wrap{grid-template-columns:minmax(0,1fr) minmax(0,260px);
+                                      gap:34px;align-items:center}
+  .hero-split.rev .wrap>.shot{order:-1}
+  .hero-stack .wrap{grid-template-columns:1fr;max-width:640px}
+  .eyebrow{display:inline-block;font:400 12px/1 var(--cond);letter-spacing:.2em;
+           text-transform:uppercase;color:var(--hot);margin:0 0 14px;
+           border-bottom:2px solid var(--hot);padding-bottom:5px}
+  h1{font:600 clamp(34px,5.6vw,58px)/1.04 var(--cond);text-transform:uppercase;
+     letter-spacing:.005em;margin:0 0 16px;text-wrap:balance;max-width:16ch}
+  .hero-sub{font-size:17px;color:var(--soft);margin:0 0 26px;max-width:46ch}
+  .shot{margin:0}
+  .shot img{width:100%;height:auto;display:block}
+  .hero-under img,.hero-plate img{width:100%;max-height:330px;object-fit:cover;display:block}
+  .hero-bleed{position:relative;min-height:340px;display:flex;align-items:flex-end;padding:0}
+  .hero-bleed .hero-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .hero-bleed::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(to top,var(--board) 6%,transparent 70%)}
+  .hero-bleed .wrap{position:relative;z-index:1;padding-block:48px}
+  .hero-bleed h1,.hero-bleed .hero-sub,.hero-bleed .price{color:var(--chalk)}
+
+  .buy{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .price{font:600 30px/1 var(--cond)}
+  .cta{display:inline-block;background:var(--hot);color:var(--board);text-decoration:none;
+       font:600 14px/1 var(--cond);letter-spacing:.13em;text-transform:uppercase;
+       padding:13px 24px}
+  .cta:hover{filter:brightness(.94)}
+
+  section{padding:44px 0}
+  .band{background:var(--tint)}
+  h2{font:600 clamp(24px,3.4vw,32px)/1.1 var(--cond);text-transform:uppercase;
+     letter-spacing:.02em;margin:0 0 6px}
+  .rule{width:100%;height:2px;background:var(--ink);border:0;margin:0 0 22px;opacity:.9}
+  .lede{font-size:16.5px;color:var(--soft);max-width:60ch;margin:0 0 12px}
+
+  /* --- menu rows: dot leaders to a right-aligned price --- */
+  .cards{display:block}
+  .card{display:grid;grid-template-columns:auto 1fr;gap:0 12px;align-items:baseline;
+        padding:15px 0;border-bottom:1px dotted var(--line)}
+  .card h3{font:400 20px/1.3 var(--cond);text-transform:uppercase;letter-spacing:.03em;
+           margin:0;grid-column:1}
+  .card::after{content:"";grid-column:2;border-bottom:1px dotted var(--line);
+               transform:translateY(-5px)}
+  .card p{grid-column:1 / -1;margin:5px 0 0;font-size:15px;color:var(--soft);max-width:56ch}
+
+  .pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:26px}
+  .pillar h3{font:400 18px/1.3 var(--cond);text-transform:uppercase;letter-spacing:.03em;
+             margin:0 0 6px;color:var(--hot)}
+  .pillar p{margin:0;font-size:15px;color:var(--soft)}
+
+  .work{list-style:none;padding:0;margin:0}
+  .work li{padding:15px 0;border-bottom:1px dotted var(--line);
+           display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:baseline}
+  .work .tag{font:400 11.5px/1 var(--cond);letter-spacing:.16em;text-transform:uppercase;
+             color:var(--hot);white-space:nowrap}
+  .work h3{font:400 19px/1.3 var(--cond);text-transform:uppercase;margin:0 0 4px}
+  .work p{margin:0;font-size:15px;color:var(--soft)}
+
+  .quote{border-left:3px solid var(--hot);padding-left:16px;margin:0 0 22px;max-width:58ch}
+  .quote p{font-size:17px;line-height:1.6;margin:0 0 7px;font-style:italic}
+  .quote span{font:400 11.5px/1 var(--cond);letter-spacing:.16em;text-transform:uppercase;
+              color:var(--soft)}
+
+  .faq{display:grid;grid-template-columns:1fr;gap:20px}
+  .faq h3{font:400 17px/1.3 var(--cond);text-transform:uppercase;letter-spacing:.03em;margin:0 0 5px}
+  .faq p{margin:0;font-size:15.5px;color:var(--soft)}
+
+  .contact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+                gap:20px;margin-top:22px}
+  .contact-grid span{display:block;font:400 11.5px/1 var(--cond);letter-spacing:.16em;
+                     text-transform:uppercase;color:var(--hot);margin-bottom:6px}
+  .contact-grid b{font:400 17px/1.4 var(--body);font-weight:600}
+
+  .shot-detail img{width:100%;height:auto;display:block;image-rendering:auto}
+  .with-shot{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:30px;align-items:start}
+  .with-shot>.shot-detail{order:2}
+
+  footer{background:var(--board);color:color-mix(in srgb, {{ theme.bg }} 62%, transparent);
+         padding:26px 0;font:400 13px/1.6 var(--cond);letter-spacing:.1em;text-transform:uppercase}
+  footer .wrap{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
+
+  @media(max-width:720px){
+    .hero-split .wrap,.hero-inset .wrap{grid-template-columns:1fr;gap:24px}
+    .hero-split.rev .wrap>.shot{order:0}
+    .with-shot{grid-template-columns:1fr;gap:22px}
+    .with-shot>.shot-detail{order:0}
+    .work li{grid-template-columns:1fr;gap:5px}
+    section{padding:34px 0}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* photos on the sub-pages, from the seller's extra uploads */
+  .work-shot{margin:0 0 14px}
+  .work-shot img{width:100%;max-height:220px;object-fit:cover;display:block;border-radius:3px}
+  .shot-wide{margin:26px 0 0}
+  .shot-wide img{width:100%;max-height:300px;object-fit:cover;display:block;border-radius:3px}
+
+  /* the menu itself */
+  .menu{list-style:none;padding:0;margin:0}
+  .menu li{display:grid;grid-template-columns:auto 1fr auto;align-items:baseline;
+           gap:0 10px;padding:14px 0;border-bottom:1px dotted var(--line)}
+  .menu .item{font:400 20px/1.2 var(--cond);text-transform:uppercase;letter-spacing:.03em}
+  .menu .dots{border-bottom:1px dotted var(--line);transform:translateY(-5px)}
+  .menu .cost{font:600 18px/1.2 var(--cond);color:var(--hot);white-space:nowrap}
+  .menu em{grid-column:1/-1;font-style:normal;font-size:14.5px;color:var(--soft);margin-top:4px}
+  .notes{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+  .notes li{font-size:15.5px;color:var(--soft)}
+  .notes b{font:400 12px/1 var(--cond);letter-spacing:.16em;text-transform:uppercase;
+           color:var(--hot);margin-right:10px}
+  .tray{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+  .tray figure{margin:0} .tray img{width:100%;height:180px;object-fit:cover;display:block}
+
+  /* reviews — chalked notes under the menu */
+  .rating-summary{display:flex;align-items:baseline;gap:16px;margin:0 0 22px;
+                  padding-bottom:14px;border-bottom:1px dotted var(--line)}
+  .rating-summary__num{font:600 38px/1 var(--cond);color:var(--hot)}
+  .rating-summary__meta{display:flex;flex-direction:column;gap:3px}
+  .stars,.review__stars{font-size:14px;letter-spacing:2px;color:var(--hot)}
+  .rating-summary__count{font:400 11.5px/1 var(--cond);letter-spacing:.14em;
+                         text-transform:uppercase;color:var(--soft)}
+  .reviews{display:grid;gap:0}
+  .review{padding:16px 0;border-bottom:1px dotted var(--line)}
+  .review__text{font-size:15.5px;line-height:1.6;margin:7px 0 9px}
+  .review__who{display:flex;align-items:center;gap:10px}
+  .avatar{display:none}
+  .review__name{font:400 13px/1 var(--cond);text-transform:uppercase;letter-spacing:.1em}
+  .review__role{font:400 12px/1 var(--cond);color:var(--soft);font-style:normal;
+                text-transform:uppercase;letter-spacing:.1em;margin-left:8px}
+  .review__role::before{content:"— "}
+
+  .reviews-section{}
+  .rev-dots{display:none}
+
+  /* Cards in a row line up even when only some of them carry a photo:
+     the card is a column, the copy block grows, so titles and text sit on the
+     same line across the row instead of drifting. */
+  .work li{display:flex;flex-direction:column}
+  .work li>div{flex:1;display:flex;flex-direction:column}
+  .work-shot img{width:100%;display:block;aspect-ratio:1.7/1;object-fit:cover}
+  .card{display:flex;flex-direction:column}
+  .card__photo img{width:100%;display:block;aspect-ratio:1.7/1;object-fit:cover}
+{% include "packs/_pages/_composition.css" %}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a href="home.html" class="brand">
+      {% if logo %}<img src="{{ logo }}" alt="{{ site_name }}">{% else %}{{ site_name }}{% endif %}
+    </a>
+    <nav>
+      <a href="home.html" class="{% if _cur == 'home.html' %}on{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>Today</a>
+      {% if 'services' in layout %}<a href="services.html" class="{% if _cur == 'services.html' %}on{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>Menu</a>{% endif %}
+      {% if 'portfolio' in layout %}<a href="portfolio.html" class="{% if _cur == 'portfolio.html' %}on{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>Specials</a>{% endif %}
+      {% if 'about' in layout %}<a href="about.html" class="{% if _cur == 'about.html' %}on{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>Us</a>{% endif %}
+      {% if 'contact' in layout %}<a href="contact.html" class="{% if _cur == 'contact.html' %}on{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>Find us</a>{% endif %}
+    </nav>
+  </div>
+</header>
+
+{% block main %}{% endblock %}
+
+<footer>
+  <div class="wrap">
+    <span>{{ footer.copyright or site_name }}</span>
+    {% if footer.address %}<span>{{ footer.address }}</span>{% endif %}
+  </div>
+</footer>
+
+<script>
+/* Arrival motion. The hidden state lives behind html.js-reveal, which is only
+   ever set here — so a page whose JS is blocked or errors renders every section
+   fully visible instead of blank. */
+(function(){
+  var root=document.documentElement;
+  if(!('IntersectionObserver' in window)) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.classList.add('js-reveal');
+  var els=[].slice.call(document.querySelectorAll('.reveal'));
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('is-in'); io.unobserve(e.target); }
+    });
+  },{rootMargin:'0px 0px -8% 0px',threshold:0.06});
+  var above=[],below=[];
+  els.forEach(function(el){
+    (el.getBoundingClientRect().top < window.innerHeight*0.92 ? above : below).push(el);
+  });
+  below.forEach(function(el){ io.observe(el); });
+  /* Safety net. Anything still hidden after 2.5s is shown regardless — if the
+     observer never fires (throttled tab, print, an odd viewport, a headless
+     capture) the content must not stay at opacity 0 permanently. */
+  setTimeout(function(){
+    els.forEach(function(el){ el.classList.add('is-in'); });
+  }, 2500);
+  /* Two frames, so the transition actually plays on what is already on screen
+     rather than being collapsed into the first paint. */
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    above.forEach(function(el,i){ setTimeout(function(){ el.classList.add('is-in'); }, i*70); });
+  });});
+})();
+</script>
+{% include "packs/_pages/_shop.html" %}
+</body>
+</html>

@@ -1,0 +1,48 @@
+{% extends "packs/" + pack.slug + "/_shell.html" %}
+{# This page declares what it is, so the shell can mark the nav without
+   depending on the renderer to pass it. A context value alone was fragile:
+   a server holding older Python while Jinja re-read the new templates from
+   disk rendered every page with Home marked. #}
+{% set current_page = 'portfolio.html' %}
+{% block main %}
+<section>
+  <div class="wrap">
+    <h2 class="{{ hclass }}">Our work</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    {% if portfolio %}
+    <ul class="work">
+      {% set _g = (shots.get('gallery') or []) + ([shots.get('square')] if shots.get('square') else []) %}
+      {% for p in portfolio %}
+      <li>
+        {% if _g and loop.index0 < _g|length %}
+        <figure class="work-shot"><img src="{{ _g[loop.index0] }}" alt="{{ p.title }}"></figure>
+        {% endif %}
+        <span class="tag {{ tclass }}">{{ p.tag or 'Piece' }}</span>
+        <div>
+          <h3 class="{{ hclass }}">{{ p.title }}</h3>
+          <p>{{ p.description }}{% if p.client %} &middot; {{ p.client }}{% endif %}{% if p.outcome %} &mdash; {{ p.outcome }}{% endif %}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="lede">{{ home.subtitle or tagline }}</p>
+    {% endif %}
+  </div>
+</section>
+
+{% if services %}
+<section class="band">
+  <div class="wrap">
+    <h2 class="{{ hclass }}">{{ home.label or 'What we make' }}</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    <div class="cards">
+      {% for s in services %}
+      <article class="card">
+                <h3 class="{{ hclass }}">{{ s.title }}</h3><p>{{ s.description }}</p></article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

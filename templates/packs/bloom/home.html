@@ -1,0 +1,87 @@
+{% extends "packs/bloom/_shell.html" %}
+{% set current_page = 'home.html' %}
+{% block main %}
+{#
+  BLOOM is a scrapbook. Photos and words overlap on a soft ground, each card
+  tilted a degree or two, nothing in a straight row. Image-led rather than
+  copy-led, because a gift is chosen by looking.
+#}
+{% include "packs/_pages/_hero.html" %}
+
+{#
+  Signature: the care label.
+
+  Sewn to the page the way it is sewn into a seam, and carrying only what is
+  true — the seller's material, where they work, their price, their real
+  figure. A care label that lies is the one thing the trade will not forgive,
+  and an invented one would be exactly the decoration-as-information habit that
+  makes a page read as generated. Fields drop out when the content is absent.
+#}
+{% if price or about.description or contact.address or stats %}
+<div class="care">
+  <div class="care__strip">
+    {% if price %}<div><span>Price</span><b>{{ price }}</b></div>{% endif %}
+    {% if contact.address %}<div><span>Made in</span><b>{{ contact.address }}</b></div>{% endif %}
+    {% if stats and stats[0].number %}
+      <div><span>{{ stats[0].label }}</span><b>{{ stats[0].number }}</b></div>{% endif %}
+    {% if stats | length > 1 and stats[1].number %}
+      <div><span>{{ stats[1].label }}</span><b>{{ stats[1].number }}</b></div>{% endif %}
+    {% if home.cta %}<div><span>Care</span><b>Wash cool, dry flat</b></div>{% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% set _g = shots.get('gallery') or [] %}
+{% if _g or shots.get('square') %}
+<section {{ sect(0) }}>
+  <div class="wrap">
+    <div class="scrap">
+      {% if shots.get('square') %}
+      <figure class="pin a"><img src="{{ shots.square }}" alt="{{ site_title }}"></figure>{% endif %}
+      {% for g in _g[:2] %}
+      <figure class="pin {{ 'b' if loop.first else 'c' }}"><img src="{{ g }}" alt="{{ site_title }}"></figure>
+      {% endfor %}
+      <div class="note-card">
+        <h2>{{ about.heading or 'Made by us' }}</h2>
+        <p>{{ about.description }}</p>
+        {% if about.mission %}<p class="warm">{{ about.mission }}</p>{% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if services %}
+<section {{ sect(1, 'band') }}>
+  <div class="wrap">
+    <h2>{{ home.label or 'What we make' }}</h2>
+    <ul class="ribbon">
+      {% for s in services %}
+      <li><b>{{ s.title }}</b><span>{{ s.description }}</span></li>
+      {% endfor %}
+      {% if home.pillar1_title %}<li><b>{{ home.pillar1_title }}</b><span>{{ home.pillar1_desc }}</span></li>{% endif %}
+      {% if home.pillar2_title %}<li><b>{{ home.pillar2_title }}</b><span>{{ home.pillar2_desc }}</span></li>{% endif %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
+{% include "packs/_pages/_feature.html" %}
+{% include "packs/_pages/_reviews.html" %}
+
+{% if contact %}
+<section {{ sect(2) }}>
+  <div class="wrap">
+    <div class="hello">
+      <h2>{{ contact.title or 'Say hello' }}</h2>
+      <p class="lede">{{ contact.description }}</p>
+      <div class="contact-grid">
+        {% if contact.phone %}<div><span>Phone</span><b>{{ contact.phone }}</b></div>{% endif %}
+        {% if contact.email %}<div><span>Email</span><b>{{ contact.email }}</b></div>{% endif %}
+        {% if contact.address %}<div><span>Where</span><b>{{ contact.address }}</b></div>{% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

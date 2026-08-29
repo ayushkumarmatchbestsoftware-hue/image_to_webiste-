@@ -1,0 +1,365 @@
+{#
+  STOREFRONT — cart, checkout, payment.
+
+  Included by every Pack shell, styled entirely from the bridge tokens (--c-*)
+  so it inherits whichever design was chosen without a per-Pack stylesheet.
+
+  Three things shape the JavaScript below:
+
+  1. It NEVER adds up money. Totals come from POST /api/<id>/quote, so the
+     figure the buyer sees is the figure the server will charge. A cart that
+     does its own arithmetic can disagree with the server, and the buyer always
+     believes the screen.
+
+  2. It only switches on when it can find its website id in the URL AND the
+     shop API answers. A downloaded, offline copy of this page therefore shows
+     no cart at all and falls back to the WhatsApp enquiry button that is
+     already in the hero — better than a Buy button that leads nowhere.
+
+  3. Placing an order sends an idempotency key. A double-tap on a slow phone
+     must not create two orders for one buyer.
+#}
+<div id="shopRoot" hidden>
+  <button id="cartFab" class="shop-fab" type="button" aria-haspopup="dialog">
+    <span class="shop-fab__label">Cart</span>
+    <span class="shop-fab__count" id="cartCount">0</span>
+  </button>
+
+  <div class="shop-scrim" id="shopScrim" hidden></div>
+
+  <aside class="shop-panel" id="shopPanel" role="dialog" aria-modal="true"
+         aria-labelledby="shopTitle" hidden>
+    <header class="shop-panel__head">
+      <h2 id="shopTitle">Your order</h2>
+      <button class="shop-x" id="shopClose" type="button" aria-label="Close">&times;</button>
+    </header>
+
+    <div class="shop-body" id="shopBody">
+      <!-- cart -->
+      <section class="shop-step" data-step="cart">
+        <ul class="shop-lines" id="shopLines"></ul>
+        <p class="shop-empty" id="shopEmpty">Nothing here yet.</p>
+        <div class="shop-total" id="shopTotal" hidden>
+          <span>Total</span><b id="shopTotalValue"></b>
+        </div>
+        <button class="shop-go" id="toCheckout" type="button" disabled>Checkout</button>
+      </section>
+
+      <!-- details -->
+      <section class="shop-step" data-step="details" hidden>
+        <label class="shop-field">Name
+          <input id="cName" autocomplete="name" required></label>
+        <label class="shop-field">Phone
+          <input id="cPhone" autocomplete="tel" inputmode="tel"></label>
+        <label class="shop-field">Email
+          <input id="cEmail" autocomplete="email" inputmode="email"></label>
+        <label class="shop-field">Delivery address
+          <textarea id="cAddress" rows="3" autocomplete="street-address"></textarea></label>
+        <label class="shop-field">Anything the seller should know
+          <textarea id="cNote" rows="2"></textarea></label>
+
+        <fieldset class="shop-methods" id="shopMethods">
+          <legend>How would you like to pay?</legend>
+        </fieldset>
+
+        <p class="shop-error" id="shopError" hidden></p>
+        <button class="shop-go" id="placeOrder" type="button">Place order</button>
+        <button class="shop-back" id="backToCart" type="button">Back to cart</button>
+      </section>
+
+      <!-- done -->
+      <section class="shop-step" data-step="done" hidden>
+        <p class="shop-done-id">Order <b id="doneId"></b></p>
+        <h3 id="doneHead"></h3>
+        <p id="doneBody"></p>
+
+        <div id="upiBox" hidden>
+          <a class="shop-go" id="upiPay" href="#">Open UPI app</a>
+          <p class="shop-vpa">or send to <b id="upiVpa"></b>
+            <button class="shop-copy" id="upiCopy" type="button">copy</button></p>
+          <label class="shop-field">Reference / UTR from your payment app
+            <input id="upiRef" inputmode="latin"></label>
+          <p class="shop-error" id="upiError" hidden></p>
+          <button class="shop-go" id="upiConfirm" type="button">I have paid</button>
+          <p class="shop-fine">The seller will confirm once the payment shows in
+            their account.</p>
+        </div>
+        <p class="shop-fine" id="doneFine" hidden></p>
+      </section>
+    </div>
+  </aside>
+</div>
+
+<style>
+  /* The hidden ATTRIBUTE only works while nothing else sets display. Every
+     panel below sets display for its own layout, which silently beat the
+     browser's [hidden]{display:none} — so the cart drawer rendered open on
+     every page load. Scoped to the shop so the seller's own page is untouched. */
+  #shopRoot[hidden],#shopRoot [hidden]{display:none !important}
+
+  .shop-fab{position:fixed;right:20px;bottom:20px;z-index:900;display:flex;gap:10px;
+    align-items:center;border:0;cursor:pointer;padding:14px 22px;border-radius:100px;
+    background:var(--c-deep);color:var(--c-on-deep);font:600 15px/1 var(--body,inherit);
+    box-shadow:0 6px 24px rgba(0,0,0,.22)}
+  .shop-fab:hover{filter:brightness(1.08)}
+  .shop-fab__count{min-width:22px;height:22px;border-radius:11px;display:grid;
+    place-items:center;background:var(--c-accent);color:var(--c-deep);
+    font-size:12px;font-variant-numeric:tabular-nums}
+  .shop-scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:940}
+  .shop-panel{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);z-index:950;
+    background:var(--c-ground);color:var(--c-ink);display:flex;flex-direction:column;
+    box-shadow:-8px 0 40px rgba(0,0,0,.28)}
+  .shop-panel__head{display:flex;align-items:center;justify-content:space-between;
+    padding:20px 22px;border-bottom:1px solid var(--c-line)}
+  .shop-panel__head h2{margin:0;font-size:1.15rem}
+  .shop-x{background:none;border:0;font-size:26px;line-height:1;cursor:pointer;
+    color:var(--c-soft)}
+  .shop-body{padding:20px 22px;overflow-y:auto;flex:1}
+  .shop-lines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+  .shop-line{display:grid;grid-template-columns:1fr auto;gap:4px 12px;
+    padding-bottom:14px;border-bottom:1px solid var(--c-line)}
+  .shop-line__name{font-weight:600}
+  .shop-line__unit{grid-column:1;font-size:.85rem;color:var(--c-soft)}
+  .shop-line__amt{grid-row:1;grid-column:2;font-variant-numeric:tabular-nums}
+  .shop-qty{grid-column:2;display:flex;align-items:center;gap:8px}
+  .shop-qty button{width:26px;height:26px;border:1px solid var(--c-line);
+    background:none;color:var(--c-ink);cursor:pointer;border-radius:4px;font-size:15px}
+  .shop-total{display:flex;justify-content:space-between;align-items:baseline;
+    margin:22px 0 6px;font-size:1.15rem}
+  .shop-total b{font-variant-numeric:tabular-nums}
+  .shop-empty{color:var(--c-soft)}
+  .shop-go{display:block;width:100%;margin-top:18px;padding:15px;border:0;cursor:pointer;
+    background:var(--c-deep);color:var(--c-on-deep);border-radius:6px;
+    font:600 15px/1 var(--body,inherit);text-align:center;text-decoration:none}
+  .shop-go:disabled{opacity:.45;cursor:not-allowed}
+  .shop-back{display:block;width:100%;margin-top:10px;padding:12px;border:0;
+    background:none;color:var(--c-soft);cursor:pointer;font-size:.9rem}
+  .shop-field{display:block;margin-bottom:14px;font-size:.82rem;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--c-soft)}
+  .shop-field input,.shop-field textarea{display:block;width:100%;margin-top:6px;
+    padding:11px 12px;border:1px solid var(--c-line);border-radius:5px;
+    background:var(--c-tint);color:var(--c-ink);font:400 15px/1.4 var(--body,inherit);
+    text-transform:none;letter-spacing:0}
+  .shop-field input:focus-visible,.shop-field textarea:focus-visible{
+    outline:2px solid var(--c-accent);outline-offset:1px}
+  .shop-methods{border:1px solid var(--c-line);border-radius:6px;padding:14px;margin:6px 0 4px}
+  .shop-methods legend{padding:0 6px;font-size:.82rem;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--c-soft)}
+  .shop-method{display:flex;gap:10px;align-items:flex-start;padding:8px 0;cursor:pointer}
+  .shop-method small{display:block;color:var(--c-soft)}
+  .shop-error{color:#c0392b;font-size:.9rem;margin:10px 0 0}
+  .shop-done-id{color:var(--c-soft);font-size:.85rem;letter-spacing:.08em;
+    text-transform:uppercase}
+  .shop-vpa{margin:12px 0;font-size:.95rem}
+  .shop-copy{border:1px solid var(--c-line);background:none;color:var(--c-soft);
+    cursor:pointer;border-radius:4px;padding:3px 8px;font-size:.75rem;margin-left:6px}
+  .shop-fine{color:var(--c-soft);font-size:.85rem;margin-top:12px}
+  @media (max-width:520px){ .shop-panel{width:100%} }
+</style>
+
+<script>
+(function(){
+  "use strict";
+  // Where the shop API lives.
+  //
+  // Publishing writes window.__SHOP__ into the page with an ABSOLUTE api base,
+  // because a published site is served from another origin (or another host
+  // entirely) and a relative /api/... would resolve against that host, where
+  // nothing is listening. The preview has no such block, so it falls back to
+  // reading the id out of its own path and calling the API alongside itself.
+  var CFG = window.__SHOP__ || null, SITE, API;
+  if (CFG && CFG.site) {
+    SITE = CFG.site;
+    API = (CFG.api || "/api").replace(/\/$/, "") + "/" + SITE;
+  } else {
+    var m = location.pathname.match(/([0-9a-f-]{8,})\/[^\/]*$/i);
+    if (!m) return;                     // downloaded copy — stay hidden
+    SITE = m[1];
+    API = "/api/" + SITE;
+  }
+
+  var root = document.getElementById("shopRoot");
+  var $ = function(id){ return document.getElementById(id); };
+  var KEY = "cart:" + SITE, cart = [], catalogue = null, methods = [], lastOrder = null;
+
+  try { cart = JSON.parse(localStorage.getItem(KEY) || "[]") || []; } catch(e){ cart = []; }
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(cart)); } catch(e){} }
+
+  fetch(API + "/shop").then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      // No catalogue, or nothing priced, means this seller takes enquiries
+      // rather than orders. Showing a cart would be a lie.
+      if (!d || !d.orderable || !d.items.length) return;
+      catalogue = d; methods = d.methods || [];
+      root.hidden = false;
+      wire();
+      render();
+    }).catch(function(){ /* offline: cart stays hidden */ });
+
+  function add(id){
+    var line = cart.filter(function(l){ return l.id === id; })[0];
+    if (line) line.qty = Math.min(99, line.qty + 1); else cart.push({id:id, qty:1});
+    save(); render(); open();
+  }
+  function setQty(id, q){
+    cart = cart.map(function(l){ return l.id===id ? {id:id, qty:q} : l; })
+               .filter(function(l){ return l.qty > 0; });
+    save(); render();
+  }
+
+  function render(){
+    $("cartCount").textContent = cart.reduce(function(n,l){ return n + l.qty; }, 0);
+    var ul = $("shopLines"); ul.innerHTML = "";
+    $("shopEmpty").hidden = cart.length > 0;
+    $("shopTotal").hidden = true;
+    $("toCheckout").disabled = cart.length === 0;
+    if (!cart.length) return;
+
+    // Ask the SERVER what this costs. Never add it up here.
+    fetch(API + "/quote", {method:"POST", headers:{"Content-Type":"application/json"},
+                           body: JSON.stringify({lines: cart})})
+      .then(function(r){ return r.json(); })
+      .then(function(q){
+        if (q.error) return;
+        ul.innerHTML = "";
+        q.lines.forEach(function(ln){
+          var li = document.createElement("li");
+          li.className = "shop-line";
+          li.innerHTML =
+            '<span class="shop-line__name"></span>' +
+            '<span class="shop-line__amt"></span>' +
+            '<span class="shop-line__unit"></span>' +
+            '<span class="shop-qty"><button type="button" aria-label="One fewer">&minus;</button>' +
+            '<span>' + ln.qty + '</span>' +
+            '<button type="button" aria-label="One more">+</button></span>';
+          li.querySelector(".shop-line__name").textContent = ln.name;
+          li.querySelector(".shop-line__amt").textContent = ln.amount_display;
+          li.querySelector(".shop-line__unit").textContent = ln.unit_display + " each";
+          var b = li.querySelectorAll(".shop-qty button");
+          b[0].onclick = function(){ setQty(ln.id, ln.qty - 1); };
+          b[1].onclick = function(){ setQty(ln.id, Math.min(99, ln.qty + 1)); };
+          ul.appendChild(li);
+        });
+        $("shopTotalValue").textContent = q.total_display;
+        $("shopTotal").hidden = false;
+      });
+  }
+
+  function step(name){
+    Array.prototype.forEach.call(document.querySelectorAll(".shop-step"), function(s){
+      s.hidden = s.getAttribute("data-step") !== name;
+    });
+  }
+  function open(){ $("shopPanel").hidden = false; $("shopScrim").hidden = false;
+                   document.body.style.overflow = "hidden"; }
+  function close(){ $("shopPanel").hidden = true; $("shopScrim").hidden = true;
+                    document.body.style.overflow = ""; }
+
+  function wire(){
+    // Any Buy / Enquire control on the page becomes Add to cart, so each Pack
+    // keeps its own button design and wording.
+    Array.prototype.forEach.call(document.querySelectorAll(".cta,.buy .cta,.btn--solid"),
+      function(el){
+        if (el.dataset.shopWired) return;
+        el.dataset.shopWired = "1";
+        el.addEventListener("click", function(ev){
+          ev.preventDefault();
+          add(catalogue.items[0].id);
+        });
+      });
+
+    $("cartFab").onclick = function(){ step("cart"); render(); open(); };
+    $("shopClose").onclick = close;
+    $("shopScrim").onclick = close;
+    document.addEventListener("keydown", function(e){
+      if (e.key === "Escape" && !$("shopPanel").hidden) close();
+    });
+    $("toCheckout").onclick = function(){ paintMethods(); step("details"); };
+    $("backToCart").onclick = function(){ step("cart"); };
+    $("placeOrder").onclick = submit;
+    $("upiConfirm").onclick = confirmPaid;
+    $("upiCopy").onclick = function(){
+      navigator.clipboard && navigator.clipboard.writeText($("upiVpa").textContent);
+      this.textContent = "copied";
+    };
+  }
+
+  function paintMethods(){
+    var f = $("shopMethods");
+    f.querySelectorAll(".shop-method").forEach(function(n){ n.remove(); });
+    methods.forEach(function(mth, i){
+      var l = document.createElement("label");
+      l.className = "shop-method";
+      l.innerHTML = '<input type="radio" name="paym" value="' + mth.id + '"' +
+                    (i === 0 ? " checked" : "") + '><span><b></b><small></small></span>';
+      l.querySelector("b").textContent = mth.label;
+      l.querySelector("small").textContent = mth.blurb;
+      f.appendChild(l);
+    });
+  }
+
+  // One key per checkout attempt. A double tap, or a retry after the network
+  // drops, returns the SAME order instead of creating a second one.
+  var idem = null;
+  function submit(){
+    var err = $("shopError"); err.hidden = true;
+    var chosen = document.querySelector('input[name="paym"]:checked');
+    idem = idem || (Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+    $("placeOrder").disabled = true;
+
+    fetch(API + "/orders", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        lines: cart,
+        customer: {name:$("cName").value, phone:$("cPhone").value,
+                   email:$("cEmail").value, address:$("cAddress").value,
+                   note:$("cNote").value},
+        payment_method: chosen ? chosen.value : "cod",
+        idempotency_key: idem
+      })})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        $("placeOrder").disabled = false;
+        if (d.error){ err.textContent = d.error; err.hidden = false; return; }
+        lastOrder = d.order;
+        cart = []; save(); render();
+        showDone(d);
+      })
+      .catch(function(){
+        $("placeOrder").disabled = false;
+        err.textContent = "could not reach the shop — please try again";
+        err.hidden = false;
+      });
+  }
+
+  function showDone(d){
+    $("doneId").textContent = d.order.id;
+    $("doneHead").textContent = d.payment.headline;
+    $("doneBody").textContent = d.payment.body;
+    if (d.payment.method === "upi"){
+      $("upiBox").hidden = false;
+      $("upiPay").href = d.payment.link;
+      $("upiVpa").textContent = d.payment.vpa;
+    } else {
+      $("upiBox").hidden = true;
+      $("doneFine").hidden = false;
+      $("doneFine").textContent = "Total " + d.order.total_display + ".";
+    }
+    step("done");
+  }
+
+  function confirmPaid(){
+    var e = $("upiError"); e.hidden = true;
+    fetch(API + "/orders/" + lastOrder.id + "/paid",
+      {method:"POST", headers:{"Content-Type":"application/json"},
+       body: JSON.stringify({reference: $("upiRef").value})})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.error){ e.textContent = d.error; e.hidden = false; return; }
+        $("upiBox").hidden = true;
+        $("doneHead").textContent = "Thank you";
+        $("doneBody").textContent =
+          "The seller will confirm your payment and get in touch.";
+      });
+  }
+})();
+</script>

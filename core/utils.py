@@ -217,69 +217,56 @@ CRITICAL RULES for Copy:
 5. NO "Welcome to", "Experience the", "Discover the", "Our journey".
 6. FACTS: The "Business:" text above is the only source of truth. Extract EVERY concrete fact it contains (years of experience, counts, locations, founding date, certifications, etc.) — not just the first one you notice — and reuse the exact same figures everywhere they are relevant; "stats" is the canonical place for all of them together. Never state a number that isn't grounded in what was actually written above, and never contradict a fact you already stated elsewhere in this same response. If the business description genuinely contains few or no quantifiable facts, a short or empty "stats" list is correct — never invent additional numbers just to make the list longer."""
 
-        content_parts = [full_prompt]
-        # Keep track of opened PIL images so we can close them after the API call
-        _opened_images = []
-        if image_paths:
-            from PIL import Image  # lazy import — only needed when images were uploaded
-            for i, path in enumerate(image_paths):
-                try:
-                    img = Image.open(path)
-                    _opened_images.append(img)
-                    label = "Hero Image" if i == 0 else "About Background" if i == 1 else f"Portfolio Project Image {i-1}"
-                    content_parts.append(f"--- ATTACHED IMAGE {i+1} ({label}) ---")
-                    content_parts.append(img)
-                except Exception as e:
-                    print(f">>> [IMG ERR] {path}: {str(e)}")
+        # Label each image so the model knows the role it will play on the
+        # page, exactly as the Gemini path did with its inline text markers.
+        # core.llm handles the PIL open/downscale/encode/close cycle, so the
+        # file-handle bookkeeping that used to live here is gone with it.
+        labelled = []
+        for i, path in enumerate(image_paths or []):
+            label = ("Hero Image" if i == 0
+                     else "About Background" if i == 1
+                     else f"Portfolio Project Image {i-1}")
+            labelled.append(f"--- ATTACHED IMAGE {i+1} ({label}) ---")
+        if labelled:
+            full_prompt += "\n\n" + "\n".join(labelled)
 
-        try:
-            response = await asyncio.to_thread(
-                genai_client.models.generate_content,
-                model="gemini-3.1-flash-image-preview",
-                contents=content_parts,
-                config={
-                    "system_instruction": system_prompt,
-                    "temperature": 0.85,
-                    # Was 4500 — too tight a budget for a full 9-section site
-                    # (rich portfolio + 3+ multi-sentence testimonials + stats
-                    # + faq + pricing + theme/layout metadata all compete for
-                    # the same output budget). The model was complying with
-                    # the "at least 3 items" instructions but compressing each
-                    # field's substance to fit, which read as "sparse" content
-                    # even though prompt wording alone kept getting stronger.
-                    "max_output_tokens": 8192
-                }
-            )
-        finally:
-            # ── Leak Fix #2: Always close PIL image objects to free file handles
-            # and decoded bitmap memory. Done AFTER the API call so Gemini can
-            # read the pixels, but immediately after to avoid holding RAM longer.
-            for _img in _opened_images:
-                try:
-                    _img.close()
-                except Exception:
-                    pass
-            _opened_images.clear()
-
-        if not response: return None
-
-        try:
-            text = response.text.strip()
-        except ValueError as ve:
-            return None
-
-        text = re.sub(r'^```[a-z]*\n?', '', text, flags=re.MULTILINE)
-        text = re.sub(r'\n?```$', '', text, flags=re.MULTILINE)
-        text = text.strip()
-
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError as je:
+        from core.llm import chat_json
+        data = await chat_json(
+            system=system_prompt,
+            text=full_prompt,
+            images=list(image_paths or []),
+            temperature=0.85,
+            # Was 4500 on the old path — too tight a budget for a full
+            # 9-section site (rich portfolio + 3+ multi-sentence testimonials
+            # + stats + faq + pricing + theme/layout metadata all compete for
+            # the same output budget). The model complied with the "at least
+            # 3 items" instructions but compressed each field's substance to
+            # fit, which read as sparse content however hard the prompt pushed.
+            max_tokens=8192,
+        )
+        if not data:
             return None
 
         data["theme"] = validate_and_fix_theme(
             data.get("theme", {}), fallback, has_image=(image_count > 0)
         )
+
+        # The system prompt asks for about.title / about.story and
+        # testimonials[].content / .author, but the templates read
+        # about.heading / about.description (home.html:746) and t.text / t.name
+        # (home.html:904). Without this remap the About block and every
+        # testimonial render blank. Same shape as the stats normalisation in
+        # generation.py — do it here so both entry points get the fix.
+        _ab = data.get("about") or {}
+        if isinstance(_ab, dict):
+            data["about"] = {**_ab,
+                             "heading": _ab.get("heading") or _ab.get("title", ""),
+                             "description": _ab.get("description") or _ab.get("story", "")}
+        data["testimonials"] = [
+            {**t, "text": t.get("text") or t.get("content", ""),
+                  "name": t.get("name") or t.get("author", "")}
+            for t in (data.get("testimonials") or []) if isinstance(t, dict)
+        ]
         return data
 
     except Exception as e:
@@ -391,30 +378,17 @@ RULES:
 
     try:
         content = f"Instruction: {instruction}\n\nPage Name: {page_name}\n\nHTML Content:\n{html}"
-        
-        response = await asyncio.to_thread(
-            genai_client.models.generate_content,
-            model="gemini-2.0-flash",
-            contents=[content],
-            config={
-                "system_instruction": system_prompt,
-                "temperature": 0.3,
-                "response_mime_type": "application/json"
-            }
+
+        from core.llm import chat_json
+        # A full page round-trips through here, so the output budget has to be
+        # large enough to re-emit the whole document plus the summary.
+        data = await chat_json(
+            system=system_prompt, text=content,
+            temperature=0.3, max_tokens=16384,
         )
-
-        if not response or not response.text:
+        if not data:
             return {"error": "AI returned no response"}
-
-        try:
-            data = json.loads(response.text)
-            return data
-        except json.JSONDecodeError:
-            # Fallback regex extraction if not perfect JSON
-            match = re.search(r'\{.*\}', response.text, re.DOTALL)
-            if match:
-                return json.loads(match.group(0))
-            return {"error": "Failed to parse AI response as JSON"}
+        return data
 
     except Exception as e:
         traceback.print_exc()

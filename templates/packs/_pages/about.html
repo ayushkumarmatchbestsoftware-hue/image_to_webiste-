@@ -1,0 +1,69 @@
+{#
+  Shared About page. Extends whichever Pack shell was selected, so it inherits
+  that Pack's palette, type and chrome without duplicating any of it.
+#}
+{% extends "packs/" + pack.slug + "/_shell.html" %}
+{# This page declares what it is, so the shell can mark the nav without
+   depending on the renderer to pass it. A context value alone was fragile:
+   a server holding older Python while Jinja re-read the new templates from
+   disk rendered every page with Home marked. #}
+{% set current_page = 'about.html' %}
+{% block main %}
+<section>
+  <div class="wrap">
+    <h2 class="{{ hclass }}">{{ about.heading or ('About ' ~ site_name) }}</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    {% set _g = shots.get('gallery') or [] %}
+    <div class="{{ 'with-shot' if (_g or shots.get('square')) else '' }}">
+      <div>
+        <p class="lede">{{ about.description }}</p>
+        {% if about.mission %}<p class="lede">{{ about.mission }}</p>{% endif %}
+      </div>
+      {% set _a = _g[0] if _g else shots.get('square') %}
+      {% if _a %}<figure class="shot-detail"><img src="{{ _a }}" alt="{{ about.heading }}"></figure>{% endif %}
+    </div>
+  </div>
+</section>
+
+{% if home.pillar1_title or home.pillar2_title %}
+<section class="band">
+  <div class="wrap">
+    <h2 class="{{ hclass }}">How we work</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    <div class="cards">
+      {% if home.pillar1_title %}
+      <article class="card">
+                <h3 class="{{ hclass }}">{{ home.pillar1_title }}</h3><p>{{ home.pillar1_desc }}</p></article>{% endif %}
+      {% if home.pillar2_title %}
+      <article class="card">
+                <h3 class="{{ hclass }}">{{ home.pillar2_title }}</h3><p>{{ home.pillar2_desc }}</p></article>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if testimonials %}
+<section>
+  <div class="wrap">
+    <h2 class="{{ hclass }}">What people say</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    {% for t in testimonials[:3] %}
+    <blockquote class="quote"><p>&ldquo;{{ t.text }}&rdquo;</p>
+      <span class="{{ tclass }}">{{ t.name }}{% if t.role %} &mdash; {{ t.role }}{% endif %}</span></blockquote>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if faq %}
+<section class="band">
+  <div class="wrap">
+    <h2 class="{{ hclass }}">Questions</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    <div class="faq">
+      {% for f in faq %}<div><h3 class="{{ hclass }}">{{ f.question }}</h3><p>{{ f.answer }}</p></div>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,78 @@
+{% include "packs/_pages/_hero.html" %}
+
+{% if home.pillar1_title or home.pillar2_title %}
+<section class="band">
+  <div class="wrap">
+    <div class="pillars">
+      {% if home.pillar1_title %}<div class="pillar">
+        <h3>{{ home.pillar1_title }}</h3><p>{{ home.pillar1_desc }}</p></div>{% endif %}
+      {% if home.pillar2_title %}<div class="pillar">
+        <h3>{{ home.pillar2_title }}</h3><p>{{ home.pillar2_desc }}</p></div>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if services %}
+<section>
+  <div class="wrap">
+    <h2>{{ home.label or 'What we make' }}</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    <div class="cards">
+      {% for s in services[:3] %}
+      <article class="card"><h3>{{ s.title }}</h3><p>{{ s.description }}</p></article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if about and about.description %}
+<section class="band">
+  <div class="wrap">
+    <h2>{{ about.heading or 'About' }}</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    <div class="with-shot">
+      <div>
+        <p class="lede">{{ about.description }}</p>
+        {% if about.mission %}<p class="lede">{{ about.mission }}</p>{% endif %}
+      </div>
+      {% if shots.get('square') %}
+      <figure class="shot-detail"><img src="{{ shots.square }}" alt="{{ about.heading }}"></figure>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if portfolio %}
+<section>
+  <div class="wrap">
+    <h2>Work</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    <ul class="work">
+      {% for p in portfolio[:3] %}
+      <li>
+        <span class="tag">{{ p.tag or 'Piece' }}</span>
+        <div><h3>{{ p.title }}</h3><p>{{ p.description }}{% if p.outcome %} &mdash; {{ p.outcome }}{% endif %}</p></div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
+{% if contact %}
+<section class="band">
+  <div class="wrap">
+    <h2>{{ contact.title or 'Get in touch' }}</h2>
+    {% if has_rule %}<hr class="rule">{% endif %}
+    <p class="lede">{{ contact.description }}</p>
+    <div class="contact-grid">
+      {% if contact.phone %}<div><span>Phone</span><b>{{ contact.phone }}</b></div>{% endif %}
+      {% if contact.email %}<div><span>Email</span><b>{{ contact.email }}</b></div>{% endif %}
+      {% if contact.address %}<div><span>Where</span><b>{{ contact.address }}</b></div>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
