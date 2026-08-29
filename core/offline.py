@@ -36,11 +36,16 @@ def api_available() -> bool:
     True only if a key is present, the client constructed, AND no previous call
     failed for a reason retrying cannot fix (revoked key, exhausted quota).
     """
-    from core.llm import get_client, api_dead
+    # The key's NAME depends on the provider — OPENAI_API_KEY, GEMINI_API_KEY,
+    # GROQ_API_KEY and so on. Testing one vendor's name meant this reported
+    # "no key" for every other provider, which would have sent a perfectly
+    # working Gemini or Groq setup down the offline path. Ask core/llm.py,
+    # which is the only place that knows which provider was selected.
+    from core.llm import get_client, api_dead, provider_info
     dead, _why = api_dead()
     if dead:
         return False
-    return bool(os.getenv("OPENAI_API_KEY")) and get_client() is not None
+    return bool(provider_info().get("key_present")) and get_client() is not None
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,55 @@
+{
+  "$comment": "This design describes itself. Drop a folder containing _shell.html, home.html and this file into templates/packs/ and it becomes available with no code change.",
+  "title": "Binder",
+  "source": "adapted from a supplied Atelier & Co design",
+  "character": "a dark spine of vertical tabs down the left edge with the content on a paper sheet lifted off it; Fraunces over Inter, Space Mono labels, one ink ledger strip",
+  "mode": "light",
+  "accent": "#b8863b",
+  "ink": "#16231f",
+  "paper": "#efe9da",
+  "heading_font": "'Fraunces', Georgia, serif",
+  "use_case": "studios and makers who sell a craft as much as a product",
+  "categories": {
+    "other": 2.2,
+    "toys": 1.6,
+    "apparel": 1.6,
+    "food": 0.9
+  },
+  "keywords": {
+    "studio": 3.0,
+    "atelier": 3.0,
+    "workshop": 2.5,
+    "maker": 3.0,
+    "craft": 2.5,
+    "handmade": 2.0,
+    "artisan": 2.5,
+    "bespoke": 3.0,
+    "commission": 3.0,
+    "custom": 2.5,
+    "furniture": 2.5,
+    "joinery": 2.5,
+    "ceramic": 2.0,
+    "pottery": 2.5,
+    "leather": 2.0,
+    "wood": 2.0,
+    "wooden": 2.0,
+    "tool": 2.0,
+    "hardware": 2.0,
+    "restoration": 2.5,
+    "portfolio": 2.5,
+    "design": 2.0,
+    "print": 2.0,
+    "bindery": 3.0
+  },
+  "against": {
+    "bulk": 1.5,
+    "wholesale": 1.0
+  },
+  "sections": [
+    "hero",
+    "services",
+    "portfolio",
+    "about",
+    "contact"
+  ]
+}

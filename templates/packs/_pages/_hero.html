@@ -26,17 +26,29 @@
 {% set port_img = shots.get('hero') or hero_img %}
 {% set wide_img = shots.get('wide') or port_img %}
 {#
-  Never display a photo at more than 1.6x its own pixel width. A 200x150 upload
-  stretched across a 1800px page is the artefact that made the last build look
-  broken; capping the slot to what the file can actually carry means a small
-  photo renders small and sharp instead of huge and soft.
+  Never display a photo wider than 1.25x its own pixels.
+
+  A seller's photo holds only so much detail. Measured on a typical upload: a
+  900x1200 photo contains a product just 447px wide, so the honest plate is
+  about 730px — while a full-bleed band on a 1440px screen wants 1350. Nothing
+  can close that gap; enlarging only makes it soft.
+
+  Two things were wrong with the previous version of this. 1.6x is already
+  visibly soft. And the `< 1400` guard meant that when the computed cap came
+  out ABOVE 1400 no cap was applied at all — so a 921px image, whose cap
+  computed to 1473, skipped the cap and was stretched across the full width.
+  The images most in need of a limit were the ones that escaped it.
+
+  The cap now always applies. A big photo computes a cap wider than any layout
+  and is unaffected; a small one renders small and sharp, centred in its slot,
+  which is the better failure.
 #}
 {% set _hw = shots.get('hero_w') or 0 %}
 {% set _ww = shots.get('wide_w') or 0 %}
-{% set _cap = (_hw * 1.6) | int if _hw else 0 %}
-{% set capstyle = ('max-width:' ~ _cap ~ 'px;') if _cap and _cap < 1400 else '' %}
-{% set _wcap = (_ww * 1.6) | int if _ww else 0 %}
-{% set widecap = ('max-width:' ~ _wcap ~ 'px;') if _wcap and _wcap < 1400 else '' %}
+{% set _cap = (_hw * 1.25) | int if _hw else 0 %}
+{% set capstyle = ('max-width:' ~ _cap ~ 'px;margin-inline:auto;') if _cap else '' %}
+{% set _wcap = (_ww * 1.25) | int if _ww else 0 %}
+{% set widecap = ('max-width:' ~ _wcap ~ 'px;margin-inline:auto;') if _wcap else '' %}
 
 {#
   Split-weight headline. Packs that set split_headline get the first half of the
@@ -64,7 +76,15 @@
 </div>
 {% endset %}
 
-{% if hv == 'bleed' and wide_img and _ww >= 1100 %}
+{#
+  The 1100px gate has meant this composition has never once run: a
+  cut-out plate tops out around 920px, because that is all the product
+  occupied in the seller's photo. A STAGED photograph is a generated
+  scene at its own resolution, so it can carry a full-bleed hero -
+  which is the single biggest visual difference between a page that
+  looks generated and one that looks photographed.
+#}
+{% if hv == 'bleed' and wide_img and (is_staged or _ww >= 1100) %}
 <section class="hero hero-bleed">
   <img class="hero-bg" src="{{ wide_img }}" alt="{{ site_title }}">
   <div class="wrap">{{ _eyebrow }}{{ _title }}{{ _sub }}{{ _buy }}</div>

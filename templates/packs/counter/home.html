@@ -6,12 +6,49 @@
   price. Almost no prose — a stall's page answers "what do you have and what
   does it cost", and everything else is a footnote.
 #}
-{% include "packs/_pages/_hero.html" %}
+{#
+  This design's own opening. Deliberately NOT the shared partial: every pack
+  including one hero is what made six designs read as one page in six colours.
+#}
+{% set shots = shots | default({}) %}
+{% set port_img = shots.get('hero') or shots.get('square') %}
+{% set wide_img = shots.get('wide') or port_img %}
+{% set _hw = shots.get('hero_w') or 0 %}
+{% set _ww = shots.get('wide_w') or 0 %}
+{% set capstyle = ('max-width:' ~ (_hw * 1.25) | int ~ 'px;margin-inline:auto;') if _hw else '' %}
+{% set widecap = ('max-width:' ~ (_ww * 1.25) | int ~ 'px;margin-inline:auto;') if _ww else '' %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{% set _cta_href = ('https://wa.me/' ~ wa ~ '?text=' ~ site_name) if wa
+                   else ('mailto:' ~ contact.email if contact.email else '#') %}
+<section class="hero hero-board">
+  <div class="wrap board">
+    <div class="board__head">
+      <p class="eyebrow {{ tclass }}">{{ home.label or 'Today' }}</p>
+      <h1 class="{{ hclass }}">{{ site_title }}</h1>
+    </div>
+    <ul class="board__list">
+      {% for s in services[:3] %}
+      <li><span class="board__item">{{ s.title }}</span>
+          <span class="board__leader"></span>
+          {% if loop.first and price %}<span class="board__price">{{ price }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    <div class="buy">
+      <a class="cta {{ tclass }}" href="{{ _cta_href }}">{{ home.cta or 'Order' }}</a>
+      {% if contact.address %}<span class="board__where">{{ contact.address }}</span>{% endif %}
+    </div>
+  </div>
+  {% if wide_img %}
+  <figure class="board__shot">
+    <img style="{{ widecap }}" src="{{ wide_img }}" alt="{{ site_title }}"></figure>{% endif %}
+</section>
 
 <section {{ sect(0) }}>
   <div class="wrap">
     <h2>{{ home.label or "Today's menu" }}</h2><hr class="rule">
     <ul class="menu">
+      {# the board above already named the first three; this is the detail #}
       {% for s in services %}
       <li><span class="item">{{ s.title }}</span><span class="dots"></span>
           <span class="cost">{{ price if loop.first and price else '' }}</span>

@@ -226,7 +226,29 @@
   .work-shot img{width:100%;display:block;aspect-ratio:1.7/1;object-fit:cover}
   .card{display:flex;flex-direction:column}
   .card__photo img{width:100%;display:block;aspect-ratio:1.7/1;object-fit:cover}
-{% include "packs/_pages/_composition.css" %}
+/* ── The vitrine ────────────────────────────────────────────────────────
+     Jewellery is not sold by a headline; it is sold by being looked at. The
+     object arrives alone under a light, and the words wait until below it —
+     the reverse of every other design here, which is the point. */
+  .hero-vitrine{padding:0 0 88px;text-align:center;position:relative}
+  .hero-vitrine::before{content:"";position:absolute;inset:0 0 auto;height:62%;
+    background:radial-gradient(ellipse at 50% 38%,
+      color-mix(in srgb,var(--gold) 13%,transparent),transparent 62%);
+    pointer-events:none}
+  .vitrine{margin:0 auto;padding:74px 0 40px;position:relative;max-width:520px}
+  .vitrine img{width:100%;height:auto;display:block}
+  .vitrine::after{content:"";position:absolute;left:50%;bottom:24px;
+    width:min(64%,300px);height:1px;transform:translateX(-50%);
+    background:linear-gradient(90deg,transparent,var(--hair),transparent)}
+  .vitrine__say{max-width:44ch}
+  .hero-vitrine h1{font:300 clamp(30px,4.4vw,54px)/1.14 var(--display);
+    letter-spacing:.10em;text-transform:uppercase;margin:0 0 18px}
+  .hero-vitrine .hero-sub{margin:0 auto 30px;max-width:38ch}
+  .hero-vitrine .buy{justify-content:center}
+
+.hero-vitrine .wrap{display:block;max-width:640px;text-align:center}
+
+  {% include "packs/_pages/_composition.css" %}
 </style>
 </head>
 <body>

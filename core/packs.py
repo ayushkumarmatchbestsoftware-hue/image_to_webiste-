@@ -17,8 +17,13 @@ what makes it that Pack.
                                         + /packs/<slug>/css, images, fonts
 """
 import hashlib
+import json
+import logging
+import os
 import re
 from typing import Optional
+
+logger = logging.getLogger("packs")
 
 # ---------------------------------------------------------------------------
 # Registry
@@ -53,7 +58,7 @@ from typing import Optional
 # six hero compositions in _pages/_hero.html, social meta, and Share Cards.
 # A design whose CSS does not cover the shared pages' class names must ship its
 # own sub-pages instead — mixing the two is what broke the last attempt.
-PACKS = {
+BUILTIN_PACKS = {
     "noir": {
         "title": "Noir",
         "source": "original",
@@ -197,6 +202,110 @@ PACKS = {
         "sections": ["hero", "services", "about", "portfolio", "contact"],
     },
 }
+
+# ── Discovery ────────────────────────────────────────────────────────────────
+#
+# A design describes itself. Drop a folder into templates/packs/ holding
+# _shell.html, home.html and a pack.json, and it becomes available — no code
+# change, no redeploy of anything but the templates.
+#
+# The dictionary above is the fallback, and it stays for a reason: if a
+# manifest is missing or malformed, that design keeps working on its built-in
+# definition rather than vanishing from the product. A design silently
+# disappearing is a far worse failure than a stale description.
+
+PACKS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "templates", "packs")
+
+# Fields a manifest may set. Anything else is ignored rather than trusted —
+# these values drive scoring and rendering, so an unexpected key is a mistake,
+# not a feature.
+MANIFEST_FIELDS = {
+    "title", "source", "character", "mode", "accent", "ink", "paper",
+    "heading_font", "use_case", "categories", "keywords", "against", "sections",
+}
+REQUIRED = {"title", "character", "sections"}
+
+
+def _read_manifest(slug: str, folder: str):
+    """Load one pack.json. Returns None and says why if it cannot be used."""
+    path = os.path.join(folder, "pack.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = json.load(fh)
+    except (OSError, ValueError) as e:
+        logger.warning(f"pack '{slug}': pack.json unreadable ({e}); "
+                       "using the built-in definition")
+        return None
+
+    body = {k: v for k, v in raw.items() if k in MANIFEST_FIELDS}
+    missing = REQUIRED - set(body)
+    if missing:
+        logger.warning(f"pack '{slug}': pack.json missing {sorted(missing)}; "
+                       "using the built-in definition")
+        return None
+    # Scoring tables must be name -> number, or select_pack throws mid-generation
+    # rather than here where it can be reported.
+    for table in ("categories", "keywords", "against"):
+        val = body.get(table)
+        if val is not None and not (isinstance(val, dict) and all(
+                isinstance(v, (int, float)) for v in val.values())):
+            logger.warning(f"pack '{slug}': '{table}' must map names to numbers; "
+                           "using the built-in definition")
+            return None
+    if not isinstance(body.get("sections"), list) or not body["sections"]:
+        logger.warning(f"pack '{slug}': 'sections' must be a non-empty list; "
+                       "using the built-in definition")
+        return None
+    body.setdefault("mode", "light")
+    return body
+
+
+def discover(directory: str = None) -> dict:
+    """
+    Every design installed on disk.
+
+    A folder counts only if it can actually render — _shell.html and home.html
+    both present. Its definition comes from pack.json, or from the built-in
+    registry when there is no manifest.
+    """
+    found = {}
+    root = directory or PACKS_DIR
+    try:
+        entries = sorted(os.listdir(root))
+    except OSError:
+        return dict(BUILTIN_PACKS)
+
+    for slug in entries:
+        folder = os.path.join(root, slug)
+        if slug.startswith(("_", ".")) or not os.path.isdir(folder):
+            continue
+        if not all(os.path.exists(os.path.join(folder, f))
+                   for f in ("_shell.html", "home.html")):
+            continue
+        body = _read_manifest(slug, folder) or BUILTIN_PACKS.get(slug)
+        if not body:
+            logger.warning(f"pack '{slug}': no pack.json and no built-in "
+                           "definition; skipped")
+            continue
+        found[slug] = dict(body)
+
+    for slug in BUILTIN_PACKS:
+        if slug not in found:
+            logger.info(f"pack '{slug}': no folder on disk, not installed")
+    return found
+
+
+PACKS = discover()
+
+if PACKS:
+    logger.info(f"designs installed: {', '.join(sorted(PACKS))}")
+else:
+    logger.error("no designs found under templates/packs/")
+
 
 DEFAULT_PACK = "binder"
 

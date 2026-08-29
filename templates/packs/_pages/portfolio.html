@@ -11,7 +11,12 @@
     {% if has_rule %}<hr class="rule">{% endif %}
     {% if portfolio %}
     <ul class="work">
-      {% set _g = (shots.get('gallery') or []) + ([shots.get('square')] if shots.get('square') else []) %}
+      {# .work-shot is a 1.7 landscape frame, so the 1.70 `wide` plate is what
+   belongs in it. Falling back to `square` put a 1.00 image in a 1.7 frame
+   and object-fit:cover threw away 41% of the product. #}
+      {% set _g = (shots.get('gallery') or [])
+                  + ([shots.get('wide')] if shots.get('wide') else [])
+                  + ([shots.get('square')] if shots.get('square') else []) %}
       {% for p in portfolio %}
       <li>
         {% if _g and loop.index0 < _g|length %}

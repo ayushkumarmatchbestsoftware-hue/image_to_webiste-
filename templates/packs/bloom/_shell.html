@@ -297,7 +297,24 @@
   .work-shot img{width:100%;display:block;aspect-ratio:1.7/1;object-fit:cover}
   .card{display:flex;flex-direction:column}
   .card__photo img{width:100%;display:block;aspect-ratio:1.7/1;object-fit:cover}
-{% include "packs/_pages/_composition.css" %}
+/* ── The swatch ─────────────────────────────────────────────────────────
+     Cloth is chosen by looking at it, so the sample leads and the words are
+     its caption — narrower measure, set beside rather than above. */
+  .hero-swatch{padding:56px 0 0}
+  .swatch{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);
+    gap:clamp(30px,5vw,66px);align-items:center}
+  .swatch__say{max-width:40ch}
+  .hero-swatch h1{margin:0 0 18px;
+    font:400 clamp(30px,4.4vw,52px)/1.08 var(--display);letter-spacing:-.015em}
+  .hero-swatch .hero-sub{margin:0 0 26px}
+  @media(max-width:820px){.swatch{grid-template-columns:1fr}}
+
+.hero-swatch .wrap{max-width:1020px}
+  .hero-swatch .swatch{display:grid;
+    grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);
+    gap:clamp(30px,5vw,66px);align-items:center}
+
+  {% include "packs/_pages/_composition.css" %}
 </style>
 </head>
 <body>

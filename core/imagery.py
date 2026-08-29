@@ -34,6 +34,21 @@ SLOTS = {
     "square": 1.00,   # tiles and thumbnails
 }
 
+# The widest each slot is actually drawn at, measured off the Packs' own
+# stylesheets on a 1440px screen.
+#
+# Without these the plate was sized from the cut-out product alone, so a
+# 900x1200 photo produced an 848px band that the page then stretched across
+# 1350px — the browser doing the enlarging, badly, on the biggest image on the
+# page. Composing at the slot's real width moves that work to LANCZOS, and the
+# MAX_UPSCALE limit in imagedirector stops it inventing detail that was never
+# in the photo.
+SLOT_WIDTH = {
+    "hero":   760,    # a column, roughly half the content width
+    "wide":  1500,    # full-bleed bands — the widest thing on any page
+    "square": 820,    # tiles, cards and thumbnails
+}
+
 # Kept for callers that still ask by the old names.
 VARIANTS = {"hero": (0.78, 1.00), "square": (1.00, 1.02)}
 
@@ -79,7 +94,7 @@ MIN_CROP_EDGE = 900
 
 
 def derive_variants(photo_bytes: bytes, theme: Optional[dict] = None,
-                    max_edge: int = 1400, is_cutout: bool = False) -> dict:
+                    max_edge: int = 1600, is_cutout: bool = False) -> dict:
     """
     Returns {name: (bytes, content_type, width, height)} — one entry per slot.
 
@@ -118,7 +133,8 @@ def derive_variants(photo_bytes: bytes, theme: Optional[dict] = None,
             try:
                 if is_cutout:
                     from core.imagedirector import compose
-                    blob = compose(src, theme or {}, aspect)
+                    blob = compose(src, theme or {}, aspect,
+                                   target_w=SLOT_WIDTH.get(name))
                     im = Image.open(io.BytesIO(blob))
                     out[name] = (blob, "image/jpeg", im.size[0], im.size[1])
                     im.close()
@@ -195,6 +211,58 @@ async def build_image_set(photo_bytes, theme: dict, website_id: str,
             bg = await to_thread(analyze_background, photos[0], theme)
             plan = await to_thread(plan_treatment, spec, quality or {}, theme, bg)
             cut_out = "cutout" in [st["op"] for st in plan]
+
+            # When the background is coming out anyway, try replacing it with
+            # an image model first (skills/bg-remover.md). It re-renders the
+            # photograph rather than segmenting it, so thin structures — a
+            # chair base, a wire handle, a chain — survive, and there is no
+            # mask to wrongly INCLUDE a patch of floor.
+            #
+            # Strictly an upgrade: no key, no quota, or a result that no longer
+            # matches the seller's product, and the local cut-out below runs
+            # exactly as before. A generation is never blocked on it.
+            # Three ways to deal with the background, best first. Each falls
+            # through to the next, and the last needs no key at all — so a
+            # generation is never blocked, only made better when it can be.
+            #
+            #   stage    put the product in a setting from its own world.
+            #            skills/product-staging.md. Best by a distance, and the
+            #            only one that also solves resolution: a staged
+            #            photograph is generated at its own size, where a
+            #            cut-out is limited to the few hundred pixels the
+            #            seller's product actually occupies.
+            #   replace  the product on the site's own ground colour. Clean,
+            #            but says "photographed against something we removed".
+            #   cut out  local rembg. No key, no network, weakest on thin
+            #            structures.
+            if cut_out:
+                from core import bgremover
+                staged = False
+                try:
+                    if bgremover.available():
+                        photos = [await to_thread(bgremover.stage, photos[0], spec)]                                  + photos[1:]
+                        staged = True
+                        urls["_staged"] = True
+                        logger.info("product staged in a generated setting")
+                except Exception as e:
+                    logger.info(f"staging unavailable ({e})")
+                if not staged:
+                    try:
+                        if bgremover.available():
+                            photos = [await to_thread(
+                                bgremover.replace, photos[0], theme)] + photos[1:]
+                            urls["_bg_replaced"] = True
+                            logger.info("background replaced by image model")
+                            staged = True
+                    except Exception as e:
+                        logger.info(f"image-model background skipped ({e}); "
+                                    "using the local cut-out")
+                if staged:
+                    # Both return a photograph, not a transparent cut-out, so
+                    # the slots crop rather than composing a plate.
+                    plan = [st for st in plan if st["op"] != "cutout"]
+                    cut_out = False
+
             if plan:
                 treated = []
                 for blob in photos:
@@ -207,7 +275,11 @@ async def build_image_set(photo_bytes, theme: dict, website_id: str,
                 # to a slot shape just clips the product.
                 urls["_is_cutout"] = cut_out
             urls["_background"] = bg
-            urls["_treatment"] = [st["op"] for st in plan] if plan else []
+            urls["_treatment"] = ([st["op"] for st in plan] if plan else [])
+            if urls.get("_staged"):
+                urls["_treatment"].append("staged")
+            elif urls.get("_bg_replaced"):
+                urls["_treatment"].append("bg_replaced")
             logger.info(f"background: clutter={bg.get('clutter')} "
                         f"edges={bg.get('edges')} clash={bg.get('clash')} "
                         f"-> removal {'YES' if bg.get('needs_removal') else 'no'}")

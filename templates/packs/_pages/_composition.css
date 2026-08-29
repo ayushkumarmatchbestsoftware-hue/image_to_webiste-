@@ -242,6 +242,37 @@ figure.plate-fit img{
   background:var(--c-tint);
 }
 
+/* ── Product images outside the hero ──────────────────────────────────────
+   The hero caps itself (see _hero.html). Everything else — detail shots,
+   gallery figures, tiles, card photos, work shots — had no limit at all, so a
+   565px plate could be stretched across a full-width card.
+
+   Same rule as the hero: never wider than 1.25x the real pixels. These slots
+   are all fed from the small variants (~565px), so one cap covers them; it is
+   a max-width, so anything already smaller is untouched.
+
+   A seller's photo holds a product only a few hundred pixels wide. Small and
+   sharp is the better failure. */
+{% if shot_cap %}
+:is(.shot-detail,.work-shot,.shot-wide,.pin,.tile,.card__photo,.gallery figure) img,
+.grid figure img{
+  max-width:{{ shot_cap }}px;
+  margin-inline:auto;
+}
+{% endif %}
+
+/* A cut-out plate in a fixed-ratio frame is letterboxed, never cropped: its
+   ground is the Grade's bg_alt, which is exactly what --c-tint holds, so the
+   fill and the plate meet invisibly. A real photograph keeps object-fit:cover,
+   because letterboxing a photograph against flat colour looks worse than
+   trimming it. */
+{% if is_cutout %}
+:is(.work-shot,.shot-detail,.shot-wide,.card__photo,.tile) img{
+  object-fit:contain;
+  background:var(--c-tint);
+}
+{% endif %}
+
 /* ── Motion ───────────────────────────────────────────────────────────────
    Sections rise a little as they arrive. Staggered by child index so a grid
    of cards resolves in sequence rather than all at once. */

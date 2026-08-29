@@ -1,0 +1,56 @@
+{
+  "$comment": "This design describes itself. Drop a folder containing _shell.html, home.html and this file into templates/packs/ and it becomes available with no code change.",
+  "title": "Pulse",
+  "source": "original",
+  "character": "a release slip. Archivo Black shouting over Space Mono spec rows on concrete, product pinned to a paper panel, a perforated tear-edge carrying the lot and drop",
+  "mode": "light",
+  "accent": "#ff4d3d",
+  "ink": "#f4f4f5",
+  "paper": "#0d0f12",
+  "heading_font": "'Archivo Black', 'Arial Black', sans-serif",
+  "use_case": "streetwear, sneakers, gadgets, gear, anything with a drop",
+  "categories": {
+    "apparel": 2.4,
+    "other": 2.2,
+    "toys": 1.2,
+    "food": 0.5
+  },
+  "keywords": {
+    "sneaker": 3.0,
+    "streetwear": 3.0,
+    "hoodie": 3.0,
+    "tshirt": 2.5,
+    "tee": 2.5,
+    "cap": 2.5,
+    "jersey": 2.5,
+    "merch": 3.0,
+    "skate": 3.0,
+    "board": 2.0,
+    "gaming": 3.0,
+    "console": 2.5,
+    "headphone": 3.0,
+    "speaker": 2.5,
+    "gadget": 3.0,
+    "device": 2.5,
+    "drop": 2.5,
+    "limited": 2.5,
+    "bold": 2.0,
+    "loud": 2.5,
+    "athletic": 2.5,
+    "gym": 2.5,
+    "performance": 2.5,
+    "energy": 2.0
+  },
+  "against": {
+    "heirloom": 2.5,
+    "delicate": 2.0,
+    "understated": 2.5
+  },
+  "sections": [
+    "hero",
+    "services",
+    "portfolio",
+    "about",
+    "contact"
+  ]
+}

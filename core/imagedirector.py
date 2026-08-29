@@ -34,6 +34,13 @@ BRIGHT_FIX = 205       # mean above which we pull it back
 FLAT_FIX = 42          # stddev below which we add contrast
 TIGHT_CROP = 0.45      # fills_frame below which the product is lost in the frame
 
+# How far a cut-out product may be enlarged when composing its plate. LANCZOS
+# holds up to about 1.5x; past that there is no detail left to enlarge and the
+# result reads as blur rather than as size. A photo that cannot fill its slot
+# therefore yields a SMALLER plate, and the display cap in _hero.html stops the
+# page blowing it back up.
+MAX_UPSCALE = 1.5
+
 
 def analyze_background(photo_bytes: bytes, theme: Optional[dict] = None) -> dict:
     """
@@ -274,6 +281,12 @@ def _rembg_session():
     if _SESSION is None:
         from rembg import new_session
         import os
+        # u2netp by default. Measured against isnet-general-use on the same photo:
+        # isnet ran 3.6s to u2netp's 0.3s, needed a 179MB download, and produced
+        # 24.5% partial alpha against 26.5% — twelve times the cost for almost
+        # nothing. Both models return a SOFT mask; that is inherent, and it is
+        # what _clean_edges deals with. Override with REMBG_MODEL if a
+        # particular product defeats the small model.
         _SESSION = new_session(os.getenv("REMBG_MODEL", "u2netp"))
     return _SESSION
 
@@ -340,16 +353,66 @@ def _despeckle(cut, min_frac=0.004):
     return out
 
 
+# Where the alpha channel is cut hard and where it is allowed to feather. A
+# mask straight out of the model is mostly PARTIAL alpha — measured on a real
+# upload: 26.5% of pixels partial against 0.4% fully opaque. Every partial
+# pixel still carries the ORIGINAL background colour, so compositing one over
+# a dark page paints a pale halo, and a faint one leaves the old shadow behind
+# as a grey ghost. Both are exactly what a seller notices.
+ALPHA_FLOOR = 60      # below this the pixel was background: drop it entirely
+
+
+def _clean_edges(cut):
+    """
+    Drop the ghost the model half-kept, and nothing else.
+
+    A soft mask leaves two faults behind. This fixes one of them, on purpose.
+
+      the ghost   very faint pixels — usually the original shadow. Dropping
+                  them outright is always right, and cheap.
+
+      the halo    partly-transparent edge pixels still carrying the old
+                  background colour. Left alone here.
+
+    Two earlier attempts at the halo both made things worse, and both are worth
+    recording because they look reasonable on paper:
+
+      Pushing mid alphas to fully opaque hardened the edge, but where the model
+      had wrongly INCLUDED a pale ellipse of floor under a chair base, it
+      turned a faint smudge into a solid white shape. Hardening cannot tell a
+      soft edge from a confident mistake.
+
+      Repainting rim pixels with nearby product colour meant dividing by a
+      blurred coverage weight, and that weight goes to zero at the outside of
+      the rim. Measured: a weight of 0.08 multiplies the colour by 12 and
+      clips to white. A white bottle on a pale ground was erased outright and
+      the rock beneath it came back with cyan channel-clipping.
+
+    So the alpha is only ever cut at the bottom. It is never promoted, and the
+    colour is never touched. A faint halo on a dark ground is a small fault;
+    an erased product is not.
+    """
+    try:
+        from PIL import Image
+    except Exception:
+        return cut
+    cut = cut.copy()
+    a = cut.split()[-1]
+    cut.putalpha(a.point(lambda v: 0 if v < ALPHA_FLOOR else v))
+    return cut
+
+
 def _cutout_rembg(img):
     try:
         from rembg import remove
-        return remove(img.convert("RGBA"), session=_rembg_session()), None
+        cut = remove(img.convert("RGBA"), session=_rembg_session())
+        return _clean_edges(cut), None
     except Exception as e:
         logger.warning(f"rembg failed, falling back: {e}")
         return None, None
 
 
-def _ground(cut, theme, pad=0.10, aspect=None, fill=0.76):
+def _ground(cut, theme, pad=0.10, aspect=None, fill=0.76, target_w=None):
     """
     Composite the cut-out onto the Site's own colour with breathing room.
 
@@ -382,6 +445,26 @@ def _ground(cut, theme, pad=0.10, aspect=None, fill=0.76):
         if pw < w / fill:
             pw = int(w / fill)
             ph = int(pw / aspect)
+
+        # Size the plate for the slot it will occupy, not merely for the
+        # product that happens to be on it.
+        #
+        # Sizing it from the cutout alone meant a 900x1200 photo produced an
+        # 848px-wide band, which the page then stretched across 1350px. The
+        # browser did that upscaling, badly, on every full-width hero.
+        #
+        # So aim at what the slot actually needs — but never scale the product
+        # beyond MAX_UPSCALE of its real pixels, because past that there is no
+        # detail left to enlarge and a soft image is worse than a small one.
+        # A low-resolution photo therefore yields a smaller plate, and the
+        # display cap in _hero.html keeps the page from blowing it up again.
+        if target_w:
+            supportable = int((w / fill) * MAX_UPSCALE)
+            want = min(int(target_w), supportable)
+            if want > pw:
+                ph = int(want / aspect)
+                pw = want
+
         scale = min((pw * fill) / w, (ph * fill) / h)
         cut = cut.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)
         w, h = cut.size
@@ -410,7 +493,7 @@ def _shadow(plate, theme):
     return out
 
 
-def compose(cut_rgba, theme: dict, aspect: float):
+def compose(cut_rgba, theme: dict, aspect: float, target_w: int = None):
     """
     Place an already-cut-out product on a plate of the given shape.
 
@@ -420,7 +503,7 @@ def compose(cut_rgba, theme: dict, aspect: float):
     """
     import io as _io
     from PIL import Image
-    plate = _ground(cut_rgba, theme, aspect=aspect)
+    plate = _ground(cut_rgba, theme, aspect=aspect, target_w=target_w)
     plate = _shadow(plate, theme)
     from core.utils import hex_to_rgb
     bg = hex_to_rgb(theme.get("bg_alt") or "#f4f2ef") or (244, 242, 239)

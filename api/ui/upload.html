@@ -82,6 +82,18 @@
   .status.run{color:var(--warn)}.status.done{color:var(--ok)}.status.fail{color:var(--err)}
 
   iframe{flex:1;width:100%;border:0;background:#fff}
+  .designs{padding:14px 16px;border-bottom:1px solid var(--line,#262b35);
+           background:rgba(255,255,255,.02)}
+  .designs__hint{margin:0 0 10px;font-size:.82rem;opacity:.65}
+  .designs__row{display:flex;gap:8px;flex-wrap:wrap}
+  .designs__row button{border:1px solid var(--line,#2a2f3a);background:none;
+    color:inherit;border-radius:8px;padding:8px 12px;cursor:pointer;
+    font:600 .82rem inherit;text-align:left;min-width:126px}
+  .designs__row button:hover{border-color:#5b8cff}
+  .designs__row button.on{background:#5b8cff;color:#08111f;border-color:#5b8cff}
+  .designs__row button small{display:block;font-weight:400;opacity:.7;
+    margin-top:2px;font-size:.72rem}
+  .designs__row button:disabled{opacity:.5;cursor:progress}
   .empty{flex:1;display:grid;place-content:center;color:var(--muted);text-align:center;
          gap:8px;padding:30px}
   .empty .big{font-size:15px;color:var(--text)}
@@ -202,6 +214,7 @@
       <span class="status" id="status">idle</span>
       <span class="sp"></span>
       <button id="editBtn" style="display:none">Edit page</button>
+      <button id="designBtn" style="display:none">Change design</button>
       <a id="open" href="#" target="_blank" style="display:none">Open in tab</a>
       <a id="dl1" href="#" style="display:none">Download .html</a>
       <a id="dl" href="#" style="display:none">Download .zip</a>
@@ -210,6 +223,12 @@
       <div class="big">Upload a product photo to begin.</div>
       <div class="d">Your photo decides the design &mdash; colours, type and layout.</div>
       <div class="d">Nothing from the template appears on your page. Only your image.</div>
+    </div>
+    <div id="designs" class="designs" hidden>
+      <p class="designs__hint">Pick a different look. Your words, prices and
+        photos stay exactly as they are &mdash; only the design changes, and it
+        costs nothing.</p>
+      <div class="designs__row" id="designRow"></div>
     </div>
     <iframe id="frame" style="display:none"></iframe>
   </div>
@@ -419,6 +438,8 @@ async function build(){
       $("dl").href="/download/"+WID; $("dl").style.display="inline-block";
       $("dl1").href="/download/"+WID+"?single=1"; $("dl1").style.display="inline-block";
       $("editBtn").style.display="inline-block"; $("editBtn").textContent="Edit page";
+      $("designBtn").style.display="inline-block";
+      loadDesigns();
       $("editBtn").classList.remove("on");
       $("spin").style.display="block"; $("spin").disabled=false; $("go2").disabled=false;
       fetch("/history").then(x=>x.json()).then(h=>{
@@ -448,6 +469,69 @@ $("editBtn").addEventListener("click", function(){
   setStatus(EDITING ? "edit mode — click any text, then Save" : "viewing",
             EDITING ? "run" : "done");
 });
+
+// ---- change the design ---------------------------------------------------
+// Re-rendering costs nothing: the copy, palette and images were saved when the
+// site was generated, so switching design calls no model and rewrites no text.
+// A seller who dislikes the look should not have to start again and be handed
+// different words.
+let DESIGNS=null, CURRENT=null;
+
+function loadDesigns(){
+  if(!WID) return;
+  fetch("/api/"+WID+"/design").then(r=>r.json()).then(d=>{
+    DESIGNS=d.designs||[]; CURRENT=d.current;
+    if(!d.changeable){
+      $("designBtn").disabled=true;
+      $("designBtn").title="Generated before designs could be changed";
+      return;
+    }
+    paintDesigns();
+  }).catch(()=>{});
+}
+
+function paintDesigns(){
+  const row=$("designRow"); row.innerHTML="";
+  DESIGNS.forEach(d=>{
+    const b=document.createElement("button");
+    b.type="button";
+    if(d.slug===CURRENT) b.classList.add("on");
+    b.appendChild(document.createTextNode(d.title));
+    const s=document.createElement("small");
+    s.textContent=(d.use_case||"").split(",")[0];
+    b.appendChild(s);
+    b.onclick=()=>applyDesign(d.slug, b);
+    row.appendChild(b);
+  });
+}
+
+function applyDesign(slug, btn){
+  if(slug===CURRENT) return;
+  [...$("designRow").querySelectorAll("button")].forEach(x=>x.disabled=true);
+  const was=btn.textContent;
+  setStatus("changing design…","run");
+  fetch("/api/"+WID+"/design",{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify({pack:slug})})
+    .then(r=>r.json()).then(d=>{
+      [...$("designRow").querySelectorAll("button")].forEach(x=>x.disabled=false);
+      if(d.error){ log(d.error,"#ff5c5c"); setStatus("design unchanged","fail"); return; }
+      CURRENT=slug; paintDesigns();
+      $("frame").src=URLBASE+"?t="+Date.now();
+      $("packpill").style.display="inline-block";
+      $("packpill").textContent="design: "+slug;
+      setStatus("design changed","done");
+      log("re-rendered as "+slug+" (no model calls)","#3ecf8e");
+    }).catch(err=>{
+      [...$("designRow").querySelectorAll("button")].forEach(x=>x.disabled=false);
+      setStatus("design unchanged","fail"); log(String(err),"#ff5c5c");
+    });
+}
+
+$("designBtn").onclick=function(){
+  const box=$("designs");
+  box.hidden=!box.hidden;
+  this.classList.toggle("on", !box.hidden);
+};
 </script>
 </body>
 </html>

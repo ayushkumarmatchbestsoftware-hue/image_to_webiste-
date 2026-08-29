@@ -1,0 +1,52 @@
+{
+  "$comment": "This design describes itself. Drop a folder containing _shell.html, home.html and this file into templates/packs/ and it becomes available with no code change.",
+  "title": "Noir",
+  "source": "original",
+  "character": "DARK. One expensive object in a pool of light. Cormorant Garamond tracked wide on near-black, centred, unhurried",
+  "mode": "dark",
+  "accent": "#c8a86b",
+  "ink": "#f2efe9",
+  "paper": "#0e0d0c",
+  "heading_font": "'Cormorant Garamond', Georgia, serif",
+  "use_case": "jewellery, watches, perfume, anything sold on desire",
+  "categories": {
+    "other": 2.4,
+    "apparel": 2.0,
+    "food": 0.6,
+    "toys": 0.3
+  },
+  "keywords": {
+    "jewellery": 3.0,
+    "jewelry": 3.0,
+    "ring": 2.5,
+    "necklace": 3.0,
+    "earring": 3.0,
+    "bracelet": 2.5,
+    "gold": 2.5,
+    "silver": 2.5,
+    "diamond": 3.0,
+    "gemstone": 3.0,
+    "watch": 3.0,
+    "perfume": 3.0,
+    "fragrance": 3.0,
+    "silk": 2.0,
+    "cashmere": 2.0,
+    "luxury": 3.0,
+    "heirloom": 2.5,
+    "couture": 3.0,
+    "bespoke": 2.5,
+    "elegant": 2.0
+  },
+  "against": {
+    "budget": 2.5,
+    "bulk": 2.0,
+    "cute": 2.0
+  },
+  "sections": [
+    "hero",
+    "about",
+    "portfolio",
+    "services",
+    "contact"
+  ]
+}

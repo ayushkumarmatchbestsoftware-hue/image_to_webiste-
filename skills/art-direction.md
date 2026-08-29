@@ -15,11 +15,17 @@ opposite pages.
 
 **hero** — how the page opens.
 
+You are told whether the photograph was STAGED — placed into a setting from the
+product's own world — or is a cut-out on a flat ground. That changes the answer
+more than anything else here: a staged scene can carry a full-bleed opening and
+a cut-out cannot, because a cut-out holds only the few hundred pixels the
+product occupied in the seller's snapshot.
+
 | variant | what it is | right when |
 |---|---|---|
 | `side-right` | copy left, product right | the default; a clear upright object |
 | `side-left` | product left, copy right | the product reads better entering from the left |
-| `bleed` | photo full-bleed behind the copy | only a wide, high-resolution, low-clutter photo |
+| `bleed` | photo full-bleed behind the copy | a STAGED photograph — the product in a real setting. This is the strongest opening available and should be preferred whenever staging succeeded |
 | `plate` | product on a band above the title | the product is the whole story |
 | `below` | title first, product band under it | the name matters more than the object |
 | `inset` | copy with a small product card | a detailed object that rewards a close look |

@@ -7,7 +7,36 @@
   list, then the pieces. Sparse on purpose: this is how an expensive object is
   presented in a room.
 #}
-{% include "packs/_pages/_hero.html" %}
+{#
+  This design's own opening. Deliberately NOT the shared partial: every pack
+  including one hero is what made six designs read as one page in six colours.
+#}
+{% set shots = shots | default({}) %}
+{% set port_img = shots.get('hero') or shots.get('square') %}
+{% set wide_img = shots.get('wide') or port_img %}
+{% set _hw = shots.get('hero_w') or 0 %}
+{% set _ww = shots.get('wide_w') or 0 %}
+{% set capstyle = ('max-width:' ~ (_hw * 1.25) | int ~ 'px;margin-inline:auto;') if _hw else '' %}
+{% set widecap = ('max-width:' ~ (_ww * 1.25) | int ~ 'px;margin-inline:auto;') if _ww else '' %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{% set _cta_href = ('https://wa.me/' ~ wa ~ '?text=' ~ site_name) if wa
+                   else ('mailto:' ~ contact.email if contact.email else '#') %}
+<section class="hero hero-vitrine">
+  {% if port_img %}
+  <figure class="vitrine">
+    <img style="{{ capstyle }}" src="{{ port_img }}" alt="{{ site_title }}">
+  </figure>
+  {% endif %}
+  <div class="wrap vitrine__say">
+    <h1 class="{{ hclass }}">{{ site_title }}</h1>
+    {% if home.subtitle or tagline %}
+    <p class="hero-sub">{{ home.subtitle or tagline }}</p>{% endif %}
+    <div class="buy">
+      {% if price %}<span class="price {{ tclass }}">{{ price }}</span>{% endif %}
+      <a class="cta {{ tclass }}" href="{{ _cta_href }}">{{ home.cta or 'Enquire' }}</a>
+    </div>
+  </div>
+</section>
 
 {% if about and about.description %}
 <section {{ sect(0) }}>

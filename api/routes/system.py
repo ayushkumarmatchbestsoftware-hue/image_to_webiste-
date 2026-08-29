@@ -39,6 +39,7 @@ async def health():
     # the second, so the UI never claims a live model when calls are failing.
     from core.llm import api_dead, provider_info
     from core import artdirector as _ad, skills as _skills
+    from core import bgremover as _bg
     from core.offline import api_available
     _dead, why = api_dead()
     info = provider_info()
@@ -61,6 +62,9 @@ async def health():
         # Whether the Art Director agent can actually run, and on what. Both
         # halves can fail independently: no vision model means no critique even
         # with a live key, and no browser means nothing to critique.
+        # Imagery follows the text provider unless IMAGE_PROVIDER overrides it,
+        # so a key swap is visible here in one place.
+        "background_replace": _bg.info(),
         "art_director": {
             "enabled": _ad.ENABLED,
             "can_direct": bool(_ad.ENABLED and _skills.load("art-direction")

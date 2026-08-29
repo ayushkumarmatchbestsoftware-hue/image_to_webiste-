@@ -40,7 +40,7 @@ keeps the output structurally sound whatever the model does.
 | `core/commerce.py` | catalogue, server-side pricing, orders, state machine |
 | `core/payments.py` | cash on delivery and UPI |
 | `core/publish.py` | hosting — a readable public URL per site |
-| `templates/packs/` | the designs; each is a `_shell.html` plus a `home.html` |
+| `templates/packs/` | the designs — a folder holding `_shell.html`, `home.html` and `pack.json` |
 | `skills/` | design criteria as editable Markdown, read by the agent at runtime |
 | `api/server.py` | app assembly only — middleware, mounts, router registration |
 | `api/routes/` | one router per area: system, generate, sites, designs, shop, publish |
@@ -84,6 +84,19 @@ reference and to `paid` only when a human has seen the money.
 **The agent is never load-bearing.** No key, no browser, a refused call or a
 malformed reply — each falls back to the deterministic rules and the site still
 ships. The agent improves a page; it cannot block one.
+
+## Adding a design
+
+A design describes itself. Drop a folder into `templates/packs/` containing
+`_shell.html`, `home.html` and a `pack.json`, and it is available on the next
+start — no code change.
+
+`pack.json` carries the description (title, character, use case, mode) and the
+matching rules that decide which sellers get it: `categories`, `keywords` and
+`against`, each mapping a name to a weight. A manifest that is unreadable, is
+missing `title`, `character` or `sections`, or whose weight tables are not
+numbers, is reported in the log and the design falls back to its built-in
+definition rather than disappearing.
 
 ## Configuration
 

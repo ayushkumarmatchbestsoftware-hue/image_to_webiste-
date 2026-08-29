@@ -199,3 +199,45 @@ async def history():
 # OFF by default so local testing is frictionless, and the /health payload says
 # so plainly — a shop taking real orders must set SHOP_REQUIRE_KEY=1.
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/api/{website_id}/design")
+async def current_design(website_id: str):
+    """Which design this site uses, and what it could be changed to."""
+    from core.packs import PACKS
+    from core import redesign
+    try:
+        current = (redesign.load_content(website_id) or {}).get("pack")
+        changeable = True
+    except redesign.RedesignError:
+        current, changeable = local_mode.WEBSITES.get(website_id, {}).get("pack"), False
+    return {"current": current, "changeable": changeable,
+            "designs": [{"slug": s, "title": p["title"], "mode": p.get("mode", "light"),
+                         "use_case": p.get("use_case", ""),
+                         "character": p.get("character", "")}
+                        for s, p in PACKS.items()]}
+
+
+@router.post("/api/{website_id}/design")
+async def change_design(website_id: str, request: Request):
+    """
+    Re-render this site in a different design.
+
+    Costs nothing and calls no model: the copy, palette and images were saved
+    at generation time, so only the rendering is redone. The seller asked to
+    change the look, not to be given different words.
+    """
+    from core import redesign
+    body = await request.json()
+    slug = str(body.get("pack", "")).strip()
+    try:
+        pages = await asyncio.to_thread(redesign.render, website_id, slug)
+        await asyncio.to_thread(redesign.save, website_id, pages, slug)
+    except redesign.RedesignError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+    except Exception as e:
+        log.warning(f"redesign failed for {website_id[:8]}: {e}")
+        return JSONResponse(status_code=500,
+                            content={"error": f"{type(e).__name__}: {e}"})
+    return {"success": True, "pack": slug, "pages": sorted(pages),
+            "preview_url": f"/preview/{website_id}/home.html"}

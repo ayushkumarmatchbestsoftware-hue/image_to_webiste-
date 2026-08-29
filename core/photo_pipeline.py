@@ -306,11 +306,21 @@ async def run_photo_generation_job(
         # agent is allowed to change the design.
         _rule_pack = select_pack(spec, spin=spin) if packs_installed() else None
         _n_sections = _sections_in(_rule_pack) if _rule_pack else 5
+        # The director runs before imagery, so it cannot know that staging
+        # SUCCEEDED — only that it is possible. That is the honest thing to
+        # pass: if staging then fails, the bleed composition finds no staged
+        # photo and falls through to the next branch on its own.
+        try:
+            from core import bgremover as _bg
+            _can_stage = _bg.available()
+        except Exception:
+            _can_stage = False
         direction = await ad_direct(
             spec, seller_facts, PACKS, _n_sections, list(FEATURE_KINDS),
             {"pack": _rule_pack,
              "hero": select_hero_variant(spec, quality, spin),
-             "feature_kind": None, "rhythm": None, "invert_at": -1})
+             "feature_kind": None, "rhythm": None, "invert_at": -1},
+            staged=_can_stage)
         _slug_for_mode = direction.get("pack") or _rule_pack
         _mode = (get_pack(_slug_for_mode).get("mode", "light")
                  if _slug_for_mode else "light")
@@ -456,6 +466,17 @@ async def run_photo_generation_job(
             # A composed plate (product cut out and centred on the Site's own
             # ground) can be letterboxed seamlessly; a real photo cannot.
             is_cutout=bool(shots.get("_is_cutout")),
+            # A staged photograph is a real scene at generated resolution, so
+            # it can carry a full-bleed hero. A cut-out never could: it holds
+            # only the few hundred pixels the seller's product occupied.
+            is_staged=bool(shots.get("_staged")),
+            # How wide a product image may be drawn: 1.25x its real pixels.
+            # Computed here rather than in the stylesheet because the shell
+            # rebinds `shots` before including it, and the nested lookups
+            # silently produced nothing — the rule rendered as an empty block
+            # with only its comment left behind.
+            shot_cap=int(min([w for w in (shots.get("square_w"),
+                                          shots.get("hero_w")) if w] or [0]) * 1.25),
             price=price,
             asset_base=pack["asset_base"],
             pack=pack,
@@ -612,6 +633,33 @@ async def run_photo_generation_job(
             }, [])
         except Exception as e:
             logger.warning(f"[{job_id[:8]}] persist skipped: {e}")
+
+        # ── Keep what it took to build this ──
+        # Everything needed to re-render this site in a DIFFERENT design, with
+        # no model calls: the copy, the Grade, the layout and the image URLs.
+        # Without it, letting a seller change their design would mean paying to
+        # write the same words again — and they would come back different.
+        try:
+            import json as _json
+            await asyncio.to_thread(
+                upload_media_to_r2,
+                _json.dumps({
+                    "content": data,
+                    "spec": spec,
+                    "theme": dict(theme),
+                    "layout": layout,
+                    "shots": shots,
+                    "price": price,
+                    "site_name": site_name,
+                    "brand_name": brand_name,
+                    "spin": spin,
+                    "density": density,
+                    "pack": pack_slug,
+                }, ensure_ascii=False).encode("utf-8"),
+                "application/json", f"websites/{website_id}", "content.json")
+        except Exception as e:
+            logger.warning(f"[{job_id[:8]}] content not saved, "
+                           f"redesign will be unavailable: {e}")
 
         # ── Catalogue ──
         # The orderable version of what was just generated. Written separately

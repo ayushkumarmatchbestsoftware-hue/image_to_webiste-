@@ -134,7 +134,8 @@ def shoot(html: str, width: int = 1440, height: int = 2600) -> bytes:
 # ── Before the render: choosing the page ──────────────────────────────────────
 
 async def direct(spec: dict, seller_facts: str, packs: dict, n_sections: int,
-                 feature_options: list, fallback: dict) -> dict:
+                 feature_options: list, fallback: dict,
+                 staged: bool = False) -> dict:
     """
     Choose pack, hero, feature, rhythm and invert. Returns `fallback` unchanged
     if the agent is unavailable or answers with anything unusable.
@@ -163,6 +164,10 @@ async def direct(spec: dict, seller_facts: str, packs: dict, n_sections: int,
     }
     payload = {
         "product_spec": spec,
+        # Whether the photograph is a staged scene decides whether a full-bleed
+        # opening is even possible, so the director is told rather than left to
+        # guess from the Spec.
+        "photo_is_staged": bool(staged),
         "seller_said": seller_facts or "(nothing)",
         "designs_available": menu,
         "feature_options": feature_options,

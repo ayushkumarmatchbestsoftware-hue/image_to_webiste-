@@ -166,6 +166,7 @@ def render(slug: str) -> str:
                "hero_w": 900, "hero_h": 1150, "wide_w": 1400, "wide_h": 823,
                "square_w": 900, "square_h": 900},
         is_cutout=True, price=b["price"], asset_base=pack.get("asset_base", "/a"),
+        shot_cap=int(min(900, 900) * 1.25),
         pack=dict(pack, slug=slug), comp=comp, sect=make_sect(comp),
         stats=data["stats"], **{k: v for k, v in data.items() if k != "stats"})
     return jinja_env.get_template(f"packs/{slug}/home.html").render(**ctx)

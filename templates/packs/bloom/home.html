@@ -6,7 +6,37 @@
   tilted a degree or two, nothing in a straight row. Image-led rather than
   copy-led, because a gift is chosen by looking.
 #}
-{% include "packs/_pages/_hero.html" %}
+{#
+  This design's own opening. Deliberately NOT the shared partial: every pack
+  including one hero is what made six designs read as one page in six colours.
+#}
+{% set shots = shots | default({}) %}
+{% set port_img = shots.get('hero') or shots.get('square') %}
+{% set wide_img = shots.get('wide') or port_img %}
+{% set _hw = shots.get('hero_w') or 0 %}
+{% set _ww = shots.get('wide_w') or 0 %}
+{% set capstyle = ('max-width:' ~ (_hw * 1.25) | int ~ 'px;margin-inline:auto;') if _hw else '' %}
+{% set widecap = ('max-width:' ~ (_ww * 1.25) | int ~ 'px;margin-inline:auto;') if _ww else '' %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{% set _cta_href = ('https://wa.me/' ~ wa ~ '?text=' ~ site_name) if wa
+                   else ('mailto:' ~ contact.email if contact.email else '#') %}
+<section class="hero hero-swatch">
+  <div class="wrap swatch">
+    {% if port_img %}
+    <figure class="shot">
+      <img style="{{ capstyle }}" src="{{ port_img }}" alt="{{ site_title }}"></figure>{% endif %}
+    <div class="swatch__say">
+      <p class="eyebrow {{ tclass }}">{{ home.label or 'What we make' }}</p>
+      <h1 class="{{ hclass }}">{{ site_title }}</h1>
+      {% if home.subtitle or tagline %}
+      <p class="hero-sub">{{ home.subtitle or tagline }}</p>{% endif %}
+      <div class="buy">
+        {% if price %}<span class="price {{ tclass }}">{{ price }}</span>{% endif %}
+        <a class="cta {{ tclass }}" href="{{ _cta_href }}">{{ home.cta or 'Enquire' }}</a>
+      </div>
+    </div>
+  </div>
+</section>
 
 {#
   Signature: the care label.

@@ -1,0 +1,56 @@
+{
+  "$comment": "This design describes itself. Drop a folder containing _shell.html, home.html and this file into templates/packs/ and it becomes available with no code change.",
+  "title": "Tumble",
+  "source": "adapted from the Tumble & Co. design supplied by the user",
+  "character": "dotted cream ground, 3px ink borders on everything, hard offset shadows, Baloo 2 rounded display, a 2x2 rotated tile hero and a reviews carousel",
+  "mode": "light",
+  "accent": "#ffb020",
+  "ink": "#241b2e",
+  "paper": "#fff7e9",
+  "heading_font": "'Baloo 2', 'Segoe UI', sans-serif",
+  "use_case": "family shops selling a small range - toys, kids goods, games, party and craft supplies",
+  "categories": {
+    "toys": 2.8,
+    "other": 1.7,
+    "food": 1.2,
+    "apparel": 1.2
+  },
+  "keywords": {
+    "toy": 3.0,
+    "game": 2.5,
+    "puzzle": 3.0,
+    "block": 2.5,
+    "plush": 2.5,
+    "doll": 2.5,
+    "rattle": 2.5,
+    "stacker": 3.0,
+    "kids": 3.0,
+    "children": 3.0,
+    "child": 2.5,
+    "toddler": 3.0,
+    "baby": 2.5,
+    "nursery": 2.5,
+    "playroom": 3.0,
+    "play": 2.0,
+    "craft": 2.0,
+    "sticker": 2.5,
+    "crayon": 2.5,
+    "colouring": 2.5,
+    "party": 2.5,
+    "birthday": 2.5,
+    "wooden": 2.0,
+    "playful": 2.0
+  },
+  "against": {
+    "luxury": 2.5,
+    "understated": 2.0,
+    "heirloom": 1.5
+  },
+  "sections": [
+    "hero",
+    "services",
+    "about",
+    "portfolio",
+    "contact"
+  ]
+}
