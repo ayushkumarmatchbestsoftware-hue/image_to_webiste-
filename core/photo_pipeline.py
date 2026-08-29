@@ -33,6 +33,7 @@ from core.packs import (select_pack, get_pack, pack_layout, score_packs,
 from core.composition import plan_composition, make_sect
 from core import i18n as _i18n
 from core.design import select_hero_variant
+from core import recents as _recents
 from core.artdirector import (direct as ad_direct, shoot as ad_shoot,
                               critique as ad_critique, apply_repairs,
                               FEATURE_KINDS)
@@ -362,6 +363,28 @@ async def run_photo_generation_job(
              "feature_kind": None, "rhythm": None, "invert_at": -1},
             staged=_can_stage)
         _slug_for_mode = direction.get("pack") or _rule_pack
+
+        # ── Don't hand this seller the same design twice ──
+        # Choosing the best design for a product is a judgement about that
+        # product alone, and two honest judgements can agree: a frying pan and
+        # a set of UI icons both read as technical gear, so both were built in
+        # the release slip and the seller saw one website twice. Neither
+        # decision was wrong, so no per-product fix can prevent it - variety
+        # lives in the sequence, not the choice.
+        #
+        # The ranking below is the agent's pick first, then everything else in
+        # score order, so declining a repeat still yields a design that suits
+        # the product. Spin is the seller deliberately asking for a different
+        # design of the SAME site, so the ledger stands aside for it.
+        if _slug_for_mode and spin <= 0:
+            _by_score = sorted(score_packs(spec).items(),
+                               key=lambda kv: (-kv[1], kv[0]))
+            _ranked = [_slug_for_mode] + [k for k, _ in _by_score
+                                          if k != _slug_for_mode]
+            _slug_for_mode, _why = _recents.steer(user_id, website_id, _ranked)
+            if _why:
+                logger.info(f"[{job_id[:8]}] design ledger: {_why}")
+
         _mode = (get_pack(_slug_for_mode).get("mode", "light")
                  if _slug_for_mode else "light")
         design = derive_design(spec, quality, spin=spin, density=density, mode=_mode)
