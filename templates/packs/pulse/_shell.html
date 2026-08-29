@@ -337,6 +337,14 @@
   .wearers__list cite{grid-column:2;font:700 10.5px/1 var(--mono);
     letter-spacing:.16em;text-transform:uppercase;color:var(--soft);font-style:normal}
 
+  .feature__wrap{display:grid;grid-template-columns:minmax(96px,14%) 1fr;
+    align-items:end;gap:0 26px}
+  .feature__label{grid-row:1;writing-mode:vertical-rl;transform:rotate(180deg);
+    justify-self:end;margin:0}
+  .feature__big{grid-column:2}
+  @media(max-width:640px){.feature__wrap{grid-template-columns:1fr}
+    .feature__label{writing-mode:horizontal-tb;transform:none;justify-self:start}}
+
   {% include "packs/_pages/_composition.css" %}
 </style>
 {% include "packs/_pages/_structured.html" %}

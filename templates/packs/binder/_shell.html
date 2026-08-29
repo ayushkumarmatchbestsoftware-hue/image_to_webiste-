@@ -327,6 +327,14 @@
 
   .refbay{padding:60px 0}
 
+  .feature__wrap{display:grid;grid-template-columns:auto 1fr;gap:0 30px;
+    align-items:start;padding-left:6%}
+  .feature__label{grid-column:1;grid-row:1;text-align:right;
+    padding-top:.9em;white-space:nowrap;margin:0}
+  .feature__big{grid-column:2}
+  @media(max-width:640px){.feature__wrap{grid-template-columns:1fr;padding-left:0}
+    .feature__label{text-align:left;padding-top:0}}
+
   {% include "packs/_pages/_composition.css" %}
 </style>
 {% include "packs/_pages/_structured.html" %}
