@@ -172,8 +172,15 @@ async def direct(spec: dict, seller_facts: str, packs: dict, n_sections: int,
         "designs_available": menu,
         "feature_options": feature_options,
         "sections_on_this_page": n_sections,
-        "rules_would_have_chosen": {k: v for k, v in fallback.items()
-                                    if not k.startswith("_")},
+        # Named "current", not "rules_would_have_chosen". The old name framed
+        # the existing choice as hypothetical - something the agent was there to
+        # replace - and on the hero it replaced it every time, answering
+        # side-right for a gold ring, a baby blanket, a burger and a frying pan
+        # alike. It is not hypothetical: it is what ships if the agent says
+        # nothing, and on the hero it was chosen from the photo's measured
+        # geometry, which the agent cannot see.
+        "current": {k: v for k, v in fallback.items()
+                    if not k.startswith("_")},
     }
     schema = (
         '{"pack":"<slug>","pack_reason":"<one line>",'

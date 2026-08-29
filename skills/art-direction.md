@@ -15,20 +15,36 @@ opposite pages.
 
 **hero** — how the page opens.
 
-You are told whether the photograph was STAGED — placed into a setting from the
-product's own world — or is a cut-out on a flat ground. That changes the answer
-more than anything else here: a staged scene can carry a full-bleed opening and
-a cut-out cannot, because a cut-out holds only the few hundred pixels the
-product occupied in the seller's snapshot.
+**A variant has already been chosen for you, and it is in `current`. Keep it
+unless you can name what is wrong with it.**
 
-| variant | what it is | right when |
+This is not deference for its own sake. You have not seen the photograph — only
+the Spec describing it. The variant in `current` was chosen from the object's
+measured orientation and the photo's resolution, filtered to the openings that
+this particular image can actually carry. On the hero you know less than the
+process that already ran, so changing it needs a reason from the Spec, not a
+preference.
+
+There is no default variant. `side-right` is the most common shape on the web,
+which is exactly why reaching for it is usually the answer you have not thought
+about: it is the one opening a seller could have got from any site builder. If
+`current` is `side-right`, that was a decision made from the geometry; if you
+are about to *change* something to `side-right`, you almost certainly should not.
+
+You are told whether the photograph was STAGED — placed into a setting from the
+product's own world — or is a cut-out on a flat ground. That is the one thing
+you know that the geometry did not: a staged scene can carry a full-bleed
+opening and a cut-out cannot, because a cut-out holds only the few hundred
+pixels the product occupied in the seller's snapshot.
+
+| variant | what it is | change to it when |
 |---|---|---|
-| `side-right` | copy left, product right | the default; a clear upright object |
-| `side-left` | product left, copy right | the product reads better entering from the left |
-| `bleed` | photo full-bleed behind the copy | a STAGED photograph — the product in a real setting. This is the strongest opening available and should be preferred whenever staging succeeded |
-| `plate` | product on a band above the title | the product is the whole story |
-| `below` | title first, product band under it | the name matters more than the object |
-| `inset` | copy with a small product card | a detailed object that rewards a close look |
+| `bleed` | photo full-bleed behind the copy | staging SUCCEEDED. The strongest opening available, and the one reason that most often overrides `current` |
+| `plate` | product on a band above the title | the object is the whole story and the name adds nothing — an object a buyer recognises on sight |
+| `below` | title first, product band under it | the name carries more than the object — a brand, a maker, a title the buyer is looking for |
+| `inset` | copy with a small product card | fine detail is the argument: a finish, a grain, a setting that rewards a close look |
+| `side-left` | product left, copy right | the object faces or leads to the right, so entering from the left completes the movement |
+| `side-right` | copy left, product right | a clear upright object read left-to-right |
 
 **feature** — the one element set enormous. Exactly one, or none.
 

@@ -311,3 +311,10 @@ figure.plate-fit img{
   .feature--quote .feature__mark{display:none}
   section.t-inset > .wrap{max-width:100%;padding:26px 22px}
 }
+
+  /* An eyebrow is a label around its own words, never a bar across the page.
+     Each Pack sets it inline-block, which shrinks to fit - but a grid item's
+     inline-block is blockified to block and then stretched to its column, so
+     in the plate hero pulse's outlined eyebrow ran the full page width with
+     the word marooned at the left. fit-content holds whatever the container. */
+  .eyebrow{width:fit-content;max-width:100%}
