@@ -1,0 +1,273 @@
+name: Deploy Xelta Image to Website to EC2 - STAGING
+
+on:
+  push:
+    branches:
+      - deploy/staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xlt-image-to-website-staging-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ENVIRONMENT: staging
+
+  IMAGE_NAME: xlt-image-to-website
+  CONTAINER_NAME: xlt-image-to-website-staging
+
+  APP_DIRECTORY: /home/ubuntu/xlt-image-to-website
+  APP_ENV_FILE: /home/ubuntu/xlt-image-to-website/.env
+
+  TEMP_IMAGE_DIR: /tmp/xlt-image-to-website-images
+
+  BRANCH: deploy/staging
+
+  APP_PORT: "8890"
+  HOST_PORT: "8890"
+
+  BIND_ADDRESS: 0.0.0.0
+
+  HEALTHCHECK_URL: http://0.0.0.0:8890/openapi.json
+
+  DOCKER_NETWORK: cloudflare_net
+
+jobs:
+  build-scan-deploy:
+    name: Build, Scan, and Deploy - STAGING
+
+    if: github.ref == 'refs/heads/deploy/staging'
+
+    runs-on: ubuntu-latest
+
+    environment: staging
+
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH }}
+
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+
+      - name: Set Image Metadata
+        id: image_metadata
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          IMAGE_TAG="stg-${SHORT_SHA}"
+          NEW_IMAGE_TAG="${IMAGE_NAME}:${IMAGE_TAG}"
+          IMAGE_ARCHIVE="${IMAGE_NAME}-${IMAGE_TAG}.tar.gz"
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "NEW_IMAGE_TAG=${NEW_IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "IMAGE_ARCHIVE=${IMAGE_ARCHIVE}" >> "$GITHUB_ENV"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "new_image_tag=${NEW_IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "image_archive=${IMAGE_ARCHIVE}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Required Files
+        run: |
+          test -f Dockerfile
+          test -f requirements.txt
+          test -f config.py
+          test -d api
+
+      - name: Pre-Build Trivy SCA Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          pull: true
+          load: true
+          no-cache: true
+          tags: ${{ steps.image_metadata.outputs.new_image_tag }}
+          labels: |
+            org.opencontainers.image.title=${{ env.IMAGE_NAME }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.environment=${{ env.ENVIRONMENT }}
+
+      - name: Blocking Trivy Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image_metadata.outputs.new_image_tag }}
+          format: table
+          severity: CRITICAL,HIGH
+          vuln-type: os
+          exit-code: 1
+          ignore-unfixed: true
+
+      - name: Export Docker Image
+        run: |
+          mkdir -p exported-images
+          docker save "${NEW_IMAGE_TAG}" | gzip -1 > "exported-images/${IMAGE_ARCHIVE}"
+          ls -lh exported-images
+
+      - name: Copy Archive to EC2 via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST_STAGING }}
+          username: ubuntu
+          key: ${{ secrets.EC2_STAGING_SSH_KEY }}
+          port: 22
+          source: exported-images/${{ steps.image_metadata.outputs.image_archive }}
+          target: /home/ubuntu/
+
+      - name: Deploy Application via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          IMAGE_TAG: ${{ steps.image_metadata.outputs.image_tag }}
+          NEW_IMAGE_TAG: ${{ steps.image_metadata.outputs.new_image_tag }}
+          IMAGE_ARCHIVE: ${{ steps.image_metadata.outputs.image_archive }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+          APP_DIRECTORY: ${{ env.APP_DIRECTORY }}
+          APP_ENV_FILE: ${{ env.APP_ENV_FILE }}
+          TEMP_IMAGE_DIR: ${{ env.TEMP_IMAGE_DIR }}
+          BRANCH: ${{ env.BRANCH }}
+          APP_PORT: ${{ env.APP_PORT }}
+          HOST_PORT: ${{ env.HOST_PORT }}
+          BIND_ADDRESS: ${{ env.BIND_ADDRESS }}
+          HEALTHCHECK_URL: ${{ env.HEALTHCHECK_URL }}
+          DOCKER_NETWORK: ${{ env.DOCKER_NETWORK }}
+        with:
+          host: ${{ secrets.EC2_HOST_STAGING }}
+          username: ubuntu
+          key: ${{ secrets.EC2_STAGING_SSH_KEY }}
+          port: 22
+          script_stop: true
+          command_timeout: 60m
+          envs: ENVIRONMENT,IMAGE_NAME,IMAGE_TAG,NEW_IMAGE_TAG,IMAGE_ARCHIVE,CONTAINER_NAME,APP_DIRECTORY,APP_ENV_FILE,TEMP_IMAGE_DIR,BRANCH,APP_PORT,HOST_PORT,BIND_ADDRESS,HEALTHCHECK_URL,DOCKER_NETWORK
+          script: |
+            set -Eeuo pipefail
+            echo "=========================================="
+            echo " DEPLOYING XELTA IMAGE TO WEBSITE (${ENVIRONMENT})"
+            echo "=========================================="
+            command -v docker >/dev/null 2>&1 || {
+              echo "ERROR: Docker is not installed."
+              exit 1
+            }
+            command -v curl >/dev/null 2>&1 || {
+              echo "ERROR: curl is required."
+              exit 1
+            }
+
+            mkdir -p "${TEMP_IMAGE_DIR}"
+            mkdir -p "${APP_DIRECTORY}"
+
+            echo "Checking Docker network..."
+            if ! sudo docker network inspect "${DOCKER_NETWORK}" >/dev/null 2>&1; then
+              echo "Creating Docker network: ${DOCKER_NETWORK}"
+              sudo docker network create "${DOCKER_NETWORK}"
+            fi
+
+            echo "Syncing repository..."
+            if [ -d "${APP_DIRECTORY}/.git" ]; then
+              cd "${APP_DIRECTORY}"
+              git fetch --all --prune
+              git checkout "${BRANCH}"
+              git reset --hard "origin/${BRANCH}"
+            else
+              echo "No git checkout found at ${APP_DIRECTORY}"
+              echo "Continuing with image-only deployment."
+            fi
+
+            if [ ! -f "${APP_ENV_FILE}" ]; then
+              echo "ERROR: Runtime env file not found: ${APP_ENV_FILE}"
+              exit 1
+            fi
+
+            echo "Loading Docker image..."
+            if [ -f "/home/ubuntu/exported-images/${IMAGE_ARCHIVE}" ]; then
+              mv "/home/ubuntu/exported-images/${IMAGE_ARCHIVE}" "${TEMP_IMAGE_DIR}/"
+            elif [ -f "/home/ubuntu/${IMAGE_ARCHIVE}" ]; then
+              mv "/home/ubuntu/${IMAGE_ARCHIVE}" "${TEMP_IMAGE_DIR}/"
+            fi
+
+            if [ ! -f "${TEMP_IMAGE_DIR}/${IMAGE_ARCHIVE}" ]; then
+              echo "ERROR: Image archive not found at ${TEMP_IMAGE_DIR}/${IMAGE_ARCHIVE}"
+              exit 1
+            fi
+
+            gunzip -c "${TEMP_IMAGE_DIR}/${IMAGE_ARCHIVE}" | sudo docker load
+
+            echo "Removing old container..."
+            sudo docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+
+            echo "Starting new container..."
+            sudo docker run -d \
+              --name "${CONTAINER_NAME}" \
+              --network "${DOCKER_NETWORK}" \
+              --restart unless-stopped \
+              --init \
+              --pull never \
+              --cap-drop ALL \
+              --security-opt no-new-privileges:true \
+              --read-only \
+              --user 10001:10001 \
+              --tmpfs /tmp:rw,nosuid,nodev,size=2048m \
+              --tmpfs /home/appuser/.cache:rw,nosuid,nodev,size=512m \
+              --log-driver json-file \
+              --log-opt max-size=10m \
+              --log-opt max-file=3 \
+              --env-file "${APP_ENV_FILE}" \
+              -e "ENVIRONMENT=${ENVIRONMENT}" \
+              -e "CMD_MODE=api" \
+              -e "PORT=${APP_PORT}" \
+              -e "XDG_CACHE_HOME=/tmp/.cache" \
+              -p "${BIND_ADDRESS}:${HOST_PORT}:${APP_PORT}" \
+              "${NEW_IMAGE_TAG}"
+
+            echo "Running staging health checks..."
+            HEALTH_OK="false"
+            for i in {1..30}; do
+              if curl -fsS "${HEALTHCHECK_URL}" >/dev/null 2>&1; then
+                echo "Health check passed."
+                HEALTH_OK="true"
+                break
+              fi
+              echo "Waiting for service... (${i}/30)"
+              sleep 3
+            done
+
+            if [ "${HEALTH_OK}" != "true" ]; then
+              echo "WARNING: Health check failed in staging."
+              echo "Recent container logs:"
+              sudo docker logs --tail=100 "${CONTAINER_NAME}" || true
+              echo "Continuing because staging health checks are non-blocking."
+            fi
+
+            sudo docker tag "${NEW_IMAGE_TAG}" "${IMAGE_NAME}:latest"
+
+            echo "Cleaning up..."
+            rm -rf "${TEMP_IMAGE_DIR}" /home/ubuntu/exported-images
+            sudo docker image prune -f || true
+            echo "=========================================="
+            echo " DEPLOYMENT COMPLETED (${ENVIRONMENT})"
+            echo "=========================================="
