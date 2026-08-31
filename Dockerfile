@@ -4,7 +4,8 @@
 # whole requirements set has Linux wheels for.
 FROM python:3.13-slim-bookworm
 WORKDIR /app
-ENV PYTHONUNBUFFERED=1 \
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     PIP_NO_CACHE_DIR=1
 
@@ -55,11 +56,23 @@ RUN useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin app && 
 VOLUME ["/app/local_store"]
 USER 10001
 
+# The port is read from the environment, because the deployment sets one.
+# staging.yml passes PORT=8890 and docker-compose maps 5000; a hardcoded port
+# meant the container listened somewhere the health check was not looking, and
+# a deploy that cannot answer /health is rolled back as a failure.
+ENV PORT=5000
 EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=25s --retries=3 \
-  CMD curl -fsS http://localhost:5000/health || exit 1
+  CMD curl -fsS "http://localhost:${PORT}/health" || exit 1
 
 # api.server, not app:app. app.py is the older text-to-website entry point and
 # carries none of the photo pipeline, commerce, publishing or agent — deploying
 # it would serve a different product from the one that was tested.
-CMD ["uvicorn", "api.server:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "1"]
+# Shell form so ${PORT} expands, and `exec` so uvicorn becomes PID 1 and gets
+# the stop signal directly — without it the container ignores SIGTERM and every
+# deploy waits out the full kill timeout.
+#
+# uvicorn, not `python -m api.server`: that module defines `app` and has no
+# __main__ block, so running it as a script imports the application and exits
+# immediately. The container would start, stop, and report nothing useful.
+CMD ["sh", "-c", "exec uvicorn api.server:app --host 0.0.0.0 --port ${PORT} --workers 1"]
