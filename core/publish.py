@@ -7,7 +7,6 @@ Two targets sit behind one call:
   local    served by this platform at /s/<slug>/. Needs nothing — no account,
            no token, no DNS — so a seller can be live the moment their site is
            generated. This is the default.
-  vercel   handed to services/vercel_service.py when VERCEL_TOKEN is set, for a
            real CDN and a real domain.
 
 The part that is easy to get wrong:
@@ -16,8 +15,8 @@ The part that is easy to get wrong:
 
 The preview works out its own website id from the URL and calls /api/... beside
 itself, which is fine while the page and the API share an origin. A published
-site does not: on Vercel the page is on vercel.app and a relative /api/... hits
-Vercel, where nothing is listening, and every Buy button dies silently. So
+site does not: served from its own host, a relative /api/... hits that host,
+where nothing is listening, and every Buy button dies silently. So
 publishing injects an absolute base into the page. Get this wrong and the site
 looks perfect and sells nothing.
 """
@@ -246,5 +245,3 @@ def unpublish(slug: str) -> bool:
     return True
 
 
-def vercel_available() -> bool:
-    return bool(os.getenv("VERCEL_TOKEN"))

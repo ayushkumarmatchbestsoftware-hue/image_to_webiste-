@@ -40,9 +40,7 @@ async def report(job_id: str, stage: str, detail: str = "") -> None:
     try:
         from core.jobs import set_job_progress
         await set_job_progress(job_id, pct, label, detail)
-    except ImportError:
-        # Job store without progress support (the real Redis module today).
-        # The job still runs; the bar just won't move.
-        pass
     except Exception as e:
+        # Never raises. A progress update that fails must not be able to
+        # fail a generation - the bar stalls, the site still ships.
         logger.debug(f"progress {stage} not recorded: {e}")

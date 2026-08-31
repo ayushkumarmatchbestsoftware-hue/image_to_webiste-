@@ -59,11 +59,10 @@ async def publish_site(website_id: str, request: Request):
 async def publish_status(website_id: str):
     slug = _pub._slug_of(website_id)
     if not slug:
-        return {"published": False, "vercel_available": _pub.vercel_available()}
+        return {"published": False}
     rec = _pub.get_published(slug)
     rec["published"] = True
     rec["url"] = f"/s/{slug}/"
-    rec["vercel_available"] = _pub.vercel_available()
     return rec
 
 

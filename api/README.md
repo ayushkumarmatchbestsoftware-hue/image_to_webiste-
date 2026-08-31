@@ -1,42 +1,23 @@
-# Local Test Harness — photo-first pipeline
+# The web layer
 
-Runs the PRD's image-to-website flow with every external connection replaced
-by a local stand-in. Provider is OpenAI.
+Routes, the three pages a person sees, and the bootstrap.
 
 ## Run
 
-    export OPENAI_API_KEY=sk-...        # or put it in .env
-    python local_test/server.py         # -> http://127.0.0.1:5000
+    # .env needs two lines: LLM_PROVIDER and LLM_API_KEY
+    python -m uvicorn api.server:app --reload --port 8000
 
-## Flow
+## What is here
 
-    photo ──▶ POST /triage                FR-2/3/5  verdict + coaching + Product Spec
-          ──▶ POST /generate-from-photo   FR-7/8/9/15  design + copy + render
-          ──▶ GET  /job-status/{id}       poll
-          ──▶ GET  /preview/{id}/home.html
-
-## Endpoints
-
-| Route | Purpose |
+| | |
 |---|---|
-| `POST /triage` | quality metrics (local PIL) + Product Spec (vision call) |
-| `POST /generate-from-photo` | full photo-first generation, supports `spin` |
-| `GET /job-status/{job_id}` | queued / processing / completed / failed |
-| `GET /preview/{id}/{page}` | serves generated HTML |
-| `GET /media/{key}` | serves stored images |
-| `GET /download/{id}` | zip of the site |
-| `POST /generate` | legacy text-first path (still works) |
+| `__init__.py` | reads .env, then configures logging. Import order is load-bearing. |
+| `server.py` | assembly only: middleware, static mounts, router registration |
+| `deps.py` | the merchant-key guard and the order rate limit |
+| `routes/` | one router per area: system, generate, sites, designs, shop, publish |
+| `ui/` | upload, orders, designs |
 
-## Local stand-ins
+## What it talks to
 
-| Real | Replaced with |
-|---|---|
-| Cloudflare R2 | `./local_store/` |
-| Redis · MongoDB | in-process dicts |
-| PostgreSQL · credits · JWT | removed |
-| Vercel | stub |
-
-## Models
-
-`OPENAI_MODEL_FAST` (default `gpt-4.1-mini`) — triage/detection
-`OPENAI_MODEL_CONTENT` (default `gpt-4.1`) — site copy
+Nothing external. Storage is files under `STORE_DIR`, job state is a dict in
+this process, and the model is whichever provider `LLM_PROVIDER` names.

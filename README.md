@@ -45,7 +45,9 @@ keeps the output structurally sound whatever the model does.
 | `api/server.py` | app assembly only — middleware, mounts, router registration |
 | `api/routes/` | one router per area: system, generate, sites, designs, shop, publish |
 | `api/ui/` | the three pages a person sees: upload, orders, designs |
-| `api/local_mode.py` | stand-ins for MongoDB, Redis, R2 and Vercel, so the service runs with no external accounts |
+| `core/storage.py` | the file store — every generated page, image and record |
+| `core/jobs.py` | what a generation is doing, so the page can poll it |
+| `core/sites.py` | a site's record, read back from the content.json beside its pages |
 
 ## Running it
 
@@ -64,10 +66,11 @@ python -m uvicorn api.server:app --reload --port 8000
 | `/s/{slug}/` | a published storefront |
 | `/health` | provider, agent and browser status |
 
-`api/local_mode.py` replaces MongoDB, Redis, R2 and Vercel with local equivalents, so
-the pipeline runs end to end on one machine with no external service. Orders are
-the exception: they are written to disk and survive a restart, because an order
-is an obligation between two people.
+There is no database. Storage is files under `STORE_DIR` and job state is a dict
+in the process, so the service runs end to end with no external account. The one
+thing that must be persistent is that directory: generated sites, published
+storefronts, shop settings and the order store all live in it, and an order is
+an obligation between two people.
 
 ## Things that are load-bearing
 
@@ -115,12 +118,10 @@ Generation, imagery, publishing and the commerce layer are working. GST,
 shipping, refunds and a hosted payment gateway are not built. The merchant API
 is unauthenticated unless `SHOP_REQUIRE_KEY=1`.
 
-There is one entry point — `api.server:app`. The older Flask/FastAPI apps, the
-text-only generation route, the credits and billing stack and the pre-Pack
-templates have been removed: roughly 6,900 lines that nothing reachable from
-that entry point touched. `core/r2.py`, `core/redis.py` and `core/mongo.py`
-remain because they are the interfaces `api/local_mode.py` substitutes at
-runtime, and are what you would point at real services.
+There is one entry point — `api.server:app`. `core/storage.py` and
+`core/jobs.py` are the single implementations of storage and job state, and the
+seams to put an object store or a job queue behind if this ever needs to run on
+more than one machine.
 
 ## Before you commit
 

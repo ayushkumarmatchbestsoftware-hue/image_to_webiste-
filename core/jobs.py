@@ -5,18 +5,11 @@ A generation takes up to a minute, so the request cannot wait on it. The route
 starts the work, hands back a job id, and the page polls until the job says it
 is finished. This holds that state.
 
-It used to be Redis, with an in-process stand-in swapped in for anything that
-was not production. Keeping two implementations of one interface meant they
-could disagree, and they did: the stand-in had `set_job_progress` and the real
-module never did, so `core/progress.py` caught the ImportError and moved on.
-The progress bar animated in testing and sat frozen for sixty seconds in the
-deployment that mattered. One implementation, and the bar now moves everywhere.
-
 State lives in this process, which means it is lost on restart. That is the
 honest trade for having no database: a generation running when the server
-restarts is gone, and the seller starts it again. Redis bought durability
-across restarts and across instances - if either is ever needed, this module is
-the seam to put it back behind.
+restarts is gone, and the seller starts it again. If durability across restarts
+or across instances is ever needed, this module is the seam to put a job queue
+behind.
 """
 import logging
 from datetime import datetime, timezone

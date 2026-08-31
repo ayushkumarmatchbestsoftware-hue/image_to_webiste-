@@ -5,17 +5,11 @@ Every page, image, share card and content.json a generation produces is written
 here and read back from here. It is the one piece of state the service cannot
 run without.
 
-This used to be Cloudflare R2 behind boto3, with a disk-backed stand-in swapped
-in at import time for anything that was not production. Two implementations of
-one interface is a standing invitation to drift, and they had already drifted:
-the stand-in carried a `set_job_progress` its counterpart never had, so a
-progress bar that animated perfectly in testing was dead in the deployment that
-mattered. There is now one implementation.
+One implementation, not an interface with a stand-in behind it. Two versions of
+one thing drift, and the drift is invisible until it costs something.
 
-Files land under STORE_DIR, keyed exactly as they were keyed in the bucket -
-`websites/<id>/home.html` is a real path on disk - so nothing about the layout
-of a site changed, and a bucket could be put back under this interface without
-touching a caller.
+Files land under STORE_DIR, keyed as `websites/<id>/home.html`, so an object
+store could be put back under this interface without touching a caller.
 
   save     write bytes, return the URL a browser can fetch them from
   load     read bytes back by key

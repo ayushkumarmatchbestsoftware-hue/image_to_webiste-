@@ -1,7 +1,7 @@
 services:
   web:
     image: ${WEB_NEW_IMAGE}
-    container_name: fastapi-app-web-staging
+    container_name: image-to-website
     restart: always
     ports:
       - "5077:5000"
@@ -31,8 +31,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 25s
-    networks:
-      - cloudflare_net
-networks:
-  cloudflare_net:
-    external: true

@@ -4,10 +4,8 @@ The web layer.
 Importing this package reads .env and configures logging, in that order,
 before any route imports a core module that reads settings at import time.
 
-There used to be a step between them that replaced core.r2, core.redis and
-core.mongo with local stand-ins. There is nothing left to replace: storage and
-job state ARE local now, so the single implementation is the one that runs
-everywhere and there is no swap to get wrong.
+Nothing external is set up here. Storage is files and job state is a dict in
+this process, so there is one implementation and no swap to get wrong.
 """
 import asyncio
 import logging

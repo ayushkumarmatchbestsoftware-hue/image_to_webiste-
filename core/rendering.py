@@ -2,8 +2,7 @@
 The Jinja environment every page is rendered through.
 
 This lived inside core/generation.py, which meant importing six lines of
-template setup pulled in Mongo, Redis, telemetry, the Vercel deployer and the
-credits stack — none of which rendering needs. Everything that renders a page
+template setup pulled in the whole service — none of which rendering needs. Everything that renders a page
 now imports this instead.
 
 Two details here are load-bearing.
