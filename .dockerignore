@@ -1,29 +1,64 @@
-# ── Test & temp uploads (copied to R2, never needed in image) ──
-static/uploads/*
-!static/uploads/.gitkeep
-static/generated/*
-!static/generated/.gitkeep
+# What must NOT go into the image.
+#
+# The Dockerfile ends in `COPY . .`, so everything not named here is baked in.
+# That makes this file the whole boundary between the source and the artefact,
+# and the cost of getting it wrong is paid on every build.
 
-# ── Python cache ──
+# ── Generated sites ──────────────────────────────────────────────────────────
+# The file store. This is where every site a seller has generated lives - 50MB
+# of it on this machine and growing with every generation. It is runtime state,
+# not source: baking it in ships one machine's sellers to every deployment,
+# and rebuilds the image whenever anyone generates anything.
+local_store/
+
+# Working directories the app creates for itself at boot (see api/server.py),
+# so they are never needed in the image and their contents never are.
+static/uploads/
+static/generated/
+
+# ── Environment & secrets ────────────────────────────────────────────────────
+# Injected at runtime. A key baked into an image is a key in every layer of it,
+# recoverable long after it is deleted from the file.
+.env
+*.key
+
+# ── Python cache ─────────────────────────────────────────────────────────────
+# Bytecode compiled against a different Python than the image runs.
 __pycache__/
 *.py[cod]
 *$py.class
-*.pyc
 
-# ── Environment & secrets (injected at runtime via .env / docker env) ──
-.env
+# ── Development only ─────────────────────────────────────────────────────────
+requirements-dev.txt
+.github/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 
-# ── Git metadata ──
+# ── Documentation ────────────────────────────────────────────────────────────
+# Read by people, not by the service. Named one by one rather than as *.md,
+# because skills/ is full of .md files that ARE loaded at runtime by the art
+# director, and whether a bare *.md reaches them depends on knowing that
+# Docker's * does not cross a slash. The re-include below says it outright, so
+# the next person to add a doc pattern cannot silently strip the agent's
+# instructions and get a site rendered by the fallback rules instead.
+README.md
+prd.md
+API_DOCUMENTATION.md
+!skills/
+
+# ── Git metadata ─────────────────────────────────────────────────────────────
 .git/
 .gitignore
+.gitattributes
 
-# ── Editor & OS artifacts ──
+# ── Editor & OS artefacts ────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.DS_Store
 Thumbs.db
 
-# ── Docker files themselves ──
+# ── Docker files themselves ──────────────────────────────────────────────────
 Dockerfile
 docker-compose.yml
 .dockerignore
