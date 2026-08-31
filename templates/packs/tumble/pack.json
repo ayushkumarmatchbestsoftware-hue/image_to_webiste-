@@ -51,5 +51,14 @@
     "about",
     "portfolio",
     "contact"
-  ]
+  ],
+  "prefers": {
+    "saturation": 0.38,
+    "colour_pull": 2.6,
+    "lightness": 0.55,
+    "light_pull": 0.9,
+    "band": {
+      "budget": 0.6
+    }
+  }
 }

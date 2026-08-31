@@ -109,29 +109,6 @@ BUILTIN_PACKS = {
         "against": {"heirloom": 2.5, "delicate": 2.0, "understated": 2.5},
         "sections": ["hero", "services", "portfolio", "about", "contact"],
     },
-    "counter": {
-        "title": "Counter",
-        "source": "original",
-        "character": "a menu board — condensed uppercase on a dark plate, items "
-                     "as dot-leader rows running to a right-aligned price",
-        "accent": "#e8a33d",
-        "ink": "#1a1614",
-        "paper": "#fbf7f0",
-        "heading_font": "'Oswald', 'Arial Narrow', sans-serif",
-        "mode": "light",
-        "use_case": "food sold over a counter — stalls, cafes, tiffin, sweets",
-        "categories": {"food": 3.0, "apparel": 0.6, "toys": 0.6},
-        "keywords": {
-            "biryani": 3.0, "curry": 2.5, "thali": 3.0, "snack": 2.5,
-            "chaat": 3.0, "samosa": 3.0, "roll": 2.0, "kebab": 2.5,
-            "bakery": 2.5, "bread": 2.5, "cake": 2.5, "sweet": 2.5,
-            "mithai": 3.0, "coffee": 2.5, "chai": 3.0, "juice": 2.5,
-            "tiffin": 3.0, "meal": 2.5, "menu": 3.0, "kitchen": 2.5,
-            "restaurant": 2.5, "cafe": 2.5, "stall": 3.0, "counter": 2.5,
-        },
-        "against": {"understated": 1.5},
-        "sections": ["hero", "services", "portfolio", "about", "contact"],
-    },
     "binder": {
         "title": "Binder",
         "source": "adapted from a supplied Atelier & Co design",
@@ -181,30 +158,6 @@ BUILTIN_PACKS = {
         "against": {"luxury": 2.5, "understated": 2.0, "heirloom": 1.5},
         "sections": ["hero", "services", "about", "portfolio", "contact"],
     },
-    "bloom": {
-        "title": "Bloom",
-        "source": "original",
-        "character": "a swatch card - calico ground, the sample pinned to board with "
-                     "a selvedge notch down one edge, Petrona over Karla, "
-                     "and a sewn care label carrying the real composition",
-        "accent": "#e6a4b4",
-        "ink": "#2a2226",
-        "paper": "#fdfaf8",
-        "heading_font": "'Fraunces', Georgia, serif",
-        "mode": "light",
-        "use_case": "soft goods and gifting — toys, knits, candles, babywear",
-        "categories": {"toys": 2.6, "apparel": 1.6, "food": 1.2},
-        "keywords": {
-            "toy": 2.5, "doll": 3.0, "plush": 3.0, "soft": 2.5,
-            "baby": 3.0, "child": 2.5, "children": 2.5, "kids": 2.5,
-            "gift": 2.5, "hamper": 2.0, "candle": 2.5, "soap": 2.5,
-            "skincare": 2.5, "balm": 2.5, "flower": 3.0, "floral": 2.5,
-            "knit": 2.5, "crochet": 3.0, "embroidery": 2.5, "handmade": 2.0,
-            "cute": 2.5, "playful": 2.0, "warm": 1.8, "cosy": 2.5, "cozy": 2.5,
-        },
-        "against": {"machined": 2.0, "precision": 1.5, "engineered": 2.0},
-        "sections": ["hero", "services", "about", "portfolio", "contact"],
-    },
 }
 
 # ── Discovery ────────────────────────────────────────────────────────────────
@@ -228,6 +181,7 @@ PACKS_DIR = os.path.join(
 MANIFEST_FIELDS = {
     "title", "source", "character", "mode", "accent", "ink", "paper",
     "heading_font", "use_case", "categories", "keywords", "against", "sections",
+    "prefers",
 }
 REQUIRED = {"title", "character", "sections"}
 
@@ -389,38 +343,31 @@ def _tiebreak(spec: dict) -> dict:
     band = (spec.get("implied_price_band") or "").lower()
     orient = (spec.get("geometry") or {}).get("orientation", "square")
 
-    n = {k: 0.0 for k in PACKS}
-    # Saturated and bright reads playful; muted and mid reads heritage.
-    # A saturated, bright product suits the soft and the menu-board designs;
-    # a muted one suits the two austere designs. These only decide products no
-    # keyword recognised, so they must read something real off the photo.
-    n["bloom"] += (sat - 0.34) * 2.0 + (light - 0.52) * 1.0
-    n["tumble"] += (sat - 0.38) * 2.6 + (light - 0.55) * 0.9
-    n["counter"] += (sat - 0.40) * 2.0
-    n["noir"] += (0.40 - sat) * 1.4 + (0.45 - light) * 2.0
-    n["pulse"] += (sat - 0.42) * 1.8 + (0.48 - light) * 1.6
-    n["binder"] += (0.44 - sat) * 1.8 + (light - 0.50) * 0.8
-    # A premium or luxury band suits the quieter, editorial Pack; a budget one
-    # suits the loud and the friendly. These were authored at roughly three
-    # times the weight of the colour terms above, which made the band the whole
-    # decision rather than one signal in it: every muted premium product - a
-    # candle, a notebook, a bottle - went to noir on the +1.4 alone. Scaled
-    # into the same range as colour so the three signals actually compete.
+    # Each design declares in its OWN manifest what it suits. The alternative
+    # was six slugs written into this function, and that broke twice over:
+    # deleting a design made this raise KeyError on every generation, and
+    # adding one gave it a nudge of exactly zero however well the photo suited
+    # it - so the four designs added most recently could never win a product no
+    # keyword recognised. A design with no "prefers" block scores neutral,
+    # which is the honest answer for a design that has not said.
+    #
+    #   saturation / lightness    the centre point this design sits at
+    #   colour_pull / light_pull  how hard it is pulled off that centre, and
+    #                             which way - negative suits muted or dark
+    #   band                      price bands that suit it. Authored at roughly
+    #                             three times the colour terms, so scaled here
+    #                             rather than left to decide on its own.
+    #   orientation               object shapes its opening carries well
     BAND_WEIGHT = 0.45
-    band_shift = {}
-    if band in ("premium", "luxury"):
-        band_shift = {"noir": 1.4, "binder": 0.5, "counter": -0.8}
-    elif band == "budget":
-        band_shift = {"counter": 0.9, "bloom": 0.3, "tumble": 0.6,
-                      "noir": -0.9, "pulse": 0.4}
-    for slug, shift in band_shift.items():
-        if slug in n:
-            n[slug] += shift * BAND_WEIGHT
-    # Wide objects sit well in the full-bleed athletic hero.
-    if orient == "wide":
-        n["counter"] += 0.3
-    elif orient == "tall":
-        n["noir"] += 0.3
+
+    n = {}
+    for slug, pack in PACKS.items():
+        pref = pack.get("prefers") or {}
+        v  = (sat - float(pref.get("saturation", 0.4))) * float(pref.get("colour_pull", 0.0))
+        v += (light - float(pref.get("lightness", 0.5))) * float(pref.get("light_pull", 0.0))
+        v += float((pref.get("band") or {}).get(band, 0.0)) * BAND_WEIGHT
+        v += float((pref.get("orientation") or {}).get(orient, 0.0))
+        n[slug] = v
     return {k: round(v, 2) for k, v in n.items()}
 
 

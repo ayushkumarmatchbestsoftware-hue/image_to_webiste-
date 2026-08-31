@@ -18,17 +18,6 @@ import logging
 logger = logging.getLogger("demo")
 
 BRIEFS = {
-    "atelier": dict(
-        brand="Marl & Ash", sub_type="hand-thrown stoneware vase", material="stoneware",
-        mood="restrained, quiet", price="Rs 5,400",
-        obj=(206, 199, 188), ground=(250, 250, 249),
-        label="Edition of 40", cta="Enquire", city="Auroville",
-        blurb="Thrown, dried for a fortnight, then glazed once.",
-        services=[("Thrown by hand", "Each one a little different."),
-                  ("Single glaze", "Matte, unpigmented."),
-                  ("Fired twice", "1240 degrees, in reduction.")],
-        stats=[("40", "In the edition"), ("2014", "Studio opened")],
-        review=("Devika R.", "It reads as one quiet object in a room, which is what I wanted.")),
     "kiosk": dict(
         brand="Northbound", sub_type="waxed canvas field pack", material="waxed canvas",
         mood="utilitarian, repairable", price="Rs 6,800",
@@ -40,17 +29,6 @@ BRIEFS = {
                   ("Repairs", "Free, for as long as you own it.")],
         stats=[("18", "Ounce canvas"), ("2009", "Making since")],
         review=("Arjun M.", "Carried it daily for four years. The wax has gone soft in all the right places.")),
-    "folio": dict(
-        brand="The Bindery", sub_type="hand-bound notebook", material="cotton rag",
-        mood="editorial, unhurried", price="Rs 1,850",
-        obj=(120, 86, 60), ground=(247, 245, 240),
-        label="Volume 04", cta="Order", city="Pondicherry",
-        blurb="Sewn in signatures, cased in cloth, and made to open flat.",
-        services=[("Sewn signatures", "Sixteen pages to a fold."),
-                  ("Cotton rag paper", "120gsm, unbleached."),
-                  ("Opens flat", "Because a notebook that will not is useless.")],
-        stats=[("192", "Pages"), ("1996", "Bindery founded")],
-        review=("Meera S.", "I have filled three. The fourth is already on the desk.")),
     "poster": dict(
         brand="Loud Mouth", sub_type="cold brew concentrate", material="single-estate arabica",
         mood="loud, graphic", price="Rs 450",
@@ -84,17 +62,6 @@ BRIEFS = {
                   ("Fitting", "Sized in person.")],
         stats=[("40", "Made"), ("2019", "Since")],
         review=("Ravi K.", "Wore it through a full monsoon and it never wet through.")),
-    "counter": dict(
-        brand="Grill & Go", sub_type="charcoal chicken box", material="charcoal-grilled",
-        mood="fast, hot, cheap", price="Rs 180",
-        obj=(198, 116, 52), ground=(250, 246, 238),
-        label="Today", cta="Order takeaway", city="City Center",
-        blurb="Charcoal-grilled boxes, made to order from four in the afternoon.",
-        services=[("Chicken box", "Half bird, rice, slaw."),
-                  ("Paneer box", "Charred, same rice."),
-                  ("Fries", "Fried to order.")],
-        stats=[("4pm", "Open from"), ("11", "Years")],
-        review=("Sameer T.", "The fries actually arrive hot, which is rarer than it should be.")),
     "binder": dict(
         brand="Copper Field", sub_type="letterpress card set", material="cotton stock",
         mood="considered, made", price="Rs 1,450",
@@ -106,17 +73,6 @@ BRIEFS = {
                   ("Trade orders", "For studios and shops.")],
         stats=[("1,400", "Sheets pressed"), ("12", "Years at the press")],
         review=("Ana R.", "Used them for a whole wedding and the ink never smudged.")),
-    "bloom": dict(
-        brand="Marigold Lane", sub_type="linen cushion cover", material="washed linen",
-        mood="soft, domestic", price="Rs 1,100",
-        obj=(226, 168, 140), ground=(252, 248, 244),
-        label="What we make", cta="Add to basket", city="Goa",
-        blurb="Washed linen covers, cut and sewn in small batches.",
-        services=[("Cushion covers", "Washed linen, hidden zip."),
-                  ("Table linen", "Same cloth, longer cut."),
-                  ("Repairs", "We re-stitch what we made.")],
-        stats=[("600", "Made by hand"), ("2021", "Since")],
-        review=("Kim L.", "Washed it eight times and it has only got softer.")),
     "tumble": dict(
         brand="Tumble & Co", sub_type="wooden stacking toy", material="mango wood",
         mood="playful, sturdy", price="Rs 950",

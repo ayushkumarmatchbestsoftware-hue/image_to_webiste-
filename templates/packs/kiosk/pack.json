@@ -47,5 +47,18 @@
     "services",
     "portfolio",
     "contact"
-  ]
+  ],
+  "prefers": {
+    "saturation": 0.42,
+    "colour_pull": 0.9,
+    "lightness": 0.5,
+    "light_pull": 0.0,
+    "band": {
+      "budget": 0.4,
+      "premium": 0.2
+    },
+    "orientation": {
+      "wide": 0.3
+    }
+  }
 }
