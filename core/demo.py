@@ -13,7 +13,55 @@ import base64
 import io
 
 # One brief per Pack, matched to the use case in its registry entry.
+import logging
+
+logger = logging.getLogger("demo")
+
 BRIEFS = {
+    "atelier": dict(
+        brand="Marl & Ash", sub_type="hand-thrown stoneware vase", material="stoneware",
+        mood="restrained, quiet", price="Rs 5,400",
+        obj=(206, 199, 188), ground=(250, 250, 249),
+        label="Edition of 40", cta="Enquire", city="Auroville",
+        blurb="Thrown, dried for a fortnight, then glazed once.",
+        services=[("Thrown by hand", "Each one a little different."),
+                  ("Single glaze", "Matte, unpigmented."),
+                  ("Fired twice", "1240 degrees, in reduction.")],
+        stats=[("40", "In the edition"), ("2014", "Studio opened")],
+        review=("Devika R.", "It reads as one quiet object in a room, which is what I wanted.")),
+    "kiosk": dict(
+        brand="Northbound", sub_type="waxed canvas field pack", material="waxed canvas",
+        mood="utilitarian, repairable", price="Rs 6,800",
+        obj=(74, 84, 72), ground=(238, 237, 232),
+        label="In stock", cta="Add to bag", city="Dehradun",
+        blurb="Waxed canvas, bridle leather, brass hardware. Repaired free, for good.",
+        services=[("Waxed canvas", "18oz, British milled."),
+                  ("Brass hardware", "Solid, not plated."),
+                  ("Repairs", "Free, for as long as you own it.")],
+        stats=[("18", "Ounce canvas"), ("2009", "Making since")],
+        review=("Arjun M.", "Carried it daily for four years. The wax has gone soft in all the right places.")),
+    "folio": dict(
+        brand="The Bindery", sub_type="hand-bound notebook", material="cotton rag",
+        mood="editorial, unhurried", price="Rs 1,850",
+        obj=(120, 86, 60), ground=(247, 245, 240),
+        label="Volume 04", cta="Order", city="Pondicherry",
+        blurb="Sewn in signatures, cased in cloth, and made to open flat.",
+        services=[("Sewn signatures", "Sixteen pages to a fold."),
+                  ("Cotton rag paper", "120gsm, unbleached."),
+                  ("Opens flat", "Because a notebook that will not is useless.")],
+        stats=[("192", "Pages"), ("1996", "Bindery founded")],
+        review=("Meera S.", "I have filled three. The fourth is already on the desk.")),
+    "poster": dict(
+        brand="Loud Mouth", sub_type="cold brew concentrate", material="single-estate arabica",
+        mood="loud, graphic", price="Rs 450",
+        obj=(28, 28, 30), ground=(232, 68, 44),
+        label="New batch", cta="Order a case", city="Bengaluru",
+        blurb="Steeped eighteen hours. Cut it with water, milk, or nothing at all.",
+        services=[("Eighteen hours", "Cold, never heated."),
+                  ("One origin", "Chikmagalur, single estate."),
+                  ("Cut it how you like", "Four servings a bottle.")],
+        stats=[("18", "Hours steeped"), ("4", "Servings a bottle")],
+        review=("Farhan K.", "I stopped going to the place down the road. This is better and it is in my fridge.")),
     "noir": dict(
         brand="Aurum & Vine", sub_type="hand-set gold ring", material="18ct gold",
         mood="quiet, expensive", price="Rs 42,000",
@@ -105,7 +153,14 @@ def render(slug: str) -> str:
 
     if slug not in PACKS:
         raise KeyError(slug)
-    b = BRIEFS.get(slug) or next(iter(BRIEFS.values()))
+    b = BRIEFS.get(slug)
+    if b is None:
+        # The gallery promises "a seller of the kind it was built for". Falling
+        # back silently broke that promise quietly: four designs were shown
+        # carrying a gold ring written for noir, on noir's near-black plate.
+        logger.warning(f"no demo brief for '{slug}' - showing it with another "
+                       f"design's product; add one to BRIEFS in core/demo.py")
+        b = next(iter(BRIEFS.values()))
     pack = get_pack(slug)
     mode = pack.get("mode", "light")
 
