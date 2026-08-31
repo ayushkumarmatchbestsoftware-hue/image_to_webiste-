@@ -1,0 +1,241 @@
+{% set hclass = '' %}
+{% set tclass = '' %}
+{% set has_rule = False %}
+{% set split_headline = False %}
+{% set meta_description = (seo.description if seo and seo.description
+     else (home.subtitle or tagline or site_title)) | striptags | truncate(155) %}
+{% set head_title = seo.title if seo and seo.title else page_title %}
+{% set _sn = site_name | striptags %}
+{% set social_title = site_title if (_sn | lower) in (site_title | lower) else (_sn ~ ' | ' ~ site_title) %}
+{% set A = asset_base %}
+{% set shots = shots | default({}) %}
+{% set hero_img = shots.get('hero') or image_map.get('hero') or (images[0] if images else None) %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{% set _cur = current_page | default('home.html') %}
+<!DOCTYPE html>
+{#
+  POSTER — a run of printed sheets, not a scrolling page.
+
+  Plan
+    Colour  two flat inks and the stock. Every panel is ONE of them, edge to
+            edge, and the text flips to whichever colour it needs. No
+            gradients, no shadows, no borders, no rounded corners - a poster is
+            printed, and printing has none of those.
+    Type    Bricolage Grotesque, which has real width axis and slightly wrong
+            curves, set enormous. Manrope beneath for anything that has to be
+            read at size 14 rather than seen across a room.
+    Layout  Each section fills the viewport as a single flat field. Scrolling
+            is not a journey down one page; it is turning over one sheet to
+            find the next. The opening field carries the product silhouetted
+            in the middle with the title set into a corner.
+
+  The restraint that keeps this from being noise: only ONE thing is set large
+  per field. A poster with two headlines is a poster nobody read.
+#}
+<html lang="{{ lang | default('en') }}" dir="{{ dir | default('ltr') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ head_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Manrope:wght@400;500;700&display=swap">
+{% if lang_body_font %}<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ lang_display_font | replace(' ', '+') }}:wght@400;600&family={{ lang_body_font | replace(' ', '+') }}:wght@400;500;700&display=swap">{% endif %}
+<meta name="description" content="{{ meta_description }}">
+{% if favicon_url %}<link rel="icon" href="{{ favicon_url }}">{% endif %}
+{% if favicon_apple_url %}<link rel="apple-touch-icon" href="{{ favicon_apple_url }}">{% endif %}
+{% if seo and seo.keywords %}<meta name="keywords" content="{{ seo.keywords | join(', ') }}">{% endif %}
+<meta property="og:type" content="product">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:title" content="{{ social_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+{% if share_card_url %}<meta property="og:image" content="{{ share_card_url }}">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">{% endif %}
+<meta name="twitter:card" content="{% if share_card_url %}summary_large_image{% else %}summary{% endif %}">
+<meta name="twitter:title" content="{{ social_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
+<style>
+  :root{
+    --stock:{{ theme.bg | default('#f2efe6') }};
+    --ink:#141414;
+    --loud:{{ theme.accent | default('#e8442c') }};
+    --display:'Bricolage Grotesque', system-ui, sans-serif;
+    --body:'Manrope', system-ui, sans-serif;
+    --cond:'Bricolage Grotesque', system-ui, sans-serif;
+    --mono:'Manrope', ui-monospace, monospace;
+    --label:'Manrope', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--stock);color:var(--ink);
+    font:400 16px/1.55 var(--body);-webkit-font-smoothing:antialiased}
+  img{max-width:100%;height:auto;display:block}
+  a{color:inherit}
+  ::selection{background:var(--ink);color:var(--stock)}
+  :focus-visible{outline:3px solid currentColor;outline-offset:3px}
+
+  .wrap{max-width:1320px;margin-inline:auto;padding-inline:clamp(20px,5vw,68px)}
+
+  /* THE FIELD. One flat colour, edge to edge, tall enough to be a sheet rather
+     than a band. Nothing is drawn on top of a field but type and the product. */
+  .field{padding:clamp(54px,9vw,110px) 0;background:var(--stock);color:var(--ink)}
+  .field--loud{background:var(--loud);color:var(--stock)}
+  .field--ink{background:var(--ink);color:var(--stock)}
+  .field--tall{min-height:min(88vh,860px);display:flex;align-items:center}
+
+  header{background:var(--ink);color:var(--stock);padding:16px 0}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;
+    gap:20px;flex-wrap:wrap}
+  .brand{font:800 15px/1 var(--display);letter-spacing:.02em;text-transform:uppercase;
+    text-decoration:none}
+  .brand img{max-height:24px;width:auto}
+  header nav{display:flex;flex-wrap:wrap;gap:6px 22px}
+  header nav a{font:700 11px/1 var(--label);letter-spacing:.14em;text-transform:uppercase;
+    text-decoration:none;opacity:.62}
+  header nav a:hover{opacity:1}
+  header nav a.on{opacity:1;text-decoration:underline;text-underline-offset:5px}
+
+  /* The opening sheet: product in the middle, title set into the bottom-left
+     corner the way a poster carries its billing. */
+  .sheet{display:grid;grid-template-rows:1fr auto;gap:clamp(20px,4vw,44px);
+    width:100%}
+  .sheet__shot{margin:0;display:flex;align-items:center;justify-content:center}
+  .sheet__shot img{max-height:min(52vh,480px);width:auto;object-fit:contain}
+  .sheet__bill{display:flex;align-items:flex-end;justify-content:space-between;
+    gap:24px;flex-wrap:wrap}
+  h1{font:800 clamp(38px,8.4vw,124px)/.88 var(--display);letter-spacing:-.045em;
+    text-transform:uppercase;margin:0;max-width:14ch;text-wrap:balance}
+  .sheet__meta{text-align:right;flex-shrink:0}
+  @media(max-width:700px){.sheet__meta{text-align:left}}
+
+  h2{font:800 clamp(26px,5vw,64px)/.96 var(--display);letter-spacing:-.035em;
+    text-transform:uppercase;margin:0 0 20px;max-width:16ch}
+  p{margin:0 0 14px}
+  .lede{font:500 clamp(18px,2.2vw,26px)/1.4 var(--body);max-width:38ch}
+  .label{font:700 11px/1 var(--label);letter-spacing:.2em;text-transform:uppercase;
+    opacity:.7;margin:0 0 12px;display:block}
+  .eyebrow{font:700 11px/1 var(--label);letter-spacing:.2em;text-transform:uppercase;
+    margin:0 0 16px}
+  .price{font:800 clamp(24px,3vw,40px)/1 var(--display);letter-spacing:-.03em;
+    display:block;margin-bottom:12px}
+  .cta{display:inline-block;font:700 12px/1 var(--label);letter-spacing:.16em;
+    text-transform:uppercase;text-decoration:none;padding:16px 26px;
+    background:currentColor;transition:opacity .2s}
+  .cta span{color:var(--stock);mix-blend-mode:normal}
+  .field--loud .cta span,.field--ink .cta span{color:var(--ink)}
+  .cta:hover{opacity:.78}
+
+  /* Numbered because the making IS a sequence: this happens, then this. */
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+    gap:clamp(22px,3vw,48px);margin:0;padding:0;list-style:none;counter-reset:s}
+  .steps li{counter-increment:s}
+  .steps li::before{content:counter(s,decimal-leading-zero);
+    display:block;font:800 clamp(30px,3.6vw,52px)/1 var(--display);
+    letter-spacing:-.04em;opacity:.34;margin-bottom:8px}
+  .steps h3{font:700 15px/1.3 var(--body);letter-spacing:0;margin:0 0 6px}
+  .steps p{margin:0;opacity:.82;font-size:15px}
+
+  .plates{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+    gap:clamp(14px,2.4vw,30px)}
+  .plates figure{margin:0}
+
+  /* One review set large, the rest small. A poster has one voice. */
+  .shout{font:800 clamp(24px,4.4vw,58px)/1 var(--display);letter-spacing:-.035em;
+    text-transform:uppercase;margin:0 0 18px;max-width:19ch}
+  .shout__who{font:700 11px/1 var(--label);letter-spacing:.2em;text-transform:uppercase;
+    opacity:.72}
+  .murmur{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+    gap:24px;margin-top:clamp(28px,4vw,52px)}
+  .murmur p{margin:0;font-size:15px;opacity:.85}
+  .murmur cite{display:block;margin-top:8px;font:700 10.5px/1 var(--label);
+    letter-spacing:.18em;text-transform:uppercase;opacity:.6;font-style:normal}
+
+  footer{background:var(--ink);color:var(--stock);padding:34px 0}
+  footer .wrap{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;
+    font:700 11px/1.6 var(--label);letter-spacing:.16em;text-transform:uppercase}
+
+  /* Every panel here is already a full flat field, so the shared tonal bands
+     would put a third colour behind a design built on exactly two. */
+  section.t-bleed,section.t-inset{background:transparent}
+  section{padding:0}
+
+  .feature{padding:0}
+  .feature__wrap{padding:clamp(54px,9vw,110px) clamp(20px,5vw,68px);
+    max-width:1320px;margin-inline:auto}
+  .feature__big{font-family:var(--display);font-weight:800;letter-spacing:-.045em;
+    text-transform:uppercase;line-height:.9}
+  .feature__label{display:block;margin-top:16px;font:700 11px/1 var(--label);
+    letter-spacing:.2em;text-transform:uppercase;opacity:.7}
+
+  {% if lang_body_font %}
+  :root{
+    --display:'{{ lang_display_font }}', system-ui, sans-serif;
+    --body:'{{ lang_body_font }}', system-ui, sans-serif;
+    --cond:'{{ lang_display_font }}', system-ui, sans-serif;
+    --mono:'{{ lang_body_font }}', ui-monospace, monospace;
+    --label:'{{ lang_body_font }}', system-ui, sans-serif;
+  }
+  h1,h2,.shout,.feature__big{text-transform:none}
+  {% endif %}
+  {% if is_rtl %}
+  body{direction:rtl}
+  .sheet__meta{text-align:left}
+  .shop-panel{left:0;right:auto;box-shadow:8px 0 40px rgba(0,0,0,.3)}
+  {% endif %}
+
+  {% include "packs/_pages/_composition.css" %}
+</style>
+{% include "packs/_pages/_structured.html" %}
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a href="home.html" class="brand">
+      {% if logo %}<img src="{{ logo }}" alt="{{ site_name }}">{% else %}{{ site_name }}{% endif %}
+    </a>
+    <nav>
+      <a href="home.html" class="{% if _cur == 'home.html' %}on{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>{{ t('nav_home') }}</a>
+      {% if 'portfolio' in layout %}<a href="portfolio.html" class="{% if _cur == 'portfolio.html' %}on{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>{{ t('nav_work') }}</a>{% endif %}
+      {% if 'services' in layout %}<a href="services.html" class="{% if _cur == 'services.html' %}on{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>{{ t('nav_services') }}</a>{% endif %}
+      {% if 'about' in layout %}<a href="about.html" class="{% if _cur == 'about.html' %}on{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>{{ t('sec_about') }}</a>{% endif %}
+      {% if 'contact' in layout %}<a href="contact.html" class="{% if _cur == 'contact.html' %}on{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>{{ t('nav_contact') }}</a>{% endif %}
+    </nav>
+  </div>
+</header>
+
+{% block main %}{% endblock %}
+
+<footer>
+  <div class="wrap">
+    <span>{{ footer.copyright or site_name }}</span>
+    {% if footer.address %}<span>{{ footer.address }}</span>{% endif %}
+  </div>
+</footer>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  if(!('IntersectionObserver' in window)) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.classList.add('js-reveal');
+  var els=[].slice.call(document.querySelectorAll('.reveal'));
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('is-in'); io.unobserve(e.target); }
+    });
+  },{rootMargin:'0px 0px -8% 0px',threshold:0.06});
+  var above=[],below=[];
+  els.forEach(function(el){
+    (el.getBoundingClientRect().top < window.innerHeight*0.92 ? above : below).push(el);
+  });
+  below.forEach(function(el){ io.observe(el); });
+  setTimeout(function(){ els.forEach(function(el){ el.classList.add('is-in'); }); }, 2500);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    above.forEach(function(el,i){ setTimeout(function(){ el.classList.add('is-in'); }, i*70); });
+  });});
+})();
+</script>
+{% include "packs/_pages/_shop.html" %}
+</body>
+</html>

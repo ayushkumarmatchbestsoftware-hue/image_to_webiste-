@@ -1,0 +1,51 @@
+{
+  "$comment": "This design describes itself. Drop a folder containing _shell.html, home.html and this file into templates/packs/ and it becomes available with no code change.",
+  "title": "Poster",
+  "source": "original",
+  "character": "a run of printed sheets. Every section is one flat colour edge to edge with a single enormous line on it, so scrolling reads as turning posters over",
+  "mode": "light",
+  "accent": "#e8442c",
+  "ink": "#141414",
+  "paper": "#f2efe6",
+  "heading_font": "'Bricolage Grotesque', system-ui, sans-serif",
+  "use_case": "drinks, sauces, snacks, anything with a loud personality and a short pitch",
+  "categories": {
+    "food": 2.6,
+    "apparel": 1.2,
+    "toys": 1.0
+  },
+  "keywords": {
+    "drink": 2.8,
+    "soda": 2.8,
+    "brew": 2.6,
+    "beer": 2.8,
+    "kombucha": 2.8,
+    "sauce": 2.8,
+    "hot": 2.2,
+    "snack": 2.5,
+    "bold": 2.5,
+    "loud": 2.8,
+    "punchy": 2.8,
+    "energy": 2.5,
+    "flavour": 2.2,
+    "chilli": 2.5,
+    "roast": 2.0,
+    "batch": 2.0,
+    "poster": 2.5,
+    "graphic": 2.5,
+    "bright": 2.2,
+    "playful": 2.0
+  },
+  "against": {
+    "heirloom": 2.5,
+    "delicate": 2.2,
+    "understated": 2.5
+  },
+  "sections": [
+    "hero",
+    "services",
+    "about",
+    "portfolio",
+    "contact"
+  ]
+}

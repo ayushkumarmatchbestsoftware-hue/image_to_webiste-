@@ -1,0 +1,51 @@
+{
+  "$comment": "This design describes itself. Drop a folder containing _shell.html, home.html and this file into templates/packs/ and it becomes available with no code change.",
+  "title": "Kiosk",
+  "source": "original",
+  "character": "a board, not a page. No opening banner at all - the title, the product and the price are tiles in one lattice, and every section below is more of the same mosaic",
+  "mode": "light",
+  "accent": "#ff5722",
+  "ink": "#17181b",
+  "paper": "#f4f3ef",
+  "heading_font": "'Syne', system-ui, sans-serif",
+  "use_case": "gear, tools, bags, hardware - anything a buyer wants the whole spec of at once",
+  "categories": {
+    "apparel": 1.6,
+    "toys": 0.8,
+    "food": 0.6
+  },
+  "keywords": {
+    "gear": 2.8,
+    "tool": 2.8,
+    "hardware": 2.5,
+    "pack": 2.2,
+    "backpack": 2.8,
+    "rucksack": 2.8,
+    "canvas": 2.2,
+    "utility": 2.5,
+    "workwear": 2.5,
+    "durable": 2.2,
+    "rugged": 2.5,
+    "modular": 2.5,
+    "kit": 2.2,
+    "equipment": 2.5,
+    "field": 2.0,
+    "technical": 2.2,
+    "specification": 2.0,
+    "repairable": 2.5,
+    "hardwearing": 2.5,
+    "outdoor": 2.2
+  },
+  "against": {
+    "delicate": 2.0,
+    "couture": 2.0,
+    "cute": 1.8
+  },
+  "sections": [
+    "hero",
+    "about",
+    "services",
+    "portfolio",
+    "contact"
+  ]
+}

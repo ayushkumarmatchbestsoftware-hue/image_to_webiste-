@@ -1,0 +1,135 @@
+{% extends "packs/kiosk/_shell.html" %}
+{% set current_page = 'home.html' %}
+{% block main %}
+{#
+  KIOSK opens as a mosaic rather than a banner: the title, the product, the
+  price and the first fact tile the screen between them. Everything below is
+  more of the same board, so scrolling never leaves the format.
+#}
+{% set shots = shots | default({}) %}
+{% set port_img = shots.get('hero') or shots.get('square') %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{% set _cta_href = ('https://wa.me/' ~ wa ~ '?text=' ~ site_name) if wa
+                   else ('mailto:' ~ contact.email if contact.email else '#') %}
+
+<section class="board">
+  <div class="tile t-title">
+    {% if home.label %}<p class="eyebrow {{ tclass }}">{{ home.label }}</p>{% endif %}
+    <h1 class="{{ hclass }}">{{ site_title }}</h1>
+  </div>
+  {% if port_img %}
+  <figure class="tile tile--flush t-shot" style="margin:0">
+    <img src="{{ port_img }}" alt="{{ site_title }}">
+  </figure>
+  {% endif %}
+  <div class="tile t-seven">
+    {% if home.subtitle or tagline %}<p class="lede">{{ home.subtitle or tagline }}</p>{% endif %}
+  </div>
+  {% if price %}
+  <div class="tile tile--hot t-note">
+    <span class="label">{{ t('care_price') }}</span>
+    <p class="big">{{ price }}</p>
+  </div>
+  {% endif %}
+  <div class="tile{% if not price %} t-seven{% else %} t-buy{% endif %}">
+    <span class="label">{{ t('cta_order') }}</span>
+    <a class="cta" href="{{ _cta_href }}">{{ home.cta or t('cta_enquire') }}</a>
+  </div>
+  {% if stats %}
+  {% for s in stats[:2] %}
+  <div class="tile t-half">
+    <span class="label">{{ s.label }}</span>
+    <p class="big">{{ s.number }}</p>
+  </div>
+  {% endfor %}
+  {% endif %}
+</section>
+
+{% if about and about.description %}
+<section {{ sect(0) }}>
+  <div class="board">
+    <div class="tile tile--dark t-half">
+      <span class="label">{{ t('sec_about') }}</span>
+      <h2>{{ about.title or site_name }}</h2>
+      <p style="margin:0">{{ about.description }}</p>
+    </div>
+    <div class="tile t-half">
+      {% if about.mission %}<p class="lede">{{ about.mission }}</p>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if services %}
+<section {{ sect(1) }}>
+  <div class="board">
+    {% for s in services[:3] %}
+    <div class="tile t-third">
+      <span class="label">{{ '%02d' % loop.index }}</span>
+      <h2>{{ s.title }}</h2>
+      <p style="margin:0">{{ s.description }}</p>
+    </div>
+    {% endfor %}
+    {% if home.pillar1_title %}
+    <div class="tile t-half">
+      <h2>{{ home.pillar1_title }}</h2>
+      <p style="margin:0">{{ home.pillar1_desc }}</p>
+    </div>{% endif %}
+    {% if home.pillar2_title %}
+    <div class="tile t-half">
+      <h2>{{ home.pillar2_title }}</h2>
+      <p style="margin:0">{{ home.pillar2_desc }}</p>
+    </div>{% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% set _g = shots.get('gallery') or [] %}
+{% if _g %}
+<section {{ sect(2) }}>
+  <div class="board">
+    {% for g in _g[:3] %}
+    <figure class="tile tile--flush t-third" style="margin:0">
+      <img src="{{ g }}" alt="{{ site_title }}">
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% include "packs/_pages/_feature.html" %}
+{% include "packs/_pages/_specs.html" %}
+
+{% if testimonials %}
+<section {{ sect(8, 'said') }}>
+  <div class="board">
+    {% for r in testimonials[:3] %}
+    <div class="tile t-third{% if loop.index == 2 %} tile--hot{% endif %}">
+      <p class="say">{{ r.text }}
+        <span class="say__who">{{ r.name }}</span>
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if contact %}
+<section {{ sect(3) }}>
+  <div class="board">
+    <div class="tile t-half">
+      <span class="label">{{ t('nav_contact') }}</span>
+      <h2>{{ contact.title or t('cta_enquire') }}</h2>
+      <p class="lede">{{ contact.description }}</p>
+    </div>
+    <div class="tile t-half">
+      <div class="rows">
+        {% if contact.phone %}<div class="row"><span class="row__k">{{ t('contact_phone') }}</span><span class="row__v">{{ contact.phone }}</span></div>{% endif %}
+        {% if contact.email %}<div class="row"><span class="row__k">{{ t('contact_email') }}</span><span class="row__v">{{ contact.email }}</span></div>{% endif %}
+        {% if contact.address %}<div class="row"><span class="row__k">{{ t('contact_where') }}</span><span class="row__v">{{ contact.address }}</span></div>{% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,51 @@
+{
+  "$comment": "This design describes itself. Drop a folder containing _shell.html, home.html and this file into templates/packs/ and it becomes available with no code change.",
+  "title": "Folio",
+  "source": "original",
+  "character": "an issue of a magazine. A centred masthead between double rules, the product full width beneath it, and the copy set in true columns with a drop cap",
+  "mode": "light",
+  "accent": "#2f5d50",
+  "ink": "#1c1b19",
+  "paper": "#f1efe9",
+  "heading_font": "'Newsreader', Georgia, serif",
+  "use_case": "books, stationery, tea, records - anything with a story that is worth reading before buying",
+  "categories": {
+    "food": 1.4,
+    "apparel": 1.2,
+    "toys": 0.5
+  },
+  "keywords": {
+    "book": 3.0,
+    "notebook": 2.8,
+    "journal": 2.8,
+    "stationery": 2.8,
+    "paper": 2.2,
+    "letterpress": 2.2,
+    "bound": 2.5,
+    "archive": 2.5,
+    "heritage": 2.2,
+    "tea": 2.5,
+    "record": 2.5,
+    "vinyl": 2.5,
+    "story": 2.0,
+    "essay": 2.5,
+    "quarterly": 2.8,
+    "issue": 2.5,
+    "library": 2.5,
+    "ink": 2.0,
+    "typeset": 2.5,
+    "provenance": 2.5
+  },
+  "against": {
+    "gadget": 2.0,
+    "bulk": 2.0,
+    "neon": 2.0
+  },
+  "sections": [
+    "hero",
+    "about",
+    "services",
+    "portfolio",
+    "contact"
+  ]
+}

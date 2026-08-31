@@ -1,0 +1,258 @@
+{% set hclass = '' %}
+{% set tclass = '' %}
+{% set has_rule = False %}
+{% set split_headline = False %}
+{% set meta_description = (seo.description if seo and seo.description
+     else (home.subtitle or tagline or site_title)) | striptags | truncate(155) %}
+{% set head_title = seo.title if seo and seo.title else page_title %}
+{% set _sn = site_name | striptags %}
+{% set social_title = site_title if (_sn | lower) in (site_title | lower) else (_sn ~ ' | ' ~ site_title) %}
+{% set A = asset_base %}
+{% set shots = shots | default({}) %}
+{% set hero_img = shots.get('hero') or image_map.get('hero') or (images[0] if images else None) %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{% set _cur = current_page | default('home.html') %}
+<!DOCTYPE html>
+{#
+  FOLIO — an issue, not a listing.
+
+  Plan
+    Colour  a warm grey stock rather than the cream every AI serif page is set
+            on, ink near-black, and a deep bottle green for rules and marks.
+            Green because the obvious accent beside a serif is terracotta, and
+            that is the look this is trying not to be.
+    Type    Newsreader for everything that is read - it has real optical sizes,
+            so the drop cap and the body can be the same face at honest weights
+            - with Sora carrying the bylines and running heads in small caps.
+    Layout  A CENTRED masthead between double rules, then the product full
+            width beneath it, then the copy in true multiple columns with a
+            drop cap. Nothing else in the set is centred or columnar, so this
+            one is recognisable from the top of the page and stays that way.
+
+  The signature is the column set. Real columns need real text to fill them, so
+  the count steps down as the copy shortens rather than leaving a ragged half
+  column - a magazine that cannot fill its grid looks like a mistake.
+#}
+<html lang="{{ lang | default('en') }}" dir="{{ dir | default('ltr') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ head_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,600;1,6..72,300;1,6..72,400&family=Sora:wght@400;600&display=swap">
+{% if lang_body_font %}<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ lang_display_font | replace(' ', '+') }}:wght@400;600&family={{ lang_body_font | replace(' ', '+') }}:wght@400;500;700&display=swap">{% endif %}
+<meta name="description" content="{{ meta_description }}">
+{% if favicon_url %}<link rel="icon" href="{{ favicon_url }}">{% endif %}
+{% if favicon_apple_url %}<link rel="apple-touch-icon" href="{{ favicon_apple_url }}">{% endif %}
+{% if seo and seo.keywords %}<meta name="keywords" content="{{ seo.keywords | join(', ') }}">{% endif %}
+<meta property="og:type" content="product">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:title" content="{{ social_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+{% if share_card_url %}<meta property="og:image" content="{{ share_card_url }}">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">{% endif %}
+<meta name="twitter:card" content="{% if share_card_url %}summary_large_image{% else %}summary{% endif %}">
+<meta name="twitter:title" content="{{ social_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
+<style>
+  :root{
+    --paper:{{ theme.bg | default('#f1efe9') }};
+    --ink:#1c1b19;
+    --soft:#6a6862;
+    --rule:#cfccc2;
+    --green:{{ theme.accent | default('#2f5d50') }};
+    --display:'Newsreader', Georgia, serif;
+    --body:'Newsreader', Georgia, serif;
+    --cond:'Sora', system-ui, sans-serif;
+    --mono:'Sora', ui-monospace, monospace;
+    --label:'Sora', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font:400 17px/1.62 var(--body);-webkit-font-smoothing:antialiased}
+  img{max-width:100%;height:auto;display:block}
+  a{color:inherit}
+  ::selection{background:var(--green);color:var(--paper)}
+  :focus-visible{outline:2px solid var(--green);outline-offset:3px}
+
+  .wrap{max-width:1140px;margin-inline:auto;padding-inline:clamp(20px,5vw,64px)}
+  .narrow{max-width:760px;margin-inline:auto}
+
+  /* THE MASTHEAD. Centred between double rules - the one arrangement no other
+     design in the set uses, so the page is identifiable before it scrolls. */
+  header{padding:26px 0 0;text-align:center}
+  .masthead{border-top:3px solid var(--ink);border-bottom:1px solid var(--ink);
+    padding:22px 0 16px;margin-bottom:9px}
+  .brand{font:300 clamp(28px,5vw,52px)/1 var(--display);letter-spacing:.01em;
+    text-decoration:none;display:inline-block}
+  .brand img{max-height:38px;width:auto;margin-inline:auto}
+  .masthead__sub{font:400 10.5px/1 var(--label);letter-spacing:.28em;
+    text-transform:uppercase;color:var(--soft);margin:12px 0 0}
+  header nav{display:flex;flex-wrap:wrap;gap:6px 26px;justify-content:center;
+    padding-bottom:14px;border-bottom:1px solid var(--ink)}
+  header nav a{font:400 10.5px/1 var(--label);letter-spacing:.2em;
+    text-transform:uppercase;color:var(--soft);text-decoration:none}
+  header nav a:hover{color:var(--ink)}
+  header nav a.on{color:var(--green);font-weight:600}
+
+  /* THE PLATE. Full width, straight under the masthead, captioned like a
+     magazine picture rather than framed like a product shot. */
+  .plate{margin:0;padding:clamp(26px,4vw,48px) 0 0}
+  .plate img{width:100%;max-height:min(62vh,560px);object-fit:contain;
+    margin-inline:auto}
+  .plate figcaption{font:400 11px/1.5 var(--label);letter-spacing:.16em;
+    text-transform:uppercase;color:var(--soft);text-align:center;
+    padding-top:16px}
+
+  .headline{text-align:center;padding:clamp(26px,4vw,44px) 0 clamp(18px,3vw,30px)}
+  h1{font:300 clamp(32px,5.6vw,66px)/1.06 var(--display);letter-spacing:-.018em;
+    margin:0 auto;max-width:17ch;text-wrap:balance}
+  .standfirst{font:300 clamp(18px,2.1vw,23px)/1.5 var(--display);font-style:italic;
+    color:var(--soft);margin:16px auto 0;max-width:46ch}
+  .byline{font:400 10.5px/1 var(--label);letter-spacing:.24em;text-transform:uppercase;
+    color:var(--green);margin:0 0 14px}
+
+  /* THE COLUMN SET. The signature. Real columns, with the count stepping down
+     as the copy shortens so a half-empty column never appears. */
+  .columns{column-count:3;column-gap:clamp(24px,3vw,44px);
+    column-rule:1px solid var(--rule);text-align:justify;hyphens:auto}
+  .columns p{margin:0 0 1em}
+  .columns > :first-child::first-letter{
+    float:left;font:400 clamp(48px,6vw,74px)/.78 var(--display);
+    color:var(--green);padding:6px 10px 0 0}
+  @media(max-width:1000px){.columns{column-count:2}}
+  @media(max-width:680px){.columns{column-count:1;text-align:left;hyphens:manual}}
+
+  section{padding:clamp(34px,5vw,62px) 0}
+  h2{font:400 clamp(21px,2.4vw,29px)/1.2 var(--display);letter-spacing:-.01em;
+    margin:0 0 18px;text-align:center}
+  .kicker{font:400 10.5px/1 var(--label);letter-spacing:.24em;text-transform:uppercase;
+    color:var(--soft);text-align:center;margin:0 0 10px}
+  .eyebrow{font:400 10.5px/1 var(--label);letter-spacing:.24em;text-transform:uppercase;
+    color:var(--green);margin:0 0 12px}
+  p{margin:0 0 14px}
+  .lede{font:300 clamp(18px,2vw,22px)/1.5 var(--display);max-width:44ch}
+
+  .price{font:400 15px/1 var(--label);letter-spacing:.1em}
+  .cta{display:inline-block;font:400 11px/1 var(--label);letter-spacing:.22em;
+    text-transform:uppercase;text-decoration:none;color:var(--paper);
+    background:var(--green);padding:15px 26px;transition:background .2s}
+  .cta:hover{background:var(--ink)}
+  .buy{display:flex;gap:24px;align-items:center;justify-content:center;
+    flex-wrap:wrap;padding-top:8px}
+
+  /* Notes: the making, set as a magazine sidebar rather than a card grid. */
+  .notes{border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);
+    padding:20px 0;column-count:2;column-gap:clamp(24px,3vw,44px)}
+  .note{break-inside:avoid;margin:0 0 14px}
+  .note h3{font:600 10.5px/1.4 var(--label);letter-spacing:.18em;
+    text-transform:uppercase;color:var(--green);margin:0 0 4px}
+  .note p{margin:0;font-size:15.5px}
+  @media(max-width:680px){.notes{column-count:1}}
+
+  .plates{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:clamp(14px,2.4vw,28px)}
+  .plates figure{margin:0}
+
+  /* Reviews as pulled quotes, centred, divided by a rule the width of the text. */
+  .pull{text-align:center;max-width:640px;margin:0 auto;padding:22px 0}
+  .pull + .pull{border-top:1px solid var(--rule)}
+  .pull blockquote{margin:0;font:300 clamp(19px,2.3vw,26px)/1.42 var(--display);
+    font-style:italic;text-wrap:balance}
+  .pull cite{display:block;margin-top:12px;font:400 10.5px/1 var(--label);
+    letter-spacing:.24em;text-transform:uppercase;color:var(--soft);font-style:normal}
+
+  footer{border-top:3px solid var(--ink);margin-top:30px;padding:26px 0 40px}
+  footer .wrap{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;
+    font:400 10.5px/1.6 var(--label);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--soft)}
+
+  /* An issue is printed on one stock throughout, so the tonal bands are
+     dropped; the rules and the column set carry the rhythm instead. */
+  section.t-bleed,section.t-inset{background:transparent}
+
+  .feature{padding:clamp(30px,4vw,54px) 0}
+  .feature__wrap{text-align:center;max-width:900px;margin-inline:auto;
+    border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);
+    padding:clamp(26px,4vw,46px) 0}
+  .feature__big{font-family:var(--display);font-weight:300;letter-spacing:-.02em}
+  .feature__label{display:block;margin-top:14px;font:400 10.5px/1 var(--label);
+    letter-spacing:.24em;text-transform:uppercase;color:var(--green)}
+
+  {% if lang_body_font %}
+  :root{
+    --display:'{{ lang_display_font }}', Georgia, serif;
+    --body:'{{ lang_body_font }}', Georgia, serif;
+    --cond:'{{ lang_display_font }}', system-ui, sans-serif;
+    --mono:'{{ lang_body_font }}', ui-monospace, monospace;
+    --label:'{{ lang_body_font }}', system-ui, sans-serif;
+  }
+  {% endif %}
+  {% if is_rtl %}
+  body{direction:rtl}
+  .columns,.notes{direction:rtl}
+  .columns > :first-child::first-letter{float:right;padding:6px 0 0 10px}
+  .shop-panel{left:0;right:auto;box-shadow:8px 0 40px rgba(0,0,0,.2)}
+  {% endif %}
+
+  {% include "packs/_pages/_composition.css" %}
+</style>
+{% include "packs/_pages/_structured.html" %}
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="masthead">
+      <a href="home.html" class="brand">
+        {% if logo %}<img src="{{ logo }}" alt="{{ site_name }}">{% else %}{{ site_name }}{% endif %}
+      </a>
+      {% if tagline %}<p class="masthead__sub">{{ tagline }}</p>{% endif %}
+    </div>
+    <nav>
+      <a href="home.html" class="{% if _cur == 'home.html' %}on{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>{{ t('nav_home') }}</a>
+      {% if 'portfolio' in layout %}<a href="portfolio.html" class="{% if _cur == 'portfolio.html' %}on{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>{{ t('nav_work') }}</a>{% endif %}
+      {% if 'services' in layout %}<a href="services.html" class="{% if _cur == 'services.html' %}on{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>{{ t('nav_services') }}</a>{% endif %}
+      {% if 'about' in layout %}<a href="about.html" class="{% if _cur == 'about.html' %}on{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>{{ t('sec_about') }}</a>{% endif %}
+      {% if 'contact' in layout %}<a href="contact.html" class="{% if _cur == 'contact.html' %}on{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>{{ t('nav_contact') }}</a>{% endif %}
+    </nav>
+  </div>
+</header>
+
+{% block main %}{% endblock %}
+
+<footer>
+  <div class="wrap">
+    <span>{{ footer.copyright or site_name }}</span>
+    {% if footer.address %}<span>{{ footer.address }}</span>{% endif %}
+  </div>
+</footer>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  if(!('IntersectionObserver' in window)) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.classList.add('js-reveal');
+  var els=[].slice.call(document.querySelectorAll('.reveal'));
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('is-in'); io.unobserve(e.target); }
+    });
+  },{rootMargin:'0px 0px -8% 0px',threshold:0.06});
+  var above=[],below=[];
+  els.forEach(function(el){
+    (el.getBoundingClientRect().top < window.innerHeight*0.92 ? above : below).push(el);
+  });
+  below.forEach(function(el){ io.observe(el); });
+  setTimeout(function(){ els.forEach(function(el){ el.classList.add('is-in'); }); }, 2500);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    above.forEach(function(el,i){ setTimeout(function(){ el.classList.add('is-in'); }, i*70); });
+  });});
+})();
+</script>
+{% include "packs/_pages/_shop.html" %}
+</body>
+</html>

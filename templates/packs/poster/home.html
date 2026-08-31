@@ -1,0 +1,113 @@
+{% extends "packs/poster/_shell.html" %}
+{% set current_page = 'home.html' %}
+{% block main %}
+{#
+  POSTER runs as a sequence of flat fields, alternating stock / loud / ink so
+  that scrolling reads as turning sheets over. Only ONE thing is set large on
+  each field - a poster with two headlines is a poster nobody read.
+#}
+{% set shots = shots | default({}) %}
+{% set port_img = shots.get('hero') or shots.get('square') %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{% set _cta_href = ('https://wa.me/' ~ wa ~ '?text=' ~ site_name) if wa
+                   else ('mailto:' ~ contact.email if contact.email else '#') %}
+
+<section class="field field--loud field--tall">
+  <div class="wrap">
+    <div class="sheet">
+      {% if port_img %}
+      <figure class="sheet__shot"><img src="{{ port_img }}" alt="{{ site_title }}"></figure>
+      {% endif %}
+      <div class="sheet__bill">
+        <div>
+          {% if home.label %}<p class="eyebrow {{ tclass }}">{{ home.label }}</p>{% endif %}
+          <h1 class="{{ hclass }}">{{ site_title }}</h1>
+        </div>
+        <div class="sheet__meta">
+          {% if price %}<span class="price">{{ price }}</span>{% endif %}
+          <a class="cta" href="{{ _cta_href }}"><span>{{ home.cta or t('cta_order') }}</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if home.subtitle or tagline %}
+<section class="field">
+  <div class="wrap">
+    <p class="lede" style="max-width:24ch;font-size:clamp(22px,3.4vw,44px);
+       font-family:var(--display);font-weight:700;letter-spacing:-.03em;line-height:1.08">
+      {{ home.subtitle or tagline }}</p>
+  </div>
+</section>
+{% endif %}
+
+{% if services %}
+<section class="field field--ink">
+  <div class="wrap">
+    <span class="label">{{ t('nav_services') }}</span>
+    <ol class="steps">
+      {% for s in services %}
+      <li><h3>{{ s.title }}</h3><p>{{ s.description }}</p></li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+{% endif %}
+
+{% if about and about.description %}
+<section class="field">
+  <div class="wrap">
+    <h2>{{ about.title or t('sec_about') }}</h2>
+    <p class="lede">{{ about.description }}</p>
+    {% if about.mission %}<p style="max-width:44ch;opacity:.78">{{ about.mission }}</p>{% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% set _g = shots.get('gallery') or [] %}
+{% if _g %}
+<section class="field">
+  <div class="wrap">
+    <div class="plates">
+      {% for g in _g[:3] %}<figure><img src="{{ g }}" alt="{{ site_title }}"></figure>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% include "packs/_pages/_feature.html" %}
+{% include "packs/_pages/_specs.html" %}
+
+{% if testimonials %}
+{% set _first = testimonials[0] %}
+<section class="field field--loud says">
+  <div class="wrap">
+    <p class="shout">{{ _first.text }}</p>
+    <span class="shout__who">{{ _first.name }}</span>
+    {% if testimonials | length > 1 %}
+    <div class="murmur">
+      {% for r in testimonials[1:4] %}
+      <div><p>{{ r.text }}</p><cite>{{ r.name }}</cite></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if contact %}
+<section class="field field--ink">
+  <div class="wrap">
+    <span class="label">{{ t('nav_contact') }}</span>
+    <h2>{{ contact.title or t('cta_enquire') }}</h2>
+    <p class="lede" style="opacity:.85">{{ contact.description }}</p>
+    <p style="margin:0;font-weight:700">
+      {% if contact.phone %}{{ contact.phone }}{% endif %}
+      {% if contact.email %}<br>{{ contact.email }}{% endif %}
+      {% if contact.address %}<br>{{ contact.address }}{% endif %}
+    </p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

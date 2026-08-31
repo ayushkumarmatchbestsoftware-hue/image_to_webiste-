@@ -1,0 +1,260 @@
+{% set hclass = '' %}
+{% set tclass = '' %}
+{% set has_rule = False %}
+{% set split_headline = False %}
+{% set meta_description = (seo.description if seo and seo.description
+     else (home.subtitle or tagline or site_title)) | striptags | truncate(155) %}
+{% set head_title = seo.title if seo and seo.title else page_title %}
+{% set _sn = site_name | striptags %}
+{% set social_title = site_title if (_sn | lower) in (site_title | lower) else (_sn ~ ' | ' ~ site_title) %}
+{% set A = asset_base %}
+{% set shots = shots | default({}) %}
+{% set hero_img = shots.get('hero') or image_map.get('hero') or (images[0] if images else None) %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{% set _cur = current_page | default('home.html') %}
+<!DOCTYPE html>
+{#
+  ATELIER — a gallery wall, not a shop window.
+
+  Plan
+    Colour  paper white, ink near-black, and ONE electric blue that appears
+            only in marks small enough to miss: an underline, the current page.
+            Nothing here is coloured in order to be noticed.
+    Type    Instrument Sans, set SMALL. Every other design reaches for size to
+            carry the product; this one refuses, because a gallery label is
+            never the loudest thing in the room. Instrument Serif italic
+            appears exactly once, on the tagline.
+    Layout  Everything hangs off a single vertical baseline at 38%. Section
+            labels sit in the left margin BESIDE their content, the way a
+            caption card sits beside a hung work rather than above it. The
+            product is placed LOW and RIGHT, small, and the rest of the
+            opening is left empty.
+
+  The risk is the emptiness. A seller comparing this with the others will see
+  less on the screen, which is the whole argument: it is the only design that
+  leaves the object as the busiest thing on the page.
+#}
+<html lang="{{ lang | default('en') }}" dir="{{ dir | default('ltr') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ head_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
+{% if lang_body_font %}<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ lang_display_font | replace(' ', '+') }}:wght@400;600&family={{ lang_body_font | replace(' ', '+') }}:wght@400;500;700&display=swap">{% endif %}
+<meta name="description" content="{{ meta_description }}">
+{% if favicon_url %}<link rel="icon" href="{{ favicon_url }}">{% endif %}
+{% if favicon_apple_url %}<link rel="apple-touch-icon" href="{{ favicon_apple_url }}">{% endif %}
+{% if seo and seo.keywords %}<meta name="keywords" content="{{ seo.keywords | join(', ') }}">{% endif %}
+<meta property="og:type" content="product">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:title" content="{{ social_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+{% if share_card_url %}<meta property="og:image" content="{{ share_card_url }}">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">{% endif %}
+<meta name="twitter:card" content="{% if share_card_url %}summary_large_image{% else %}summary{% endif %}">
+<meta name="twitter:title" content="{{ social_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
+<style>
+  :root{
+    --paper:{{ theme.bg | default('#ffffff') }};
+    --ink:#0b0b0c;
+    --soft:#77777d;
+    --hair:#e8e8e6;
+    --blue:{{ theme.accent | default('#2f4bff') }};
+    --display:'Instrument Sans', system-ui, sans-serif;
+    --body:'Instrument Sans', system-ui, sans-serif;
+    --note:'Instrument Serif', Georgia, serif;
+    --cond:'Instrument Sans', system-ui, sans-serif;
+    --mono:'Instrument Sans', ui-monospace, monospace;
+    --label:'Instrument Sans', system-ui, sans-serif;
+    /* The baseline the whole page hangs from. One number governs the layout. */
+    --rail:38%;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font:400 15px/1.65 var(--body);letter-spacing:-.005em;
+    -webkit-font-smoothing:antialiased}
+  img{max-width:100%;height:auto;display:block}
+  a{color:inherit}
+  ::selection{background:var(--blue);color:#fff}
+  :focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+
+  .wrap{max-width:1240px;margin-inline:auto;padding-inline:clamp(22px,6vw,86px)}
+
+  /* The caption rail: a label sits in the margin beside its content, the way a
+     gallery card sits beside the work. Below 900px there is no margin left to
+     sit in, so it becomes a plain overline. */
+  .field{display:grid;grid-template-columns:var(--rail) 1fr;gap:0 40px;
+    align-items:start}
+  .field__label{font:500 11px/1.5 var(--label);letter-spacing:.14em;
+    text-transform:uppercase;color:var(--soft);margin:0;padding-top:5px}
+  .field__body{max-width:58ch}
+  .field__body > :first-child{margin-top:0}
+  @media(max-width:900px){
+    .field{grid-template-columns:1fr;gap:12px}
+    .field__label{padding-top:0}
+  }
+
+  header{padding:34px 0 0}
+  header .wrap{display:flex;align-items:baseline;justify-content:space-between;gap:24px}
+  .brand{font:600 14px/1 var(--display);letter-spacing:-.01em;text-decoration:none}
+  .brand img{max-height:22px;width:auto}
+  header nav{display:flex;flex-wrap:wrap;gap:22px}
+  header nav a{font:400 12px/1 var(--body);letter-spacing:.02em;color:var(--soft);
+    text-decoration:none;padding-bottom:3px;border-bottom:1px solid transparent}
+  header nav a:hover{color:var(--ink)}
+  header nav a.on{color:var(--ink);border-bottom-color:var(--blue)}
+
+  /* THE OPENING. Title top-left against the rail, product low and right, and a
+     great deal of nothing. The empty space IS the composition. */
+  .open{padding:clamp(70px,13vh,150px) 0 clamp(50px,9vh,110px)}
+  .open__grid{display:grid;grid-template-columns:var(--rail) 1fr;gap:0 40px}
+  .open__say{grid-column:2;max-width:52ch}
+  h1{font:500 clamp(25px,3.1vw,40px)/1.18 var(--display);letter-spacing:-.028em;
+    margin:0 0 18px;text-wrap:balance}
+  .open__note{font:400 clamp(17px,2vw,23px)/1.45 var(--note);font-style:italic;
+    color:var(--soft);margin:0 0 34px;max-width:36ch}
+  .open__meta{display:flex;align-items:baseline;gap:26px;flex-wrap:wrap}
+  .price{font:500 14px/1 var(--body);letter-spacing:.01em}
+  .cta{font:500 12px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;
+    text-decoration:none;padding-bottom:5px;border-bottom:1px solid var(--ink);
+    transition:border-color .25s,color .25s}
+  .cta:hover{border-bottom-color:var(--blue);color:var(--blue)}
+  /* Low and right, and small. Nothing frames it. */
+  .open__plate{grid-column:2;justify-self:end;margin-top:clamp(46px,8vh,96px);
+    width:min(370px,72%)}
+  .open__plate img{width:100%}
+  @media(max-width:900px){
+    .open__grid{grid-template-columns:1fr}
+    .open__say,.open__plate{grid-column:1}
+    .open__plate{justify-self:start;width:min(320px,80%)}
+  }
+
+  /* Sections are separated by space alone — no rules, no tints, no cards. */
+  section{padding:clamp(52px,9vh,104px) 0}
+  h2{font:500 13px/1.4 var(--display);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--soft);margin:0 0 22px}
+  p{margin:0 0 15px}
+  .lede{font:400 clamp(17px,1.9vw,21px)/1.55 var(--display);letter-spacing:-.015em;
+    max-width:44ch}
+  .eyebrow{font:500 11px/1 var(--label);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--blue);margin:0 0 16px}
+
+  /* The making: a list whose term sits out in the caption rail. */
+  .index{margin:0}
+  .index__row{display:grid;grid-template-columns:var(--rail) 1fr;gap:0 40px;
+    padding:16px 0;border-top:1px solid var(--hair)}
+  .index__row:last-child{border-bottom:1px solid var(--hair)}
+  .index__t{font:500 13px/1.5 var(--body);letter-spacing:-.005em;margin:0}
+  .index__d{margin:0;color:var(--soft);max-width:52ch}
+  @media(max-width:900px){.index__row{grid-template-columns:1fr;gap:4px}}
+
+  .plates{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+    gap:clamp(16px,3vw,40px)}
+  .plates figure{margin:0}
+
+  /* Reviews: no cards, no stars. The name sits out in the caption rail. */
+  .said__row{display:grid;grid-template-columns:var(--rail) 1fr;gap:0 40px;
+    padding:26px 0}
+  .said__row + .said__row{border-top:1px solid var(--hair)}
+  .said__who{font:500 11px/1.6 var(--label);letter-spacing:.14em;
+    text-transform:uppercase;color:var(--soft);margin:0}
+  .said__text{margin:0;font:400 clamp(16px,1.8vw,19px)/1.55 var(--display);
+    letter-spacing:-.015em;max-width:46ch}
+  @media(max-width:900px){.said__row{grid-template-columns:1fr;gap:8px}}
+
+  .contact-lines{margin:0;color:var(--soft)}
+
+  footer{padding:60px 0 46px;border-top:1px solid var(--hair);margin-top:40px}
+  footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
+    font:400 12px/1.6 var(--body);color:var(--soft)}
+
+  /* This design's rhythm is spatial. The shared tonal bands would put grey
+     panels behind a page whose whole argument is that nothing sits behind
+     anything, so the tint is dropped and the spacing variation kept. */
+  section.t-bleed,section.t-inset{background:transparent}
+
+  .feature__wrap{display:grid;grid-template-columns:var(--rail) 1fr;gap:0 40px}
+  .feature__label{grid-column:1;grid-row:1;font:500 11px/1.5 var(--label);
+    letter-spacing:.14em;text-transform:uppercase;color:var(--soft);
+    padding-top:.7em;margin:0}
+  .feature__big{grid-column:2;font-weight:500;letter-spacing:-.03em}
+  @media(max-width:900px){.feature__wrap{grid-template-columns:1fr}
+    .feature__label{grid-row:auto;padding-top:0}}
+
+  {% if lang_body_font %}
+  :root{
+    --display:'{{ lang_display_font }}', system-ui, sans-serif;
+    --body:'{{ lang_body_font }}', system-ui, sans-serif;
+    --note:'{{ lang_display_font }}', Georgia, serif;
+    --cond:'{{ lang_display_font }}', system-ui, sans-serif;
+    --mono:'{{ lang_body_font }}', ui-monospace, monospace;
+    --label:'{{ lang_body_font }}', system-ui, sans-serif;
+  }
+  {% endif %}
+  {% if is_rtl %}
+  body{direction:rtl}
+  .wrap,.feature__wrap{direction:rtl}
+  .open__plate{justify-self:start}
+  .shop-panel{left:0;right:auto;box-shadow:8px 0 40px rgba(0,0,0,.18)}
+  {% endif %}
+
+  {% include "packs/_pages/_composition.css" %}
+</style>
+{% include "packs/_pages/_structured.html" %}
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a href="home.html" class="brand">
+      {% if logo %}<img src="{{ logo }}" alt="{{ site_name }}">{% else %}{{ site_name }}{% endif %}
+    </a>
+    <nav>
+      <a href="home.html" class="{% if _cur == 'home.html' %}on{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>{{ t('nav_home') }}</a>
+      {% if 'portfolio' in layout %}<a href="portfolio.html" class="{% if _cur == 'portfolio.html' %}on{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>{{ t('nav_work') }}</a>{% endif %}
+      {% if 'services' in layout %}<a href="services.html" class="{% if _cur == 'services.html' %}on{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>{{ t('nav_services') }}</a>{% endif %}
+      {% if 'about' in layout %}<a href="about.html" class="{% if _cur == 'about.html' %}on{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>{{ t('sec_about') }}</a>{% endif %}
+      {% if 'contact' in layout %}<a href="contact.html" class="{% if _cur == 'contact.html' %}on{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>{{ t('nav_contact') }}</a>{% endif %}
+    </nav>
+  </div>
+</header>
+
+{% block main %}{% endblock %}
+
+<footer>
+  <div class="wrap">
+    <span>{{ footer.copyright or site_name }}</span>
+    {% if footer.address %}<span>{{ footer.address }}</span>{% endif %}
+  </div>
+</footer>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  if(!('IntersectionObserver' in window)) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.classList.add('js-reveal');
+  var els=[].slice.call(document.querySelectorAll('.reveal'));
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('is-in'); io.unobserve(e.target); }
+    });
+  },{rootMargin:'0px 0px -8% 0px',threshold:0.06});
+  var above=[],below=[];
+  els.forEach(function(el){
+    (el.getBoundingClientRect().top < window.innerHeight*0.92 ? above : below).push(el);
+  });
+  below.forEach(function(el){ io.observe(el); });
+  setTimeout(function(){ els.forEach(function(el){ el.classList.add('is-in'); }); }, 2500);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    above.forEach(function(el,i){ setTimeout(function(){ el.classList.add('is-in'); }, i*70); });
+  });});
+})();
+</script>
+{% include "packs/_pages/_shop.html" %}
+</body>
+</html>

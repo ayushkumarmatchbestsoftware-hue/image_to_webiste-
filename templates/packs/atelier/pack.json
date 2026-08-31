@@ -1,0 +1,52 @@
+{
+  "$comment": "This design describes itself. Drop a folder containing _shell.html, home.html and this file into templates/packs/ and it becomes available with no code change.",
+  "title": "Atelier",
+  "source": "original",
+  "character": "a gallery wall. Paper white, type set small, labels out in the left margin beside their content, and the product placed low and right with the rest of the opening left empty",
+  "mode": "light",
+  "accent": "#2f4bff",
+  "ink": "#0b0b0c",
+  "paper": "#ffffff",
+  "heading_font": "'Instrument Sans', system-ui, sans-serif",
+  "use_case": "studios, ceramics, prints, design objects - anything sold to someone who already knows what they are looking at",
+  "categories": {
+    "apparel": 1.4,
+    "toys": 0.4,
+    "food": 0.3
+  },
+  "keywords": {
+    "ceramic": 2.5,
+    "porcelain": 2.5,
+    "stoneware": 2.5,
+    "pottery": 2.2,
+    "sculpture": 3.0,
+    "print": 2.2,
+    "artwork": 3.0,
+    "gallery": 3.0,
+    "studio": 2.0,
+    "edition": 2.5,
+    "minimal": 3.0,
+    "architectural": 2.5,
+    "monochrome": 2.2,
+    "matte": 1.8,
+    "glaze": 2.2,
+    "hand-thrown": 2.5,
+    "vase": 2.2,
+    "objet": 2.5,
+    "design": 1.6,
+    "restrained": 2.5
+  },
+  "against": {
+    "kids": 2.5,
+    "cute": 2.5,
+    "bulk": 2.0,
+    "combo": 1.5
+  },
+  "sections": [
+    "hero",
+    "about",
+    "services",
+    "portfolio",
+    "contact"
+  ]
+}

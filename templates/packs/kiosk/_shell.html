@@ -1,0 +1,241 @@
+{% set hclass = '' %}
+{% set tclass = '' %}
+{% set has_rule = False %}
+{% set split_headline = False %}
+{% set meta_description = (seo.description if seo and seo.description
+     else (home.subtitle or tagline or site_title)) | striptags | truncate(155) %}
+{% set head_title = seo.title if seo and seo.title else page_title %}
+{% set _sn = site_name | striptags %}
+{% set social_title = site_title if (_sn | lower) in (site_title | lower) else (_sn ~ ' | ' ~ site_title) %}
+{% set A = asset_base %}
+{% set shots = shots | default({}) %}
+{% set hero_img = shots.get('hero') or image_map.get('hero') or (images[0] if images else None) %}
+{% set wa = (contact.phone or '') | replace('+','') | replace(' ','') | replace('-','') %}
+{% set _cur = current_page | default('home.html') %}
+<!DOCTYPE html>
+{#
+  KIOSK — a board, not a page.
+
+  Plan
+    Colour  a warm grey card ground with the lattice showing through as the
+            ground itself: the gaps between tiles ARE the background, so the
+            grid is drawn by absence rather than by borders.
+    Type    Syne — a geometric with genuinely odd letterforms, wide and heavy
+            for the tiles that shout, and DM Sans underneath for everything
+            that has to be read rather than seen.
+    Layout  There is NO opening banner. The page begins as a mosaic: the title
+            is a tile, the product is a tile, the price is a tile, and they
+            tile the first screen between them. Every section further down is
+            more of the same board, so scrolling never leaves the format.
+
+  This is the densest design in the set on purpose. The others give the
+  product air; this one surrounds it with everything a buyer wants to know at
+  once, the way a market stall lays its whole range out flat rather than
+  walking you through it.
+#}
+<html lang="{{ lang | default('en') }}" dir="{{ dir | default('ltr') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ head_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap">
+{% if lang_body_font %}<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ lang_display_font | replace(' ', '+') }}:wght@400;600&family={{ lang_body_font | replace(' ', '+') }}:wght@400;500;700&display=swap">{% endif %}
+<meta name="description" content="{{ meta_description }}">
+{% if favicon_url %}<link rel="icon" href="{{ favicon_url }}">{% endif %}
+{% if favicon_apple_url %}<link rel="apple-touch-icon" href="{{ favicon_apple_url }}">{% endif %}
+{% if seo and seo.keywords %}<meta name="keywords" content="{{ seo.keywords | join(', ') }}">{% endif %}
+<meta property="og:type" content="product">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:title" content="{{ social_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+{% if share_card_url %}<meta property="og:image" content="{{ share_card_url }}">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">{% endif %}
+<meta name="twitter:card" content="{% if share_card_url %}summary_large_image{% else %}summary{% endif %}">
+<meta name="twitter:title" content="{{ social_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
+<style>
+  :root{
+    --card:{{ theme.bg | default('#f4f3ef') }};
+    --board:#1b1c20;
+    --ink:#17181b;
+    --soft:#6d6f76;
+    --hot:{{ theme.accent | default('#ff5722') }};
+    --display:'Syne', system-ui, sans-serif;
+    --body:'DM Sans', system-ui, sans-serif;
+    --cond:'Syne', system-ui, sans-serif;
+    --mono:'DM Sans', ui-monospace, monospace;
+    --label:'DM Sans', system-ui, sans-serif;
+    --gap:1px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--board);color:var(--ink);
+    font:400 15px/1.6 var(--body);-webkit-font-smoothing:antialiased}
+  img{max-width:100%;height:auto;display:block}
+  a{color:inherit}
+  ::selection{background:var(--hot);color:#fff}
+  :focus-visible{outline:2px solid var(--hot);outline-offset:-2px}
+
+  .wrap{max-width:100%;margin:0;padding:0}
+
+  /* THE BOARD. The dark page shows through the 1px gaps, so the lattice is
+     drawn by what is NOT there. No tile owns a border of its own, which is why
+     the grid stays perfectly even however the tiles are spanned. */
+  .board{display:grid;grid-template-columns:repeat(12,1fr);
+    gap:var(--gap);background:var(--board);border-block:var(--gap) solid var(--board)}
+  .tile{background:var(--card);padding:clamp(18px,2vw,30px);min-width:0}
+  .tile--flush{padding:0;display:flex;align-items:center;justify-content:center}
+  .tile--dark{background:var(--board);color:var(--card)}
+  .tile--hot{background:var(--hot);color:#fff}
+
+  /* Spans. Named for what they hold, so the mosaic is legible in the markup. */
+  .t-title{grid-column:span 7}
+  .t-shot{grid-column:span 5;grid-row:span 3}
+  .t-buy{grid-column:span 4}
+  .t-seven{grid-column:span 7}
+  .t-note{grid-column:span 3}
+  .t-half{grid-column:span 6}
+  .t-third{grid-column:span 4}
+  .t-full{grid-column:span 12}
+  .t-quarter{grid-column:span 3}
+  @media(max-width:900px){
+    .t-title,.t-shot,.t-buy,.t-note,.t-half,.t-third,.t-quarter,.t-seven{grid-column:span 12}
+    .t-shot{grid-row:auto}
+  }
+
+  header .board{border-top:0}
+  .brand{grid-column:span 5;font:800 17px/1 var(--display);letter-spacing:-.02em;
+    text-decoration:none;display:flex;align-items:center}
+  .brand img{max-height:26px;width:auto}
+  .navtile{grid-column:span 7;display:flex;flex-wrap:wrap;gap:4px 20px;
+    align-items:center;justify-content:flex-end}
+  .navtile a{font:500 12px/1 var(--body);letter-spacing:.04em;color:var(--soft);
+    text-decoration:none}
+  .navtile a:hover{color:var(--ink)}
+  .navtile a.on{color:var(--hot);font-weight:700}
+
+  h1{font:800 clamp(30px,4.4vw,60px)/1.02 var(--display);letter-spacing:-.035em;
+    margin:0;text-wrap:balance}
+  h2{font:700 clamp(17px,2vw,24px)/1.15 var(--display);letter-spacing:-.02em;margin:0 0 12px}
+  p{margin:0 0 12px}
+  .label{font:700 10.5px/1 var(--label);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--soft);margin:0 0 10px;display:block}
+  .tile--hot .label,.tile--dark .label{color:inherit;opacity:.72}
+  .eyebrow{font:700 10.5px/1 var(--label);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--hot);margin:0 0 10px}
+  .big{font:800 clamp(26px,3.4vw,44px)/1 var(--display);letter-spacing:-.03em;margin:0}
+  .lede{font-size:16px;color:var(--soft);margin:0}
+
+  .tile--flush img{width:100%;height:100%;object-fit:contain;
+    max-height:min(58vh,520px);padding:clamp(14px,2vw,26px)}
+
+  .cta{display:inline-block;font:700 12px/1 var(--body);letter-spacing:.1em;
+    text-transform:uppercase;text-decoration:none;background:var(--ink);color:var(--card);
+    padding:13px 20px;transition:background .2s}
+  .cta:hover{background:var(--hot)}
+  .tile--hot .cta{background:#fff;color:var(--hot)}
+
+  .rows{margin:0}
+  .row{display:flex;gap:14px;justify-content:space-between;align-items:baseline;
+    padding:9px 0;border-bottom:1px solid color-mix(in srgb,var(--ink) 12%,transparent)}
+  .row:last-child{border-bottom:0}
+  .row__k{font:700 10.5px/1.4 var(--label);letter-spacing:.12em;text-transform:uppercase;
+    color:var(--soft);white-space:nowrap}
+  .row__v{text-align:right}
+
+  /* Reviews are tiles too. One is turned hot so the board has a hot spot. */
+  .say{margin:0;font-size:15.5px}
+  .say__who{display:block;margin-top:12px;font:700 10.5px/1 var(--label);
+    letter-spacing:.14em;text-transform:uppercase;color:var(--soft)}
+  .tile--hot .say__who{color:inherit;opacity:.8}
+
+  footer .board{border-bottom:0}
+  footer .tile{font:400 12px/1.6 var(--body);color:var(--soft)}
+
+  /* The shared rhythm assumes sections with their own padding and grounds. On
+     a board every section IS the grid, so the tonal bands are dropped and the
+     section padding zeroed - the 1px lattice is the only separator. */
+  section{padding:0}
+  section.t-bleed,section.t-inset,section.t-offset{background:transparent;padding-block:0}
+
+  .feature{padding:0}
+  .feature__wrap{background:var(--card);padding:clamp(26px,4vw,58px);
+    display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+  .feature__big{font-family:var(--display);font-weight:800;letter-spacing:-.04em}
+  .feature__label{font:700 10.5px/1 var(--label);letter-spacing:.16em;
+    text-transform:uppercase;color:var(--hot)}
+
+  {% if lang_body_font %}
+  :root{
+    --display:'{{ lang_display_font }}', system-ui, sans-serif;
+    --body:'{{ lang_body_font }}', system-ui, sans-serif;
+    --cond:'{{ lang_display_font }}', system-ui, sans-serif;
+    --mono:'{{ lang_body_font }}', ui-monospace, monospace;
+    --label:'{{ lang_body_font }}', system-ui, sans-serif;
+  }
+  {% endif %}
+  {% if is_rtl %}
+  body{direction:rtl}
+  .navtile{justify-content:flex-start}
+  .row__v{text-align:left}
+  .shop-panel{left:0;right:auto;box-shadow:8px 0 40px rgba(0,0,0,.28)}
+  {% endif %}
+
+  {% include "packs/_pages/_composition.css" %}
+</style>
+{% include "packs/_pages/_structured.html" %}
+</head>
+<body>
+
+<header>
+  <div class="board">
+    <a href="home.html" class="tile brand">
+      {% if logo %}<img src="{{ logo }}" alt="{{ site_name }}">{% else %}{{ site_name }}{% endif %}
+    </a>
+    <div class="tile navtile">
+      <a href="home.html" class="{% if _cur == 'home.html' %}on{% endif %}"{% if _cur == 'home.html' %} aria-current="page"{% endif %}>{{ t('nav_home') }}</a>
+      {% if 'portfolio' in layout %}<a href="portfolio.html" class="{% if _cur == 'portfolio.html' %}on{% endif %}"{% if _cur == 'portfolio.html' %} aria-current="page"{% endif %}>{{ t('nav_work') }}</a>{% endif %}
+      {% if 'services' in layout %}<a href="services.html" class="{% if _cur == 'services.html' %}on{% endif %}"{% if _cur == 'services.html' %} aria-current="page"{% endif %}>{{ t('nav_services') }}</a>{% endif %}
+      {% if 'about' in layout %}<a href="about.html" class="{% if _cur == 'about.html' %}on{% endif %}"{% if _cur == 'about.html' %} aria-current="page"{% endif %}>{{ t('sec_about') }}</a>{% endif %}
+      {% if 'contact' in layout %}<a href="contact.html" class="{% if _cur == 'contact.html' %}on{% endif %}"{% if _cur == 'contact.html' %} aria-current="page"{% endif %}>{{ t('nav_contact') }}</a>{% endif %}
+    </div>
+  </div>
+</header>
+
+{% block main %}{% endblock %}
+
+<footer>
+  <div class="board">
+    <div class="tile t-half">{{ footer.copyright or site_name }}</div>
+    {% if footer.address %}<div class="tile t-half" style="text-align:right">{{ footer.address }}</div>{% endif %}
+  </div>
+</footer>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  if(!('IntersectionObserver' in window)) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.classList.add('js-reveal');
+  var els=[].slice.call(document.querySelectorAll('.reveal'));
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('is-in'); io.unobserve(e.target); }
+    });
+  },{rootMargin:'0px 0px -8% 0px',threshold:0.06});
+  var above=[],below=[];
+  els.forEach(function(el){
+    (el.getBoundingClientRect().top < window.innerHeight*0.92 ? above : below).push(el);
+  });
+  below.forEach(function(el){ io.observe(el); });
+  setTimeout(function(){ els.forEach(function(el){ el.classList.add('is-in'); }); }, 2500);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    above.forEach(function(el,i){ setTimeout(function(){ el.classList.add('is-in'); }, i*70); });
+  });});
+})();
+</script>
+{% include "packs/_pages/_shop.html" %}
+</body>
+</html>
