@@ -10,22 +10,22 @@
 # is here is what the code actually asks for.
 
 # ── Web layer ────────────────────────────────────────────────────────────────
-fastapi==0.121.0
-uvicorn==0.27.0
+fastapi==0.136.3
+uvicorn==0.49.0
 # Not imported directly. FastAPI needs it to parse the multipart upload the
 # seller's photograph arrives in, and fails at request time without it.
-python-multipart==0.0.6
+python-multipart==0.0.32
 
 # ── Rendering ────────────────────────────────────────────────────────────────
-jinja2==3.1.3
+jinja2==3.1.6
 # Used directly by core/composition.py for its escaping primitives.
 markupsafe==3.0.3
 
 # ── Photographs ──────────────────────────────────────────────────────────────
-pillow==10.2.0
+pillow==12.2.0
 # HEIC is what phones shoot by default, and Pillow cannot open it alone.
 # core/__init__.py registers this on import.
-pillow-heif==0.15.0
+pillow-heif==1.5.0
 
 # ── Model access ─────────────────────────────────────────────────────────────
 # Every supported provider speaks the OpenAI wire format, so this is one client
@@ -41,4 +41,4 @@ onnxruntime==1.29.0
 numpy==2.5.1
 
 # ── Configuration ────────────────────────────────────────────────────────────
-python-dotenv==1.0.1
+python-dotenv==1.2.2
