@@ -29,7 +29,6 @@ __pycache__/
 *$py.class
 
 # ── Development only ─────────────────────────────────────────────────────────
-requirements-dev.txt
 .github/
 .pytest_cache/
 .ruff_cache/
