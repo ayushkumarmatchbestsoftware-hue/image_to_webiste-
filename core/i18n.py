@@ -37,6 +37,39 @@ LOCALES_DIR = os.getenv(
                  "locales"))
 SOURCE = "en"
 
+# The languages this product offers.
+#
+# The machinery below can translate into anything the model knows, and for a
+# while the interface offered a seller their regional language alongside the
+# world ones. That is not what this product is for, so the set is narrowed to
+# languages a seller would use to sell across a border.
+#
+# It is a set, not a hardcoded list: SITE_LANGUAGES overrides it, so widening
+# or narrowing what is offered is an environment change and not a code change.
+# Nothing below the interface is removed - the RTL and script tables still
+# cover far more than this - so adding a language back is exactly one variable.
+OFFERED = tuple(dict.fromkeys(
+    c for c in (
+        (os.getenv("SITE_LANGUAGES") or
+         "en,es,fr,de,it,pt,nl,ru,ar,zh,ja,ko").replace(" ", "").split(","))
+    if c))
+
+# What each offered language is called, for the interface that lists them.
+DISPLAY = {
+    "en": "English", "es": "Spanish", "fr": "French", "de": "German",
+    "it": "Italian", "pt": "Portuguese", "nl": "Dutch", "ru": "Russian",
+    "ar": "Arabic", "zh": "Chinese", "ja": "Japanese", "ko": "Korean",
+}
+
+
+def offered() -> list:
+    """[(code, name)] for the interface, in the order they are offered."""
+    return [(c, DISPLAY.get(c, c.upper())) for c in OFFERED]
+
+
+def is_offered(code: str) -> bool:
+    return normalise(code) in OFFERED
+
 # Scripts that read right to left. Getting this wrong does not produce a
 # slightly odd page; it produces an unusable one.
 RTL = {"ar", "he", "fa", "ur", "ps", "sd", "yi", "dv"}
@@ -231,6 +264,13 @@ def context(code: str) -> dict:
     missing string shows something readable rather than an empty element.
     """
     lang = normalise(code)
+    if lang not in OFFERED:
+        # Falling through would give a page whose copy is in one language and
+        # whose buttons are in another, which reads as broken rather than as
+        # unsupported. English is the honest answer.
+        logger.warning(f"'{lang}' is not an offered language; using "
+                       f"{SOURCE} (offered: {', '.join(OFFERED)})")
+        lang = SOURCE
     table = strings(lang)
     src = source_strings()
 

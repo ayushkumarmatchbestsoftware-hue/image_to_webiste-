@@ -69,6 +69,10 @@ async def health():
         # Cached languages. Any other code still works — it is
         # translated once on first use and cached beside these.
         "languages": _i18n.available(),
+        # What a seller may actually choose. `languages` above is only what is
+        # already cached; this is the offered set, and the interface builds its
+        # list from it so the two can never disagree.
+        "languages_offered": [{"code": c, "name": n} for c, n in _i18n.offered()],
         "art_director": {
             "enabled": _ad.ENABLED,
             "can_direct": bool(_ad.ENABLED and _skills.load("art-direction")

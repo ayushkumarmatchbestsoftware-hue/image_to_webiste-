@@ -188,23 +188,9 @@
       <label>Language</label>
       <input type="text" id="lang" list="langs" value="en"
              placeholder="en, hi, ar, es, ja&hellip;">
-      <datalist id="langs">
-        <option value="en">English</option>
-        <option value="hi">Hindi</option>
-        <option value="bn">Bengali</option>
-        <option value="ta">Tamil</option>
-        <option value="te">Telugu</option>
-        <option value="mr">Marathi</option>
-        <option value="gu">Gujarati</option>
-        <option value="pa">Punjabi</option>
-        <option value="ar">Arabic</option>
-        <option value="es">Spanish</option>
-        <option value="fr">French</option>
-        <option value="pt">Portuguese</option>
-        <option value="de">German</option>
-        <option value="ja">Japanese</option>
-        <option value="zh">Chinese</option>
-      </datalist>
+      <!-- Filled from /health. A second copy of the language list here
+           would be a second thing to keep in step. -->
+      <datalist id="langs"></datalist>
       <p class="hint" style="margin:-6px 0 12px;font-size:.78rem;opacity:.6">
         The list is a shortcut, not a limit &mdash; type any language code and
         the site is written in it.</p>
@@ -281,6 +267,12 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,m=>({'&':'&amp;','
 // ---- mode banner ---------------------------------------------------------
 fetch("/health").then(r=>r.json()).then(d=>{
   OFFLINE = !!d.offline;
+  var langs = d.languages_offered || [];
+  if(langs.length){
+    $("langs").innerHTML = langs.map(function(l){
+      return '<option value="'+esc(l.code)+'">'+esc(l.name)+'</option>'; }).join("");
+    $("lang").placeholder = langs.slice(0,4).map(function(l){return l.code;}).join(", ")+"…";
+  }
   $("mode").textContent = OFFLINE ? "offline mode" : (d.provider+" connected");
   $("mode").className = "pill " + (OFFLINE ? "warn" : "ok");
   $("mdl").textContent = OFFLINE ? "no model calls" : d.model_fast;
