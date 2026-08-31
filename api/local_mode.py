@@ -11,7 +11,6 @@ Replaces
   core.redis              -> in-process dicts (job state)
   core.r2                 -> ./local_store on disk (object storage)
   core.mongo              -> in-process dict (website documents)
-  services.vercel_service -> no-op stub
 
 Nothing in the tracked repo is modified; the real modules are simply never
 imported, so boto3 / motor / a live Redis are all unnecessary.
@@ -45,7 +44,6 @@ PUBLIC_URL = os.getenv("LOCAL_PUBLIC_URL") or (f"{_BASE}/media" if _BASE else "/
 JOBS = {}            # job_id -> status dict
 WEBSITE_TO_JOB = {}  # website_id -> job_id
 WEBSITES = {}        # website_id -> website document
-NOTIFICATIONS = []   # payloads that would have gone to the notification queue
 
 
 def _now():
@@ -138,17 +136,10 @@ def _redis_module():
             status="failed", error=str(error), updated_at=_now())
         print(f"[JOB] {job_id[:8]} FAILED: {error}")
 
-    async def enqueue_notification(payload):
-        NOTIFICATIONS.append(payload)
-
-    def close_all_sync_clients():
-        pass
-
     for fn in (create_job_record, get_job_status, get_job_id_for_website,
                mark_job_processing, mark_job_completed, mark_job_failed,
-               enqueue_notification, set_job_progress):
+               set_job_progress):
         setattr(m, fn.__name__, fn)
-    m.close_all_sync_clients = close_all_sync_clients
     return m
 
 
@@ -163,24 +154,10 @@ def _mongo_module():
         print(f"[DOC] stored website {wid[:8]} '{website_data.get('site_name')}'")
         return wid
 
-    async def update_website_final_url(website_id, final_url):
-        WEBSITES.setdefault(website_id, {})["final_url"] = final_url
-
-    async def get_website_layout(website_id):
-        return WEBSITES.get(website_id, {}).get("layout", [])
-
-    async def update_website_layout(website_id, new_layout):
-        WEBSITES.setdefault(website_id, {})["layout"] = new_layout
-
-    async def insert_chat_message(website_id, role, content):
-        WEBSITES.setdefault(website_id, {}).setdefault("chat_messages", []).append(
-            {"role": role, "content": content, "at": _now()})
-
     def get_websites_collection():
         raise RuntimeError("Mongo collection API is not available in local mode")
 
-    for fn in (insert_website_data, update_website_final_url,
-               get_website_layout, update_website_layout, insert_chat_message):
+    for fn in (insert_website_data,):
         setattr(m, fn.__name__, fn)
     m.get_websites_collection = get_websites_collection
     m.get_mongo_client = lambda: None
