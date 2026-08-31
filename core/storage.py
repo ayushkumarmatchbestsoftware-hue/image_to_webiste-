@@ -39,6 +39,40 @@ _BASE = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
 PUBLIC_URL = os.getenv("MEDIA_URL") or (f"{_BASE}/media" if _BASE else "/media")
 
 
+class StoreUnwritable(RuntimeError):
+    """The store directory cannot be written to. Nothing can be saved."""
+
+
+def _check_writable() -> None:
+    """
+    Fail at boot, not at the seller's first order.
+
+    The container runs as an unprivileged uid and STORE_DIR is usually a volume
+    bound from the host. If the host directory is owned by someone else the
+    service starts perfectly, serves /health, generates a site, and then cannot
+    write one byte of it - and the first person to find out is a seller whose
+    order vanished. Checking here turns that into a container that refuses to
+    start with a message naming the fix.
+    """
+    probe = os.path.join(STORE_DIR, ".write-probe")
+    try:
+        os.makedirs(STORE_DIR, exist_ok=True)
+        with open(probe, "wb") as fh:
+            fh.write(b"x")
+        os.remove(probe)
+    except OSError as e:
+        raise StoreUnwritable(
+            f"cannot write to STORE_DIR ({STORE_DIR}): {e}. Every generated "
+            f"site, published storefront and customer order is kept there. If "
+            f"this is a bind mount, the directory must be writable by the uid "
+            f"the container runs as (10001): "
+            f"chown -R 10001:10001 <host path>"
+        ) from e
+
+
+_check_writable()
+
+
 def _path_for(key: str) -> str:
     """
     The file a key names.

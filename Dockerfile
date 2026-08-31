@@ -34,19 +34,26 @@ COPY . .
 # Everything the service writes lives here. Declared as a volume so a redeploy
 # cannot take a seller's orders with it — see docker-compose.yml, which binds
 # it to a path on the host.
-# 755, not 777. The container runs as root, so the extra bits bought nothing
-# and made a directory of customer orders world-writable on the host that binds
-# it.
+# Runs as an unprivileged user. Root in a container is one escape away from
+# root on the host, and nothing here needs it.
 #
-# Running as a non-root user would be better still, and is deliberately NOT
-# done here: docker-compose binds ./data/local_store from the host, and an
-# unprivileged uid inside the container would not own that directory. The
-# service would then start cleanly and fail to write a single order. Doing it
-# properly means fixing ownership on the host too, which belongs in the deploy,
-# not silently in this file.
-RUN mkdir -p /app/local_store /app/static && \
+# The uid is FIXED at 10001 and that matters more than it looks: docker-compose
+# binds ./data/local_store from the host, and the host directory has to be
+# writable by this uid or the service starts cleanly and cannot save a single
+# order. On the deploy host, once:
+#
+#     sudo mkdir -p <app>/data/local_store
+#     sudo chown -R 10001:10001 <app>/data/local_store
+#
+# core/storage.py checks the directory is writable at import and refuses to
+# start if it is not, so getting this wrong is a loud failure at boot rather
+# than a silent one at the seller's first order.
+RUN useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin app && \
+    mkdir -p /app/local_store /app/static && \
+    chown -R 10001:10001 /app && \
     chmod -R 755 /app/local_store /app/static
 VOLUME ["/app/local_store"]
+USER 10001
 
 EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=25s --retries=3 \

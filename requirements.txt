@@ -22,7 +22,7 @@ jinja2==3.1.6
 markupsafe==3.0.3
 
 # ── Photographs ──────────────────────────────────────────────────────────────
-pillow==12.2.0
+pillow==12.3.0
 # HEIC is what phones shoot by default, and Pillow cannot open it alone.
 # core/__init__.py registers this on import.
 pillow-heif==1.5.0
