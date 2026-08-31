@@ -44,9 +44,9 @@ def _key(user_id: str) -> str:
 
 def _load(user_id: str) -> list:
     """The seller's ledger, oldest first. Missing or unreadable reads as empty."""
-    from core.r2 import fetch_media_from_r2
+    from core.storage import load as store_load
     try:
-        raw = fetch_media_from_r2(_key(user_id))
+        raw = store_load(_key(user_id))
         doc = json.loads(raw.decode("utf-8"))
         seen = doc.get("seen")
         return [e for e in seen if isinstance(e, dict) and e.get("pack")] \
@@ -56,7 +56,7 @@ def _load(user_id: str) -> list:
 
 
 def _save(user_id: str, seen: list) -> None:
-    from core.r2 import upload_media_to_r2
+    from core.storage import save as store_save
     key = _key(user_id)
     folder, name = key.rsplit("/", 1)
     payload = {
@@ -64,7 +64,7 @@ def _save(user_id: str, seen: list) -> None:
                     "the next one differs. Safe to delete.",
         "seen": seen,
     }
-    upload_media_to_r2(json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+    store_save(json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                        "application/json", folder, name)
 
 

@@ -10,10 +10,13 @@ from fastapi import (APIRouter, Request, Form, File, UploadFile, HTTPException,
                      BackgroundTasks)
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 
-from api import ROOT, local_mode
+from api import ROOT
+from core import sites as _sites
+from core import storage as _storage
+from core import jobs as _jobs
 from api.deps import log, UI_DIR, FRONTEND, DEV_USER_ID
 from config import Config
-from core.r2 import upload_media_to_r2, fetch_media_from_r2
+from core.storage import save as store_save, load as store_load
 
 router = APIRouter()
 
@@ -46,7 +49,12 @@ async def health():
     info = provider_info()
     return {
         "status": "ok",
-        "mode": "local-test",
+        # "local-test" described a mode that no longer exists: the service
+        # used to swap its storage and job store for stand-ins, and this said
+        # which half was running. There is one implementation now, so this
+        # names where the site data actually is.
+        "mode": "file-store",
+        "store": _storage.STORE_DIR,
         "provider": info["provider"],
         "vision": info["vision"],
         "free_tier": info["free_tier"],
@@ -58,8 +66,8 @@ async def health():
                                   if not info["key_present"] else ""),
         "model_content": info["model_content"],
         "model_fast": info["model_fast"],
-        "jobs": len(local_mode.JOBS),
-        "websites": len(local_mode.WEBSITES),
+        "jobs": len(_jobs.JOBS),
+        "websites": len(_sites.ids()),
         # Whether the Art Director agent can actually run, and on what. Both
         # halves can fail independently: no vision model means no critique even
         # with a live key, and no browser means nothing to critique.

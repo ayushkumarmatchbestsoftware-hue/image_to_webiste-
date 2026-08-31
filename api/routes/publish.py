@@ -10,10 +10,11 @@ from fastapi import (APIRouter, Request, Form, File, UploadFile, HTTPException,
                      BackgroundTasks)
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 
-from api import ROOT, local_mode
+from api import ROOT
+from core import sites as _sites
 from api.deps import log, UI_DIR, FRONTEND, DEV_USER_ID
 from config import Config
-from core.r2 import upload_media_to_r2, fetch_media_from_r2
+from core.storage import save as store_save, load as store_load
 
 router = APIRouter()
 from api.deps import rate_ok, merchant_ok, summary_display
@@ -29,20 +30,20 @@ async def publish_site(website_id: str, request: Request):
     if not merchant_ok(website_id, request):
         raise HTTPException(status_code=401, detail="merchant key required")
 
-    from core.r2 import list_objects_in_folder
-    keys = await asyncio.to_thread(list_objects_in_folder, f"websites/{website_id}")
+    from core.storage import listing as store_listing
+    keys = await asyncio.to_thread(store_listing, f"websites/{website_id}")
     pages = {}
     for k in keys:
         name = k.rsplit("/", 1)[-1]
         if not name.endswith(".html") or "backup" in k:
             continue
-        raw = await asyncio.to_thread(fetch_media_from_r2, k)
+        raw = await asyncio.to_thread(store_load, k)
         pages[name] = raw.decode("utf-8", "replace")
     if not pages:
         return JSONResponse(status_code=404,
                             content={"error": "nothing generated for this site yet"})
 
-    doc = local_mode.WEBSITES.get(website_id, {}) or {}
+    doc = _sites.record(website_id)
     # Settings first: they are on disk, so they survive the restart that empties
     # the in-memory website document.
     name = ((_shop.get_settings(website_id) or {}).get("site_name")

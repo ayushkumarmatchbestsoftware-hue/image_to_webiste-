@@ -28,9 +28,9 @@ class RedesignError(Exception):
 
 
 def load_content(website_id: str) -> dict:
-    from core.r2 import fetch_media_from_r2
+    from core.storage import load as store_load
     try:
-        raw = fetch_media_from_r2(f"websites/{website_id}/content.json")
+        raw = store_load(f"websites/{website_id}/content.json")
     except Exception as e:
         raise RedesignError(
             "this site was generated before designs could be changed; "
@@ -136,15 +136,15 @@ def render(website_id: str, pack_slug: str) -> dict:
 
 def save(website_id: str, pages: dict, pack_slug: str) -> None:
     """Write the re-rendered pages over the stored site and record the design."""
-    from core.r2 import upload_media_to_r2, fetch_media_from_r2
+    from core.storage import save as store_save, load as store_load
     for name, html in pages.items():
-        upload_media_to_r2(html.encode("utf-8"), "text/html",
+        store_save(html.encode("utf-8"), "text/html",
                            f"websites/{website_id}", name)
     try:
-        doc = json.loads(fetch_media_from_r2(
+        doc = json.loads(store_load(
             f"websites/{website_id}/content.json").decode("utf-8"))
         doc["pack"] = pack_slug
-        upload_media_to_r2(json.dumps(doc, ensure_ascii=False).encode("utf-8"),
+        store_save(json.dumps(doc, ensure_ascii=False).encode("utf-8"),
                            "application/json", f"websites/{website_id}",
                            "content.json")
     except Exception as e:

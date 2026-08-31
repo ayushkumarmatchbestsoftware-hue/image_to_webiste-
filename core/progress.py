@@ -38,7 +38,7 @@ async def report(job_id: str, stage: str, detail: str = "") -> None:
     if pct is None:
         return
     try:
-        from core.redis import set_job_progress
+        from core.jobs import set_job_progress
         await set_job_progress(job_id, pct, label, detail)
     except ImportError:
         # Job store without progress support (the real Redis module today).

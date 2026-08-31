@@ -10,14 +10,14 @@ from fastapi import (APIRouter, Request, Form, File, UploadFile, HTTPException,
                      BackgroundTasks)
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 
-from api import ROOT, local_mode
+from api import ROOT
 from api.deps import log, UI_DIR, FRONTEND, DEV_USER_ID
 from config import Config
-from core.r2 import upload_media_to_r2, fetch_media_from_r2
+from core.storage import save as store_save, load as store_load
 
 from typing import List, Optional
 import traceback
-from core.redis import create_job_record, get_job_status
+from core.jobs import create_job_record, get_job_status
 
 router = APIRouter()
 
@@ -124,7 +124,7 @@ async def generate_from_photo(
         b.write(payload)
 
     image_url = await asyncio.to_thread(
-        upload_media_to_r2, payload, "image/jpeg", f"websites/{website_id}/assets")
+        store_save, payload, "image/jpeg", f"websites/{website_id}/assets")
 
     # The additional photos ride along as working copies; the pipeline deletes
     # them with the first one when it is done.

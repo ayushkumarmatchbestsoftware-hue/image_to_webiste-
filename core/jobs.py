@@ -1,0 +1,76 @@
+"""
+What a generation is doing right now.
+
+A generation takes up to a minute, so the request cannot wait on it. The route
+starts the work, hands back a job id, and the page polls until the job says it
+is finished. This holds that state.
+
+It used to be Redis, with an in-process stand-in swapped in for anything that
+was not production. Keeping two implementations of one interface meant they
+could disagree, and they did: the stand-in had `set_job_progress` and the real
+module never did, so `core/progress.py` caught the ImportError and moved on.
+The progress bar animated in testing and sat frozen for sixty seconds in the
+deployment that mattered. One implementation, and the bar now moves everywhere.
+
+State lives in this process, which means it is lost on restart. That is the
+honest trade for having no database: a generation running when the server
+restarts is gone, and the seller starts it again. Redis bought durability
+across restarts and across instances - if either is ever needed, this module is
+the seam to put it back behind.
+"""
+import logging
+from datetime import datetime, timezone
+
+logger = logging.getLogger("jobs")
+
+JOBS: dict = {}            # job_id -> status
+WEBSITE_TO_JOB: dict = {}  # website_id -> job_id
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+async def create_job_record(*, job_id: str, website_id: str) -> None:
+    JOBS[job_id] = {"status": "queued", "website_id": website_id,
+                    "created_at": _now(), "error": None, "url": None,
+                    "progress": 0, "stage": "Getting ready", "detail": ""}
+    WEBSITE_TO_JOB[website_id] = job_id
+    logger.info(f"{job_id[:8]} queued (website {website_id[:8]})")
+
+
+async def get_job_status(job_id: str):
+    return JOBS.get(job_id)
+
+
+async def get_job_id_for_website(website_id: str):
+    return WEBSITE_TO_JOB.get(website_id)
+
+
+async def set_job_progress(job_id: str, percent: int, label: str,
+                           detail: str = "") -> None:
+    j = JOBS.setdefault(job_id, {})
+    # Never let the bar run backwards: a late update from a slower stage would
+    # otherwise make it jump back, which reads as a stall.
+    if percent >= j.get("progress", 0):
+        j.update(progress=percent, stage=label, detail=detail,
+                 updated_at=_now())
+
+
+async def mark_job_processing(job_id: str) -> None:
+    JOBS.setdefault(job_id, {}).update(status="processing", updated_at=_now())
+    logger.info(f"{job_id[:8]} processing")
+
+
+async def mark_job_completed(job_id: str, website_id: str, preview_url: str,
+                             notification_payload: dict = None) -> None:
+    JOBS.setdefault(job_id, {}).update(
+        status="completed", website_id=website_id, url=preview_url,
+        progress=100, stage="Ready", updated_at=_now())
+    logger.info(f"{job_id[:8]} completed -> {preview_url}")
+
+
+async def mark_job_failed(job_id: str, error: str) -> None:
+    JOBS.setdefault(job_id, {}).update(status="failed", error=str(error),
+                                       updated_at=_now())
+    logger.warning(f"{job_id[:8]} failed: {error}")

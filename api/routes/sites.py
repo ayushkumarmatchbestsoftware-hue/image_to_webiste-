@@ -10,13 +10,15 @@ from fastapi import (APIRouter, Request, Form, File, UploadFile, HTTPException,
                      BackgroundTasks)
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 
-from api import ROOT, local_mode
+from api import ROOT
+from core import sites as _sites
+from core.storage import PUBLIC_URL
 from api.deps import log, UI_DIR, FRONTEND, DEV_USER_ID
 from config import Config
-from core.r2 import upload_media_to_r2, fetch_media_from_r2
+from core.storage import save as store_save, load as store_load
 
 from core.utils import clean_editor_artifacts
-from core.redis import get_job_status, get_job_id_for_website
+from core.jobs import get_job_status, get_job_id_for_website
 
 router = APIRouter()
 
@@ -24,7 +26,7 @@ router = APIRouter()
 @router.get("/media/{object_key:path}")
 async def media(object_key: str):
     try:
-        body = await asyncio.to_thread(fetch_media_from_r2, object_key)
+        body = await asyncio.to_thread(store_load, object_key)
     except Exception:
         raise HTTPException(status_code=404, detail="Not found")
     ext = object_key.rsplit(".", 1)[-1].lower()
@@ -45,7 +47,7 @@ async def preview(website_id: str, filename: str = "home.html", edit: int = 0):
         candidates.append(f"websites/{website_id}/{alt}")
     for key in candidates:
         try:
-            html_bytes = await asyncio.to_thread(fetch_media_from_r2, key)
+            html_bytes = await asyncio.to_thread(store_load, key)
             if html_bytes:
                 break
         except Exception:
@@ -84,16 +86,16 @@ async def download(website_id: str, single: int = 0):
     Default: a zip holding ONE self-contained index.html plus the seller's
     original photo. ?single=1 returns just the .html document on its own.
     """
-    from core.r2 import list_objects_in_folder
+    from core.storage import listing as store_listing
     from core.bundle import build_single_html, build_download_zip
 
-    keys = await asyncio.to_thread(list_objects_in_folder, f"websites/{website_id}")
+    keys = await asyncio.to_thread(store_listing, f"websites/{website_id}")
     pages = {k.rsplit("/", 1)[-1]: k for k in keys if k.endswith(".html")
              and "backup" not in k}
     if not pages:
         raise HTTPException(status_code=404, detail="Nothing generated yet")
 
-    doc = local_mode.WEBSITES.get(website_id, {})
+    doc = _sites.record(website_id)
     # Falls back to a Pack that actually exists. This used to name
     # "illustrator", which was removed on 27 Aug — a record missing its `pack`
     # would then inline no stylesheet at all and download as unstyled HTML.
@@ -106,14 +108,14 @@ async def download(website_id: str, single: int = 0):
 
     # The seller's own uploaded photo(s), keyed by the URL the pages reference.
     home_key = pages.get("home.html") or sorted(pages.values())[0]
-    home_html = (await asyncio.to_thread(fetch_media_from_r2, home_key)).decode("utf-8")
+    home_html = (await asyncio.to_thread(store_load, home_key)).decode("utf-8")
     product_images = {}
     for k in keys:
         if "/assets/" not in k or k.endswith(".html"):
             continue
-        url = f"{local_mode.PUBLIC_URL}/{k}"
+        url = f"{PUBLIC_URL}/{k}"
         if url in home_html:
-            product_images[url] = await asyncio.to_thread(fetch_media_from_r2, k)
+            product_images[url] = await asyncio.to_thread(store_load, k)
 
     safe = re.sub(r"[^A-Za-z0-9_-]+", "-", site_name).strip("-") or "website"
 
@@ -122,7 +124,7 @@ async def download(website_id: str, single: int = 0):
     # the nav keeps working after download.
     docs = {}
     for name, key in sorted(pages.items()):
-        raw = (await asyncio.to_thread(fetch_media_from_r2, key)).decode("utf-8")
+        raw = (await asyncio.to_thread(store_load, key)).decode("utf-8")
         imgs = {u: b for u, b in product_images.items() if u in raw}
         out_name = "index.html" if name == "home.html" else name
         docs[out_name] = build_single_html(raw, pack_slug, packs_root, imgs,
@@ -147,7 +149,7 @@ async def replace_image(website_id: str = Form(...), image: UploadFile = File(..
     data = await image.read()
     ext = os.path.splitext(image.filename or "")[1] or ".jpg"
     url = await asyncio.to_thread(
-        upload_media_to_r2, data, image.content_type or "image/jpeg",
+        store_save, data, image.content_type or "image/jpeg",
         f"websites/{website_id}/assets", f"{uuid.uuid4().hex}{ext}")
     return {"success": True, "url": url}
 
@@ -159,7 +161,7 @@ async def save(request: Request):
     if not website_id or not html:
         raise HTTPException(status_code=400, detail="Missing website_id or html")
     page = os.path.basename(data.get("page_name") or "home.html")
-    await asyncio.to_thread(upload_media_to_r2, html.encode("utf-8"),
+    await asyncio.to_thread(store_save, html.encode("utf-8"),
                             "text/html", f"websites/{website_id}", page)
     return {"success": True}
 
@@ -167,7 +169,7 @@ async def save(request: Request):
 @router.get("/history")
 async def history():
     items = []
-    for wid, doc in reversed(list(local_mode.WEBSITES.items())):
+    for wid, doc in _sites.every():
         items.append({
             "website_id": wid,
             "site_name": doc.get("site_name"),
@@ -210,7 +212,7 @@ async def current_design(website_id: str):
         current = (redesign.load_content(website_id) or {}).get("pack")
         changeable = True
     except redesign.RedesignError:
-        current, changeable = local_mode.WEBSITES.get(website_id, {}).get("pack"), False
+        current, changeable = _sites.record(website_id).get("pack"), False
     return {"current": current, "changeable": changeable,
             "designs": [{"slug": s, "title": p["title"], "mode": p.get("mode", "light"),
                          "use_case": p.get("use_case", ""),

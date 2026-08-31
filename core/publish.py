@@ -112,10 +112,10 @@ def _rewrite_media(page_html: str) -> str:
     relative path is correct here and survives a port or host change.
     """
     try:
-        from core.r2 import R2_PUBLIC_URL
+        from core.storage import PUBLIC_URL
     except Exception:
         return page_html
-    base = (R2_PUBLIC_URL or "").rstrip("/")
+    base = (PUBLIC_URL or "").rstrip("/")
     if not base:
         return page_html
     return page_html.replace(base, f"{PUBLIC_BASE}/media" if PUBLIC_BASE else "/media")

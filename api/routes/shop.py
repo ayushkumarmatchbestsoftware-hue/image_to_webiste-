@@ -10,10 +10,11 @@ from fastapi import (APIRouter, Request, Form, File, UploadFile, HTTPException,
                      BackgroundTasks)
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 
-from api import ROOT, local_mode
+from api import ROOT
+from core import sites as _sites
 from api.deps import log, UI_DIR, FRONTEND, DEV_USER_ID
 from config import Config
-from core.r2 import upload_media_to_r2, fetch_media_from_r2
+from core.storage import save as store_save, load as store_load
 
 router = APIRouter()
 from api.deps import (rate_ok, merchant_ok, summary_display,
@@ -99,7 +100,7 @@ async def place_order(website_id: str, request: Request):
     try:
         from core import notify as _notify
         _notify.order_placed(order, _shop.get_settings(website_id),
-                             (local_mode.WEBSITES.get(website_id, {}) or {}).get("site_name", ""))
+                             _sites.record(website_id).get("site_name", ""))
     except Exception as e:
         log.warning(f"order notification skipped: {e}")
 

@@ -1,17 +1,13 @@
 """
 The web layer.
 
-Importing this package performs the bootstrap the whole service depends on,
-and the ORDER of it is load-bearing:
+Importing this package reads .env and configures logging, in that order,
+before any route imports a core module that reads settings at import time.
 
-  1. read .env
-  2. replace the external services with local stand-ins
-  3. configure logging
-
-Step 2 has to happen before anything imports core.generation, because that
-module binds core.r2 / core.redis / core.mongo at import time. Doing it here
-means any `from api.routes... import` gets it right without every module having
-to remember, which is exactly the kind of thing that breaks a week later.
+There used to be a step between them that replaced core.r2, core.redis and
+core.mongo with local stand-ins. There is nothing left to replace: storage and
+job state ARE local now, so the single implementation is the one that runs
+everywhere and there is no swap to get wrong.
 """
 import asyncio
 import logging
@@ -32,9 +28,6 @@ if os.name == "nt":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     except AttributeError:
         pass
-
-from api import local_mode
-local_mode.install()
 
 # Uvicorn installs handlers on its own loggers and leaves the root logger bare,
 # so every logger.info() in core/ went nowhere. That is why the pipeline looked

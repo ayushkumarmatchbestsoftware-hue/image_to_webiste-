@@ -19,6 +19,7 @@ The render half is deliberately untouched: same jinja_env, same templates,
 same base_ctx keys, same upload path. Only the intelligence upstream is new.
 """
 import asyncio
+import datetime as _dt
 import html as html_mod
 import logging
 import os
@@ -42,8 +43,8 @@ from core.sharecard import build_card, build_favicon
 from core.imagery import build_image_set
 from core.progress import report
 from core.rendering import jinja_env
-from core.r2 import upload_media_to_r2, fetch_media_from_r2, R2_PUBLIC_URL
-from core.redis import mark_job_processing, mark_job_completed, mark_job_failed
+from core.storage import save as store_save, load as store_load, PUBLIC_URL
+from core.jobs import mark_job_processing, mark_job_completed, mark_job_failed
 from core.utils import build_image_map_logic
 
 logger = logging.getLogger("photo_pipeline")
@@ -255,15 +256,15 @@ def _bundle_for_review(html: str, pack_slug: str, shots: dict) -> str:
     stylesheets and the seller's own images are inlined first.
     """
     from core.bundle import build_single_html
-    from core.r2 import fetch_media_from_r2, R2_PUBLIC_URL
+    from core.storage import load as store_load, PUBLIC_URL
     imgs = {}
     for url in shots.values():
-        if not isinstance(url, str) or not url.startswith(R2_PUBLIC_URL):
+        if not isinstance(url, str) or not url.startswith(PUBLIC_URL):
             continue
         if url not in html:
             continue
         try:
-            imgs[url] = fetch_media_from_r2(url[len(R2_PUBLIC_URL):].lstrip("/"))
+            imgs[url] = store_load(url[len(PUBLIC_URL):].lstrip("/"))
         except Exception:
             pass
     packs_root = os.path.join(
@@ -452,7 +453,7 @@ async def run_photo_generation_job(
             try:
                 shots.update(await build_image_set(
                     all_photos, theme, website_id,
-                    upload_media_to_r2, asyncio.to_thread,
+                    store_save, asyncio.to_thread,
                     spec=spec, quality=quality))
             except Exception as e:
                 logger.warning(f"[{job_id[:8]}] image variants skipped: {e}")
@@ -462,7 +463,7 @@ async def run_photo_generation_job(
                         build_card, photo_bytes, theme, kind, _brand, _head, price)
                     if blob:
                         url = await asyncio.to_thread(
-                            upload_media_to_r2, blob, "image/png",
+                            store_save, blob, "image/png",
                             f"websites/{website_id}/assets", target)
                         if kind == "og":
                             share_card_url = url
@@ -474,7 +475,7 @@ async def run_photo_generation_job(
                 icons = await asyncio.to_thread(build_favicon, photo_bytes)
                 for px, blob in icons.items():
                     u = await asyncio.to_thread(
-                        upload_media_to_r2, blob, "image/png",
+                        store_save, blob, "image/png",
                         f"websites/{website_id}/assets", f"icon-{px}.png")
                     if px == 32:
                         favicon_url = u
@@ -648,7 +649,7 @@ async def run_photo_generation_job(
             logger.warning(f"[{job_id[:8]}] art direction review skipped: {e}")
 
         await asyncio.to_thread(
-            upload_media_to_r2, home_html.encode("utf-8"), "text/html",
+            store_save, home_html.encode("utf-8"), "text/html",
             f"websites/{website_id}", "home.html")
 
         # ── Sub-pages ──
@@ -678,7 +679,7 @@ async def run_photo_generation_job(
                     contact=data.get("contact", {}),
                 )
                 await asyncio.to_thread(
-                    upload_media_to_r2, page_html.encode("utf-8"), "text/html",
+                    store_save, page_html.encode("utf-8"), "text/html",
                     f"websites/{website_id}", out_name)
                 return out_name
             except Exception as page_err:
@@ -692,30 +693,6 @@ async def run_photo_generation_job(
         written = ["home.html"] + [r for r in results if r]
         logger.info(f"[{job_id[:8]}] pages written: {', '.join(written)}")
 
-        # Store the Spec alongside the site so Spin (FR-20) and correction
-        # (FR-6) can regenerate without re-reading the photo.
-        try:
-            from core.mongo import insert_website_data
-            await insert_website_data({
-                "website_id": website_id, "user_id": str(user_id),
-                "site_name": site_name, "status": "completed",
-                "product_spec": spec, "triage": {"verdict": verdict, "guidance": guidance,
-                                                 "quality": quality},
-                "pack": pack_slug,
-                "genre": design["genre"]["name"],
-                "skeleton": design["skeleton"]["name"],
-                # What the director measured and what it decided to do about
-                # it. Recorded so a page that came out wrong can be traced to
-                # the rule that fired rather than guessed at.
-                "background": shots.get("_background"),
-                "treatment": shots.get("_treatment"),
-                "layout": layout, "theme": dict(theme), "spin": spin,
-                "density": density, "price": price,
-                "final_url": f"{R2_PUBLIC_URL}/websites/{website_id}/home.html",
-            }, [])
-        except Exception as e:
-            logger.warning(f"[{job_id[:8]}] persist skipped: {e}")
-
         # ── Keep what it took to build this ──
         # Everything needed to re-render this site in a DIFFERENT design, with
         # no model calls: the copy, the Grade, the layout and the image URLs.
@@ -724,7 +701,7 @@ async def run_photo_generation_job(
         try:
             import json as _json
             await asyncio.to_thread(
-                upload_media_to_r2,
+                store_save,
                 _json.dumps({
                     "content": data,
                     "spec": spec,
@@ -738,6 +715,20 @@ async def run_photo_generation_job(
                     "density": density,
                     "pack": pack_slug,
                     "language": language,
+                    "created_at": _dt.datetime.now(
+                        _dt.timezone.utc).isoformat(),
+                    # Provenance. These were written to a separate document
+                    # store that nothing ever read back; they are kept because
+                    # a page that comes out wrong should be traceable to the
+                    # decision that caused it rather than guessed at, and this
+                    # file is already being written.
+                    "user_id": str(user_id),
+                    "genre": design["genre"]["name"],
+                    "skeleton": design["skeleton"]["name"],
+                    "triage": {"verdict": verdict, "guidance": guidance,
+                               "quality": quality},
+                    "background": shots.get("_background"),
+                    "treatment": shots.get("_treatment"),
                 }, ensure_ascii=False).encode("utf-8"),
                 "application/json", f"websites/{website_id}", "content.json")
         except Exception as e:
