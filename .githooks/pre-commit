@@ -1,0 +1,55 @@
+#!/bin/sh
+# Refuse a commit that contains something shaped like a live API key.
+#
+# The history of this repository is clean, and the cheapest way to keep it that
+# way is to never let one in. A key that reaches a public remote is public the
+# moment it lands: deleting the file afterwards leaves it in every clone, in
+# the reflog, and in GitHub's API long after the branch is gone. The only real
+# remedy is to revoke the key, which costs a lot more than this check.
+#
+# Enabled by:  git config core.hooksPath .githooks
+#
+# Patterns are deliberately tight so they match a real credential and not the
+# placeholders in the documentation. "sk-..." in a README is three dots and is
+# meant to be there; a 40-character token is not.
+#
+# To commit anyway, when you are certain it is a false positive:
+#     git commit --no-verify
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+hits=$(git diff --cached -U0 -- $staged 2>/dev/null | grep -E '^\+' | grep -nE \
+  'AIzaSy[0-9A-Za-z_-]{20,}|sk-proj-[0-9A-Za-z_-]{20,}|sk-or-v1-[0-9a-f]{32,}|sk-[0-9A-Za-z]{40,}|gsk_[0-9A-Za-z]{40,}|xai-[0-9A-Za-z]{40,}|ghp_[0-9A-Za-z]{30,}|github_pat_[0-9A-Za-z_]{50,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|aws_secret_access_key[[:space:]]*=[[:space:]]*[0-9A-Za-z/+]{30,}')
+
+if [ -n "$hits" ]; then
+  echo ""
+  echo "  COMMIT REFUSED - this looks like a live credential:"
+  echo ""
+  echo "$hits" | sed 's/^/    /' | cut -c1-140
+  echo ""
+  echo "  A key that reaches a remote is public immediately, and deleting the"
+  echo "  file later does not remove it from the history. Take the value out,"
+  echo "  put it in .env (which is ignored), and revoke the key if it has"
+  echo "  already been pushed anywhere."
+  echo ""
+  echo "  If this is genuinely a placeholder:  git commit --no-verify"
+  echo ""
+  exit 1
+fi
+
+# A second class of mistake: committing the file that holds the key, rather
+# than the key itself. .gitignore covers these, but `git add -f` does not care.
+for f in $staged; do
+  case "$f" in
+    .env|.env.bak|*.key|*.pem|local_store/*)
+      echo ""
+      echo "  COMMIT REFUSED - '$f' holds secrets or runtime state and is"
+      echo "  ignored for a reason. It reached the index through 'git add -f'."
+      echo ""
+      exit 1
+      ;;
+  esac
+done
+
+exit 0

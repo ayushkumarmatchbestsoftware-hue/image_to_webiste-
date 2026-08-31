@@ -121,3 +121,14 @@ templates have been removed: roughly 6,900 lines that nothing reachable from
 that entry point touched. `core/r2.py`, `core/redis.py` and `core/mongo.py`
 remain because they are the interfaces `api/local_mode.py` substitutes at
 runtime, and are what you would point at real services.
+
+## Before you commit
+
+    git config core.hooksPath .githooks
+
+One command, once per clone. It refuses any commit containing something shaped
+like a live API key, and any attempt to force-add `.env` or the file store past
+`.gitignore`. A key that reaches a remote is public the moment it lands -
+deleting the file afterwards leaves it in every clone and in the host's API,
+and the only real remedy is revoking the key.
+
