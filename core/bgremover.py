@@ -96,8 +96,12 @@ def provider() -> str:
     if want in ADAPTER:
         return want
     try:
-        from core.llm import PROVIDER, PROVIDERS
-        if PROVIDER in ADAPTER and os.getenv(PROVIDERS[PROVIDER]["key_env"]):
+        # api_key(), not the per-vendor variable. Asking os.getenv directly is
+        # what left image editing off for anyone who set the generic
+        # LLM_API_KEY: their copy was written and their photographs were
+        # untouched, with nothing anywhere saying why.
+        from core.llm import PROVIDER, api_key
+        if PROVIDER in ADAPTER and api_key(PROVIDER):
             return PROVIDER
     except Exception:
         pass
@@ -105,9 +109,16 @@ def provider() -> str:
 
 
 def _key(name: str) -> str:
-    """The API key, read from whatever core/llm.py says this vendor calls it."""
-    from core.llm import PROVIDERS
-    return os.getenv(PROVIDERS.get(name, {}).get("key_env", ""), "")
+    """
+    The API key for this vendor.
+
+    Deferred to core/llm.py so the generic LLM_API_KEY works for images too.
+    Reading the per-vendor name here directly would have meant a seller who set
+    one key got their copy written and their photographs left alone, with
+    nothing saying why.
+    """
+    from core.llm import api_key
+    return api_key(name)
 
 
 def _endpoint(name: str, model: str) -> str:

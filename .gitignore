@@ -60,3 +60,6 @@ local_test/2.MD
 
 # API documentation - stale, and not published with the backend
 API_DOCUMENTATION.md
+
+# Backup taken when .env was rewritten
+.env.bak

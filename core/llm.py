@@ -94,13 +94,58 @@ PROVIDERS = {
 }
 
 
+# One variable for the key, whatever the vendor.
+#
+# Every provider used to need its own name - OPENAI_API_KEY, GEMINI_API_KEY,
+# GROQ_API_KEY - so changing provider meant editing two lines and leaving a
+# stale key behind, and a key pasted into the wrong name silently kept calling
+# the old vendor. LLM_API_KEY holds the key for whichever provider is selected.
+# The per-vendor names still work and still win, so nothing already deployed
+# has to change.
+GENERIC_KEY_ENV = "LLM_API_KEY"
+
+# What a key looks like, so a key alone can name its own provider.
+#
+# Longest prefix first: an OpenRouter key also begins "sk-". DeepSeek's is
+# indistinguishable from OpenAI's, which is exactly why this is a convenience
+# and LLM_PROVIDER remains the way to say it definitively.
+KEY_SHAPES = (
+    ("sk-or-", "openrouter"),
+    ("gsk_", "groq"),
+    ("xai-", "xai"),
+    ("AIza", "gemini"),
+    ("sk-", "openai"),
+)
+
+
+def api_key(provider: str = None) -> str:
+    """
+    The key for a provider: its own variable if set, otherwise the generic one.
+
+    Every place that needs a key goes through here - provider selection, the
+    client, the health report and the image adapters - so they cannot disagree
+    about whether one is present.
+    """
+    p = PROVIDERS.get(provider or PROVIDER, {})
+    return (os.getenv(p.get("key_env", "")) or os.getenv(GENERIC_KEY_ENV) or "")
+
+
 def _pick_provider() -> str:
-    """Explicit LLM_PROVIDER wins; otherwise the first provider with a key set."""
+    """
+    Explicit LLM_PROVIDER wins. Then the first provider with its own key. Then
+    the shape of LLM_API_KEY, so setting one key and nothing else works.
+    """
     want = (os.getenv("LLM_PROVIDER") or "").strip().lower()
     if want in PROVIDERS:
         return want
     for name, p in PROVIDERS.items():
         if os.getenv(p["key_env"]):
+            return name
+    generic = (os.getenv(GENERIC_KEY_ENV) or "").strip()
+    for prefix, name in KEY_SHAPES:
+        if generic.startswith(prefix):
+            logger.info(f"provider read from the shape of {GENERIC_KEY_ENV}: "
+                        f"{name}. Set LLM_PROVIDER to say it outright.")
             return name
     return "openai"
 
@@ -118,8 +163,14 @@ def provider_info() -> dict:
         "provider": PROVIDER,
         "vision": _P["vision"],
         "free_tier": _P["free_tier"],
-        "key_env": _P["key_env"],
-        "key_present": bool(os.getenv(_P["key_env"])),
+        # Which variable the key was actually read from, not merely which one
+        # this provider calls its own. With LLM_API_KEY in use, naming
+        # GEMINI_API_KEY here sends anyone debugging a missing key to edit a
+        # line that is not there.
+        "key_env": (_P["key_env"] if os.getenv(_P["key_env"])
+                    else (GENERIC_KEY_ENV if os.getenv(GENERIC_KEY_ENV)
+                          else _P["key_env"])),
+        "key_present": bool(api_key(PROVIDER)),
         "model_content": MODEL_CONTENT,
         "model_fast": MODEL_FAST,
     }
@@ -175,9 +226,9 @@ def get_client():
         _client_attempted = True
         try:
             from openai import OpenAI
-            key = os.getenv(_P["key_env"])
+            key = api_key(PROVIDER)
             if not key:
-                logger.error(f"{_P['key_env']} is not set — provider '{PROVIDER}' "
+                logger.error(f"neither {_P['key_env']} nor {GENERIC_KEY_ENV} is set — provider '{PROVIDER}' "
                              "cannot be used; the pipeline will run offline")
                 _client = None
             else:
