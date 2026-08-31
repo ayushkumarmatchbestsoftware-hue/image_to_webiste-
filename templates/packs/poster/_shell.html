@@ -118,11 +118,17 @@
     margin:0 0 16px}
   .price{font:800 clamp(24px,3vw,40px)/1 var(--display);letter-spacing:-.03em;
     display:block;margin-bottom:12px}
+  /* The button carries BOTH its colours. It used to set background:currentColor
+     and lean on a child <span> for the label - which worked on this design's
+     own pages and rendered an invisible button on the shared contact page,
+     where the markup is a bare <a class="cta">. A control that only works
+     beside the right child element is a control that will break again. */
   .cta{display:inline-block;font:700 12px/1 var(--label);letter-spacing:.16em;
     text-transform:uppercase;text-decoration:none;padding:16px 26px;
-    background:currentColor;transition:opacity .2s}
-  .cta span{color:var(--stock);mix-blend-mode:normal}
-  .field--loud .cta span,.field--ink .cta span{color:var(--ink)}
+    background:var(--ink);color:var(--stock);transition:opacity .2s}
+  .cta span{color:inherit}
+  .field--loud .cta{background:var(--stock);color:var(--loud)}
+  .field--ink .cta,section.band .cta{background:var(--stock);color:var(--ink)}
   .cta:hover{opacity:.78}
 
   /* Numbered because the making IS a sequence: this happens, then this. */
@@ -182,6 +188,40 @@
   .sheet__meta{text-align:left}
   .shop-panel{left:0;right:auto;box-shadow:8px 0 40px rgba(0,0,0,.3)}
   {% endif %}
+
+  /* ── The shared sub-pages ────────────────────────────────────────────────
+     About, Services, Portfolio and Contact are plain sections, not fields.
+     This design zeroes section padding because every one of its own sections
+     is a full-bleed field that sets its own, so those pages arrived with no
+     vertical rhythm whatsoever and an uncapped photograph running off the
+     screen. A bare .wrap gets a field's breathing room, and `band` flips to
+     ink so the sequence still reads as sheets turning over. */
+  section > .wrap{padding-block:clamp(44px,7vw,88px)}
+  section.band{background:var(--ink);color:var(--stock)}
+  .rule{border:0;border-top:5px solid currentColor;margin:0 0 26px;width:84px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+    gap:clamp(24px,3.4vw,46px)}
+  .card{margin:0}
+  .card h3{font:800 clamp(19px,2.4vw,28px)/1.04 var(--display);letter-spacing:-.03em;
+    text-transform:uppercase;margin:0 0 8px}
+  .card p{margin:0;opacity:.82}
+  .faq{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:28px}
+  .faq h3{font:800 16px/1.18 var(--display);text-transform:uppercase;margin:0 0 6px}
+  .faq p{margin:0;opacity:.82}
+  .contact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+    gap:28px;margin-top:28px}
+  .contact-grid > div{display:flex;flex-direction:column;gap:7px}
+  .contact-grid span{font:700 11px/1 var(--label);letter-spacing:.2em;
+    text-transform:uppercase;opacity:.65}
+  .contact-grid b{font:800 clamp(17px,2vw,23px)/1.2 var(--display);letter-spacing:-.025em}
+  .shot-detail,.shot-wide,.work-shot{margin:28px 0 0}
+  .shot-detail img,.shot-wide img,.work-shot img{width:auto;
+    max-height:min(46vh,420px);margin-inline:auto}
+  .work{list-style:none;margin:28px 0 0;padding:0;display:grid;
+    gap:clamp(28px,4vw,52px)}
+  .work li{margin:0}
+  .quote{margin:0;font:800 clamp(22px,3.4vw,42px)/1.02 var(--display);
+    letter-spacing:-.035em;text-transform:uppercase}
 
   {% include "packs/_pages/_composition.css" %}
 </style>

@@ -232,6 +232,51 @@ def _read_manifest(slug: str, folder: str):
     return body
 
 
+SHARED_PAGES = ("about.html", "services.html", "portfolio.html", "contact.html")
+
+
+def _subpage_classes() -> set:
+    """Every class the shared sub-pages style themselves with."""
+    import re
+    out = set()
+    folder = os.path.join(PACKS_DIR, "_pages")
+    for name in SHARED_PAGES:
+        try:
+            with open(os.path.join(folder, name), encoding="utf-8") as fh:
+                body = fh.read()
+        except OSError:
+            continue
+        for group in re.findall(r'class="([^"{}]*)"', body):
+            out.update(c for c in group.split() if c and not c.startswith("{"))
+    return out
+
+
+def _warn_unstyled_subpages(slug: str, folder: str) -> None:
+    """
+    Say when a design has not styled the pages it did not write.
+
+    About, Services, Portfolio and Contact are shared partials that extend
+    whichever design was chosen, so a design only has to provide the CSS. Two
+    designs built to own their own home page - one whose page ground is a dark
+    lattice, one whose sections are all full-bleed fields - zeroed the section
+    and wrapper padding those partials rely on and never replaced it. Their
+    home pages were faultless and every other page rendered as dark-on-dark
+    text flush against the edge of the screen. Nothing failed, nothing logged,
+    and it reached a seller.
+    """
+    try:
+        with open(os.path.join(folder, "_shell.html"), encoding="utf-8") as fh:
+            shell = fh.read()
+    except OSError:
+        return
+    missing = sorted(c for c in _subpage_classes() if f".{c}" not in shell)
+    if missing:
+        logger.warning(
+            f"design '{slug}' styles none of {', '.join(missing)} - the shared "
+            f"{'/'.join(p.split('.')[0] for p in SHARED_PAGES)} pages will "
+            f"render unstyled on it")
+
+
 def discover(directory: str = None) -> dict:
     """
     Every design installed on disk.
@@ -260,6 +305,7 @@ def discover(directory: str = None) -> dict:
                            "definition; skipped")
             continue
         found[slug] = dict(body)
+        _warn_unstyled_subpages(slug, folder)
 
     for slug in BUILTIN_PACKS:
         if slug not in found:

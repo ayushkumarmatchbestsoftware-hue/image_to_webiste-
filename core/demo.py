@@ -100,8 +100,15 @@ def _plate(w, h, obj, ground):
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def render(slug: str) -> str:
-    """Render one Pack's home page with its own demo seller. Returns HTML."""
+def render(slug: str, page: str = "home.html") -> str:
+    """
+    Render one page of a design with its own demo seller. Returns HTML.
+
+    `page` is "home.html" for the design's own opening, or one of the shared
+    sub-pages in packs/_pages/ - about, services, portfolio, contact. The
+    sub-pages matter as much as the opening: a seller who clicks About and
+    finds an unstyled page has a broken site, however good the front is.
+    """
     from core.rendering import jinja_env
     from core.packs import PACKS, get_pack
     from core.design import derive_design
@@ -182,4 +189,6 @@ def render(slug: str) -> str:
         shot_cap=int(min(900, 900) * 1.25),
         pack=dict(pack, slug=slug), comp=comp, sect=make_sect(comp),
         stats=data["stats"], **{k: v for k, v in data.items() if k != "stats"})
-    return jinja_env.get_template(f"packs/{slug}/home.html").render(**ctx)
+    tpl = (f"packs/{slug}/home.html" if page == "home.html"
+           else f"packs/_pages/{page}")
+    return jinja_env.get_template(tpl).render(**ctx, current_page=page)
