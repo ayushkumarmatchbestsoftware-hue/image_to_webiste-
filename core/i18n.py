@@ -74,6 +74,13 @@ def is_offered(code: str) -> bool:
 # slightly odd page; it produces an unusable one.
 RTL = {"ar", "he", "fa", "ur", "ps", "sd", "yi", "dv"}
 
+# Languages written vertically top-to-bottom when a design asks for vertical
+# text. A Latin label in a vertical rail has to be rotated 180 degrees to read
+# bottom-up; doing the same to Japanese turns it upside down, because
+# writing-mode:vertical-rl is already its natural direction. A design with a
+# vertical rail needs to know which it is dealing with.
+VERTICAL_NATIVE = {"ja", "zh", "zh-tw", "zh-hant", "ko"}
+
 # A Latin-only font renders Devanagari or Arabic as empty boxes, so the display
 # and body faces have to follow the script. Google Fonts names, since that is
 # the one font host the pages already load from.
@@ -286,4 +293,5 @@ def context(code: str) -> dict:
         "t": t,
         "lang_display_font": fonts[0] if fonts else None,
         "lang_body_font": fonts[1] if fonts else None,
+        "vertical_native": lang in VERTICAL_NATIVE,
     }

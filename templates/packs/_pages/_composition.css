@@ -318,3 +318,31 @@ figure.plate-fit img{
      in the plate hero pulse's outlined eyebrow ran the full page width with
      the word marooned at the left. fit-content holds whatever the container. */
   .eyebrow{width:fit-content;max-width:100%}
+
+/* ── Long unbreakable strings ─────────────────────────────────────────────
+   An email address, a URL or a handle offers no wrap opportunity, and a grid
+   or flex item defaults to min-width:auto, which refuses to shrink below its
+   own content. Together those put support@teppankobo.example.jp straight
+   through the cell beside it and over the address in the next column.
+
+   Found on a Japanese site, because the dense text next door made the overlap
+   obvious — but it was never about the language. The same address overflows in
+   English; there is simply more empty space for it to overflow into.
+
+   min-width:0 lets the track shrink. overflow-wrap:anywhere is applied only to
+   the fields that actually carry addresses, so ordinary prose still breaks at
+   spaces like prose should. */
+.contact-grid > *,
+.cards > *,
+.faq > *,
+.work > li,
+.steps > li,
+.refs > *,
+.rows > *{min-width:0}
+
+.contact-grid b,
+.contact-grid span,
+.contact-lines,
+.lines,
+.row__v,
+.rows b{overflow-wrap:anywhere}

@@ -94,7 +94,20 @@
   .tabstrip__mark{font-family:var(--display);font-weight:600;font-size:1.15rem;
                   color:var(--paper-hi);writing-mode:vertical-rl;letter-spacing:.04em;
                   margin-bottom:32px;max-height:42vh;overflow:hidden}
-  .tabstrip__list{display:flex;flex-direction:column;gap:6px;flex:1}
+  /* min-height:0 because a flex item will not shrink below its own content
+     unless told to, and a vertical tab's content length IS its text height.
+     The labels were sized against English uppercase; Japanese ones are longer,
+     so the strip grew past the spine and ran over the footer beneath it.
+     Capping each tab's height was worse than the problem: vertical text just
+     wrapped into a second column and spilled out of a 64px rail sideways.
+     nowrap keeps every label one clean column, and the rail scrolls if they
+     do not all fit - a nav that scrolls is usable, one that overlaps is not. */
+  .tabstrip__list{display:flex;flex-direction:column;gap:6px;
+                  flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+                  scrollbar-width:none}
+  .tabstrip__list::-webkit-scrollbar{display:none}
+  .tabstrip__tab{white-space:nowrap;flex-shrink:0}
+  .tabstrip__foot{flex-shrink:0}
   .tabstrip__tab{writing-mode:vertical-rl;transform:rotate(180deg);
                  font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;
                  text-transform:uppercase;color:color-mix(in srgb,{{ theme.bg }} 55%,transparent);
@@ -298,6 +311,12 @@
     --mono:'{{ lang_body_font }}', ui-monospace, monospace;
     --label:'{{ lang_body_font }}', system-ui, sans-serif;
   }
+  {% endif %}
+  {% if vertical_native %}
+  /* Japanese, Chinese and Korean read top-to-bottom in vertical-rl already.
+     The 180-degree turn exists so a LATIN label reads bottom-up in the rail;
+     applied to these it renders the label upside down. */
+  .tabstrip__tab{transform:none}
   {% endif %}
   {% if is_rtl %}
   /* Right-to-left is not a translation detail; without it the page is simply
