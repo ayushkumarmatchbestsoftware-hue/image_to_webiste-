@@ -57,3 +57,6 @@ _archive/
 local_test/1.md
 local_test/2.MD
 *.key
+
+# API documentation - stale, and not published with the backend
+API_DOCUMENTATION.md
