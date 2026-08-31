@@ -186,14 +186,16 @@
       <input type="text" id="brand" placeholder="Channapatna Toys">
 
       <label>Language</label>
-      <input type="text" id="lang" list="langs" value="en"
-             placeholder="en, hi, ar, es, ja&hellip;">
-      <!-- Filled from /health. A second copy of the language list here
-           would be a second thing to keep in step. -->
-      <datalist id="langs"></datalist>
+      <!--
+        A select, not a text box with a datalist behind it. A datalist offers no
+        visible affordance: the seller saw a field reading "en" and had no way
+        to know eleven other languages existed. Options are filled from /health
+        so this page never carries a second copy of the list to keep in step.
+      -->
+      <select id="lang"><option value="en">English</option></select>
       <p class="hint" style="margin:-6px 0 12px;font-size:.78rem;opacity:.6">
-        The list is a shortcut, not a limit &mdash; type any language code and
-        the site is written in it.</p>
+        The whole site &mdash; the writing, the buttons and the checkout
+        &mdash; is written in the language you pick.</p>
 
       <div class="row">
         <div><label>Price</label><input type="text" id="price" placeholder="&#8377;450"></div>
@@ -267,11 +269,15 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,m=>({'&':'&amp;','
 // ---- mode banner ---------------------------------------------------------
 fetch("/health").then(r=>r.json()).then(d=>{
   OFFLINE = !!d.offline;
+  // Fill the language select from what the service actually offers, and keep
+  // whatever the seller had already picked. The single English option in the
+  // markup is only what shows before this returns.
   var langs = d.languages_offered || [];
   if(langs.length){
-    $("langs").innerHTML = langs.map(function(l){
+    var was = $("lang").value || "en";
+    $("lang").innerHTML = langs.map(function(l){
       return '<option value="'+esc(l.code)+'">'+esc(l.name)+'</option>'; }).join("");
-    $("lang").placeholder = langs.slice(0,4).map(function(l){return l.code;}).join(", ")+"…";
+    $("lang").value = langs.some(function(l){ return l.code === was; }) ? was : "en";
   }
   $("mode").textContent = OFFLINE ? "offline mode" : (d.provider+" connected");
   $("mode").className = "pill " + (OFFLINE ? "warn" : "ok");

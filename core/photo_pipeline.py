@@ -450,9 +450,23 @@ async def run_photo_generation_job(
                 return
             # Several distinct crops of the ONE photo, so the page can show the
             # product three or four times without repeating a frame.
+            # A cut-out is composited onto a ground before it is served, and
+            # that ground has to be the colour the design will actually put
+            # behind it. It was always theme.bg, which is right for a design
+            # whose hero is the page ground and wrong for one whose hero is a
+            # flat colour field: the seller's pizza arrived as a pale grey
+            # rectangle pasted onto a vermilion poster. A design says which of
+            # its own colours the plate lands on with `plate_ground`.
+            _plate_theme = theme
+            _pg = (pack.get("plate_ground") or "").strip()
+            if _pg:
+                _colour = theme.get(_pg) or (_pg if _pg.startswith("#") else "")
+                if _colour:
+                    _plate_theme = dict(theme, bg=_colour, bg_alt=_colour)
+                    logger.info(f"[{job_id[:8]}] plate ground: {_pg} -> {_colour}")
             try:
                 shots.update(await build_image_set(
-                    all_photos, theme, website_id,
+                    all_photos, _plate_theme, website_id,
                     store_save, asyncio.to_thread,
                     spec=spec, quality=quality))
             except Exception as e:

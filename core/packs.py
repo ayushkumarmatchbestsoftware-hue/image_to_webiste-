@@ -182,6 +182,7 @@ MANIFEST_FIELDS = {
     "title", "source", "character", "mode", "accent", "ink", "paper",
     "heading_font", "use_case", "categories", "keywords", "against", "sections",
     "prefers",
+    "plate_ground",
 }
 REQUIRED = {"title", "character", "sections"}
 

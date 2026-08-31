@@ -57,5 +57,6 @@
       "budget": 0.9,
       "premium": -0.5
     }
-  }
+  },
+  "plate_ground": "accent"
 }
