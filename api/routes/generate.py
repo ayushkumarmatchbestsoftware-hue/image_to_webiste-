@@ -19,7 +19,7 @@ from typing import List, Optional
 import traceback
 from core.jobs import create_job_record, get_job_status
 
-router = APIRouter()
+router = APIRouter(tags=["Generation"])
 
 
 @router.post("/triage")

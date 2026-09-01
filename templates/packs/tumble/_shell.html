@@ -142,15 +142,20 @@
     background:linear-gradient(to top,var(--cream) 8%,transparent 66%)}
   .hero-bleed .wrap{position:relative;z-index:1;padding-block:56px;display:block}
 
-  /* the 2x2 rotated tile block — the seller's photos where they have them */
+  /* the rotated tile block — dynamically adjusts to available photos */
   .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;aspect-ratio:1/1}
+  .tiles.tiles--1,.tiles.tiles--solo{display:block;aspect-ratio:auto;max-width:440px;margin:0 auto}
+  .tiles.tiles--2{grid-template-columns:1fr 1fr;aspect-ratio:auto}
+  .tiles.tiles--3{grid-template-columns:repeat(3,1fr);aspect-ratio:auto}
   .tile{border:3px solid var(--ink);border-radius:24px;overflow:hidden;
         display:flex;align-items:center;justify-content:center}
-  .tile img{width:100%;height:100%;object-fit:cover}
-  .tile:nth-child(1){background:var(--marigold);rotate:-3deg}
-  .tile:nth-child(2){background:var(--cobalt);rotate:2deg}
-  .tile:nth-child(3){background:var(--mint);rotate:2deg}
-  .tile:nth-child(4){background:var(--cherry);rotate:-2deg}
+  .tile img{width:100%;height:100%;object-fit:cover;display:block}
+  .tile:nth-child(1),.tile.tile--0{background:var(--marigold);rotate:-3deg}
+  .tile:nth-child(2),.tile.tile--1{background:var(--cobalt);rotate:2deg}
+  .tile:nth-child(3),.tile.tile--2{background:var(--mint);rotate:2deg}
+  .tile:nth-child(4),.tile.tile--3{background:var(--cherry);rotate:-2deg}
+  .tile.tile--solo{aspect-ratio:1/1;max-width:440px;rotate:-2deg;margin:0 auto}
+  .tile:empty{display:none !important}
 
   .trust{border-bottom:3px solid var(--ink);background:var(--ink);color:var(--cream-hi);padding:16px 0}
   .trust .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;
@@ -301,14 +306,18 @@
   .sheet{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);
     gap:clamp(26px,4vw,56px);align-items:center}
   .sheet__tiles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .sheet__tiles.sheet__tiles--solo,.sheet__tiles.sheet__tiles--1{display:block;max-width:440px;margin:0 auto}
+  .sheet__tiles.sheet__tiles--2{grid-template-columns:1fr 1fr}
   .sheet .tile{aspect-ratio:1/1;border:3px solid var(--ink);border-radius:18px;
     background:var(--cream-hi);overflow:hidden;display:grid;place-items:center;
     box-shadow:5px 5px 0 var(--ink)}
-  .sheet .tile img{width:100%;height:100%;object-fit:contain;display:block}
+  .sheet .tile img{width:100%;height:100%;object-fit:cover;display:block}
   .sheet .tile--0{transform:rotate(-3deg)}
   .sheet .tile--1{transform:rotate(2.2deg)}
   .sheet .tile--2{transform:rotate(1.6deg)}
   .sheet .tile--3{transform:rotate(-2.4deg)}
+  .sheet .tile--solo{transform:rotate(-2deg);max-width:440px;margin:0 auto}
+  .sheet .tile:empty{display:none !important}
   .sheet__say h1{margin:8px 0 16px;
     font:600 clamp(30px,4.6vw,54px)/1.04 var(--display);letter-spacing:-.02em}
   @media(max-width:860px){.sheet{grid-template-columns:1fr}}

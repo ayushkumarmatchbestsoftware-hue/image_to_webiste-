@@ -20,7 +20,7 @@ from core.storage import save as store_save, load as store_load
 from core.utils import clean_editor_artifacts
 from core.jobs import get_job_status, get_job_id_for_website
 
-router = APIRouter()
+router = APIRouter(tags=["Sites & Content"])
 
 
 @router.get("/media/{object_key:path}")

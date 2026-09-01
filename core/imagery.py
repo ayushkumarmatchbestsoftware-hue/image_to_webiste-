@@ -34,19 +34,11 @@ SLOTS = {
     "square": 1.00,   # tiles and thumbnails
 }
 
-# The widest each slot is actually drawn at, measured off the Packs' own
-# stylesheets on a 1440px screen.
-#
-# Without these the plate was sized from the cut-out product alone, so a
-# 900x1200 photo produced an 848px band that the page then stretched across
-# 1350px — the browser doing the enlarging, badly, on the biggest image on the
-# page. Composing at the slot's real width moves that work to LANCZOS, and the
-# MAX_UPSCALE limit in imagedirector stops it inventing detail that was never
-# in the photo.
+# The widest each slot is actually drawn at, scaled for high-DPI displays.
 SLOT_WIDTH = {
-    "hero":   760,    # a column, roughly half the content width
-    "wide":  1500,    # full-bleed bands — the widest thing on any page
-    "square": 820,    # tiles, cards and thumbnails
+    "hero":   1200,   # a column, roughly half the content width on retina
+    "wide":  1920,   # full-bleed bands — crisp on 1080p and 1440p
+    "square": 1200,   # tiles, cards and thumbnails on retina
 }
 
 # Kept for callers that still ask by the old names.
@@ -86,31 +78,14 @@ def _tint(img, hex_colour: str, strength: float = 0.34):
     return Image.blend(img.convert("RGB"), layer, strength)
 
 
-# Below this, cropping throws away pixels the page cannot spare. A 200x150
-# upload cropped to a 0.8 portrait becomes 120x150 — smaller than the original
-# and then stretched across the page. For small sources the right move is to
-# leave the frame alone.
-MIN_CROP_EDGE = 900
+# Below this, cropping throws away pixels the page cannot spare.
+MIN_CROP_EDGE = 480
 
 
 def derive_variants(photo_bytes: bytes, theme: Optional[dict] = None,
-                    max_edge: int = 1600, is_cutout: bool = False) -> dict:
+                    max_edge: int = 2048, is_cutout: bool = False) -> dict:
     """
     Returns {name: (bytes, content_type, width, height)} — one entry per slot.
-
-    Two different jobs depending on what came in:
-
-      a background-free cut-out  each slot is COMPOSED from it: a plate at the
-                                 slot's own shape with the product centred and
-                                 scaled to fill it. That is what makes the
-                                 image sit square in its frame instead of
-                                 being trimmed by object-fit.
-
-      an ordinary photo          each slot is CROPPED to that shape, so the
-                                 browser has nothing left to cut off.
-
-    Never raises — a failure just means fewer variants, and the templates fall
-    back to the hero.
     """
     out = {}
     try:
@@ -126,7 +101,7 @@ def derive_variants(photo_bytes: bytes, theme: Optional[dict] = None,
 
     small = max(src.size) < MIN_CROP_EDGE and not is_cutout
     if small:
-        logger.info(f"source is {src.size[0]}x{src.size[1]} — too small to crop, "
+        logger.info(f"source is {src.size[0]}x{src.size[1]} — small source, "
                     "using the frame as shot")
     try:
         for name, aspect in SLOTS.items():
@@ -139,13 +114,12 @@ def derive_variants(photo_bytes: bytes, theme: Optional[dict] = None,
                     out[name] = (blob, "image/jpeg", im.size[0], im.size[1])
                     im.close()
                     continue
-                # A small photo is used whole. Cropping it would discard the
-                # few pixels it has and force a larger upscale on the page.
+                # Use high quality crop
                 im = src.copy() if small else _crop_to(src, aspect, 1.0)
                 if max(im.size) > max_edge:
                     im.thumbnail((max_edge, max_edge), Image.LANCZOS)
                 buf = io.BytesIO()
-                im.save(buf, format="JPEG", quality=86, optimize=True)
+                im.save(buf, format="JPEG", quality=95, optimize=True)
                 out[name] = (buf.getvalue(), "image/jpeg", im.size[0], im.size[1])
                 im.close()
             except Exception as e:

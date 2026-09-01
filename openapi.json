@@ -1,0 +1,1417 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Image to Website API",
+    "description": "Production backend for turning a single product photograph into a complete, working online store with deterministic Jinja rendering, AI vision intelligence, and server-managed commerce.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "tags": [
+          "System & Diagnostics"
+        ],
+        "summary": "Index",
+        "operationId": "index__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packs-info": {
+      "get": {
+        "tags": [
+          "System & Diagnostics"
+        ],
+        "summary": "Packs Info",
+        "description": "What Packs exist and what each is for \u2014 used by the UI and for debugging.",
+        "operationId": "packs_info_packs_info_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "System & Diagnostics"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/templates": {
+      "get": {
+        "tags": [
+          "Design Packs"
+        ],
+        "summary": "Templates Gallery",
+        "description": "Browse the designs before uploading anything.\n\nEach is rendered live rather than screenshotted, so the gallery can never\ndrift out of date the way a folder of images does.",
+        "operationId": "templates_gallery_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/templates/{slug}": {
+      "get": {
+        "tags": [
+          "Design Packs"
+        ],
+        "summary": "Template Preview",
+        "description": "One design, rendered with a demo seller of the kind it was built for.",
+        "operationId": "template_preview_templates__slug__get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/triage": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Triage",
+        "description": "FR-2 / FR-3 / FR-5 \u2014 verdict + coaching + Product Spec, BEFORE generating.\n\nThe local quality pass is pure PIL and returns in well under 2s; the\ndetection call is what the rest of the wait is.",
+        "operationId": "triage_triage_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_triage_triage_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generate-from-photo": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Generate From Photo",
+        "description": "Runs the photo-first pipeline on a photo already cleared by /triage.",
+        "operationId": "generate_from_photo_generate_from_photo_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_generate_from_photo_generate_from_photo_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/job-status/{job_id}": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Job Status",
+        "operationId": "job_status_job_status__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/media/{object_key}": {
+      "get": {
+        "tags": [
+          "Sites & Content"
+        ],
+        "summary": "Media",
+        "operationId": "media_media__object_key__get",
+        "parameters": [
+          {
+            "name": "object_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/preview/{website_id}/{filename}": {
+      "get": {
+        "tags": [
+          "Sites & Content"
+        ],
+        "summary": "Preview",
+        "operationId": "preview_preview__website_id___filename__get",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          },
+          {
+            "name": "edit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Edit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/download/{website_id}": {
+      "get": {
+        "tags": [
+          "Sites & Content"
+        ],
+        "summary": "Download",
+        "description": "Default: a zip holding ONE self-contained index.html plus the seller's\noriginal photo. ?single=1 returns just the .html document on its own.",
+        "operationId": "download_download__website_id__get",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          },
+          {
+            "name": "single",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Single"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/replace-image": {
+      "post": {
+        "tags": [
+          "Sites & Content"
+        ],
+        "summary": "Replace Image",
+        "description": "Swap the seller's photo from inside edit mode.",
+        "operationId": "replace_image_replace_image_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_replace_image_replace_image_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/save": {
+      "post": {
+        "tags": [
+          "Sites & Content"
+        ],
+        "summary": "Save",
+        "operationId": "save_save_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history": {
+      "get": {
+        "tags": [
+          "Sites & Content"
+        ],
+        "summary": "History",
+        "operationId": "history_history_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{website_id}/design": {
+      "get": {
+        "tags": [
+          "Sites & Content"
+        ],
+        "summary": "Current Design",
+        "description": "Which design this site uses, and what it could be changed to.",
+        "operationId": "current_design_api__website_id__design_get",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Sites & Content"
+        ],
+        "summary": "Change Design",
+        "description": "Re-render this site in a different design.\n\nCosts nothing and calls no model: the copy, palette and images were saved\nat generation time, so only the rendering is redone. The seller asked to\nchange the look, not to be given different words.",
+        "operationId": "change_design_api__website_id__design_post",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shop/{website_id}": {
+      "get": {
+        "tags": [
+          "Commerce & Orders"
+        ],
+        "summary": "Shop Dashboard",
+        "description": "The merchant's order desk. Served as a plain page; it talks to the API.",
+        "operationId": "shop_dashboard_shop__website_id__get",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{website_id}/shop": {
+      "get": {
+        "tags": [
+          "Commerce & Orders"
+        ],
+        "summary": "Shop Info",
+        "description": "Everything the storefront needs to render a cart and a checkout.",
+        "operationId": "shop_info_api__website_id__shop_get",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{website_id}/quote": {
+      "post": {
+        "tags": [
+          "Commerce & Orders"
+        ],
+        "summary": "Shop Quote",
+        "description": "Price a cart without placing an order.\n\nThe cart page calls this instead of adding its numbers up locally, so what\nthe buyer is shown is the same figure the server will charge.",
+        "operationId": "shop_quote_api__website_id__quote_post",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{website_id}/orders": {
+      "post": {
+        "tags": [
+          "Commerce & Orders"
+        ],
+        "summary": "Place Order",
+        "description": "Place an order. Public, rate limited, server-priced.",
+        "operationId": "place_order_api__website_id__orders_post",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Commerce & Orders"
+        ],
+        "summary": "Merchant Orders",
+        "operationId": "merchant_orders_api__website_id__orders_get",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{website_id}/orders/{order_id}/paid": {
+      "post": {
+        "tags": [
+          "Commerce & Orders"
+        ],
+        "summary": "Claim Paid",
+        "description": "The buyer says they have paid and gives a reference.\n\nMoves the order to `pending`, never `paid` \u2014 a UPI deep link tells us\nnothing, so only the seller checking their bank can settle it.",
+        "operationId": "claim_paid_api__website_id__orders__order_id__paid_post",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          },
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{website_id}/orders/{order_id}": {
+      "patch": {
+        "tags": [
+          "Commerce & Orders"
+        ],
+        "summary": "Update Order",
+        "operationId": "update_order_api__website_id__orders__order_id__patch",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          },
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{website_id}/price": {
+      "post": {
+        "tags": [
+          "Commerce & Orders"
+        ],
+        "summary": "Set Item Price",
+        "description": "Set what the product costs. Turns an enquiry-only site into a shop.",
+        "operationId": "set_item_price_api__website_id__price_post",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{website_id}/settings": {
+      "post": {
+        "tags": [
+          "Commerce & Orders"
+        ],
+        "summary": "Shop Settings",
+        "description": "Seller settings \u2014 UPI ID, payee name, where to send new-order alerts.",
+        "operationId": "shop_settings_api__website_id__settings_post",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{website_id}/publish": {
+      "post": {
+        "tags": [
+          "Publishing"
+        ],
+        "summary": "Publish Site",
+        "operationId": "publish_site_api__website_id__publish_post",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Publishing"
+        ],
+        "summary": "Publish Status",
+        "operationId": "publish_status_api__website_id__publish_get",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Publishing"
+        ],
+        "summary": "Unpublish Site",
+        "operationId": "unpublish_site_api__website_id__publish_delete",
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Website Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/s/{slug}/": {
+      "get": {
+        "tags": [
+          "Publishing"
+        ],
+        "summary": "Published Home",
+        "operationId": "published_home_s__slug___get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/s/{slug}": {
+      "get": {
+        "tags": [
+          "Publishing"
+        ],
+        "summary": "Published Home",
+        "operationId": "published_home_s__slug__get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/s/{slug}/{filename}": {
+      "get": {
+        "tags": [
+          "Publishing"
+        ],
+        "summary": "Published Page",
+        "description": "Serve a published page. This is the buyer-facing URL \u2014 the one that goes on\na WhatsApp status or a card \u2014 so it is deliberately short and readable.",
+        "operationId": "published_page_s__slug___filename__get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/published": {
+      "get": {
+        "tags": [
+          "Publishing"
+        ],
+        "summary": "Published Index",
+        "operationId": "published_index_published_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_generate_from_photo_generate_from_photo_post": {
+        "properties": {
+          "photo_token": {
+            "type": "string",
+            "title": "Photo Token"
+          },
+          "extra_tokens": {
+            "type": "string",
+            "title": "Extra Tokens",
+            "default": ""
+          },
+          "brand_name": {
+            "type": "string",
+            "title": "Brand Name",
+            "default": ""
+          },
+          "price": {
+            "type": "string",
+            "title": "Price",
+            "default": ""
+          },
+          "seller_facts": {
+            "type": "string",
+            "title": "Seller Facts",
+            "default": ""
+          },
+          "density": {
+            "type": "string",
+            "title": "Density",
+            "default": "generous"
+          },
+          "spin": {
+            "type": "integer",
+            "title": "Spin",
+            "default": 0
+          },
+          "override_triage": {
+            "type": "boolean",
+            "title": "Override Triage",
+            "default": false
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "default": ""
+          },
+          "sub_type": {
+            "type": "string",
+            "title": "Sub Type",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "photo_token"
+        ],
+        "title": "Body_generate_from_photo_generate_from_photo_post"
+      },
+      "Body_replace_image_replace_image_post": {
+        "properties": {
+          "website_id": {
+            "type": "string",
+            "title": "Website Id"
+          },
+          "image": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "website_id",
+          "image"
+        ],
+        "title": "Body_replace_image_replace_image_post"
+      },
+      "Body_triage_triage_post": {
+        "properties": {
+          "photo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Photo"
+          },
+          "photos": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Photos",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "photo"
+        ],
+        "title": "Body_triage_triage_post"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "System & Diagnostics",
+      "description": "Health diagnostics, provider status, installed template packs, and system metrics."
+    },
+    {
+      "name": "Generation",
+      "description": "Photo triage, quality analysis, product detection, and end-to-end async site generation."
+    },
+    {
+      "name": "Sites & Content",
+      "description": "Site previews, live in-place page editing, media delivery, and zip bundle downloads."
+    },
+    {
+      "name": "Design Packs",
+      "description": "Template pack gallery and live demo theme rendering."
+    },
+    {
+      "name": "Commerce & Orders",
+      "description": "Product catalog, server-side cart pricing, order lifecycle, and merchant order desk."
+    },
+    {
+      "name": "Publishing",
+      "description": "Slug assignment, public storefront hosting, and published site serving."
+    }
+  ]
+}

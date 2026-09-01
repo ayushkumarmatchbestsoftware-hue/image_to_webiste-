@@ -18,7 +18,7 @@ from api.deps import log, UI_DIR, FRONTEND, DEV_USER_ID
 from config import Config
 from core.storage import save as store_save, load as store_load
 
-router = APIRouter()
+router = APIRouter(tags=["System & Diagnostics"])
 
 
 @router.get("/", response_class=HTMLResponse)

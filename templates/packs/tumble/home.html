@@ -8,9 +8,10 @@
   a multi-photo upload more than the others do.
 #}
 {% set _g = shots.get('gallery') or [] %}
-{% set _tiles = ([shots.get('hero')] if shots.get('hero') else []) + _g + ([shots.get('square')] if shots.get('square') else []) %}
+{% set port_img = shots.get('hero') or shots.get('square') %}
+{% set _all_tiles = ([port_img] if port_img else []) + _g %}
 
-{% if _tiles | length >= 2 %}
+{% if _all_tiles | length >= 2 %}
 <section class="hero">
   <div class="wrap">
     <div>
@@ -24,17 +25,16 @@
         {% if 'about' in layout %}<a class="btn btn--ghost" href="about.html">Our story</a>{% endif %}
       </div>
     </div>
-    <div class="tiles" aria-hidden="true">
-      {% for n in range(4) %}
-      <div class="tile">{% if n < _tiles | length %}<img src="{{ _tiles[n] }}" alt="">{% endif %}</div>
+    <div class="tiles tiles--{{ _all_tiles | length }}" aria-hidden="true">
+      {% for t_img in _all_tiles[:4] %}
+      <div class="tile tile--{{ loop.index0 }}"><img src="{{ t_img }}" alt="{{ site_title }}"></div>
       {% endfor %}
     </div>
   </div>
 </section>
 {% else %}
 {#
-  This design's own opening. Deliberately NOT the shared partial: every pack
-  including one hero is what made six designs read as one page in six colours.
+  This design's own opening for single photo uploads. Renders a single prominent hero card without empty placeholder boxes.
 #}
 {% set shots = shots | default({}) %}
 {% set port_img = shots.get('hero') or shots.get('square') %}
@@ -48,13 +48,12 @@
                    else ('mailto:' ~ contact.email if contact.email else '#') %}
 <section class="hero hero-sheet">
   <div class="wrap sheet">
-    <div class="sheet__tiles">
-      {% set _t = ([port_img] if port_img else []) + (shots.get('gallery') or [])
-                  + ([shots.get('square')] if shots.get('square') else []) %}
-      {% for n in range(4) %}
-      <div class="tile tile--{{ n }}">
-        {% if n < _t | length %}<img src="{{ _t[n] }}" alt="">{% endif %}
-      </div>{% endfor %}
+    <div class="sheet__tiles sheet__tiles--solo">
+      {% if port_img %}
+      <div class="tile tile--0 tile--solo">
+        <img src="{{ port_img }}" alt="{{ site_title }}">
+      </div>
+      {% endif %}
     </div>
     <div class="sheet__say">
       <p class="eyebrow {{ tclass }}">{{ home.label or t('nav_services') }}</p>
