@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, HTMLResponse, Response
 
 from api import ROOT
 from core import sites as _sites
-from api.deps import log, UI_DIR, FRONTEND, DEV_USER_ID
+from api.deps import log, DEV_USER_ID
 from config import Config
 from core.storage import save as store_save, load as store_load
 
@@ -23,12 +23,10 @@ from core import commerce as _shop
 from core import payments as _pay
 
 
-@router.get("/shop/{website_id}", response_class=HTMLResponse)
+@router.get("/shop/{website_id}")
 async def shop_dashboard(website_id: str):
-    """The merchant's order desk. Served as a plain page; it talks to the API."""
-    path = os.path.join(UI_DIR, "orders.html")
-    with open(path, encoding="utf-8") as fh:
-        return HTMLResponse(fh.read())
+    """The merchant's order summary and catalog information."""
+    return summary_display(website_id)
 
 
 @router.get("/api/{website_id}/shop")

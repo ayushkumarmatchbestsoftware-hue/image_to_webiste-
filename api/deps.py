@@ -10,12 +10,7 @@ import time
 
 from fastapi import Request
 
-from api import ROOT
-
 log = logging.getLogger("server")
-
-UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
-FRONTEND = os.path.join(UI_DIR, "upload.html")
 
 # The pipeline skips credit deduction for exactly this id (generation.py, step 11).
 DEV_USER_ID = "00000000-0000-0000-0000-000000000001"

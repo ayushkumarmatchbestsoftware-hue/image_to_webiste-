@@ -11,24 +11,22 @@ from fastapi import (APIRouter, Request, Form, File, UploadFile, HTTPException,
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 
 from api import ROOT
-from api.deps import log, UI_DIR, FRONTEND, DEV_USER_ID
+from api.deps import log, DEV_USER_ID
 from config import Config
 from core.storage import save as store_save, load as store_load
 
 router = APIRouter(tags=["Design Packs"])
 
 
-@router.get("/templates", response_class=HTMLResponse)
+@router.get("/templates")
 async def templates_gallery():
-    """
-    Browse the designs before uploading anything.
-
-    Each is rendered live rather than screenshotted, so the gallery can never
-    drift out of date the way a folder of images does.
-    """
-    path = os.path.join(UI_DIR, "designs.html")
-    with open(path, encoding="utf-8") as fh:
-        return HTMLResponse(fh.read())
+    """List all available design packs and their metadata."""
+    from core.packs import PACKS
+    return {"packs": [
+        {"slug": s, "title": p["title"], "character": p["character"],
+         "accent": p["accent"], "source": p["source"], "sections": p["sections"],
+         "mode": p.get("mode", "light"), "use_case": p.get("use_case", "")}
+        for s, p in PACKS.items()]}
 
 
 @router.get("/templates/{slug}", response_class=HTMLResponse)

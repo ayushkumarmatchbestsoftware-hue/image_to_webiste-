@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, HTMLResponse, Response
 from api import ROOT
 from core import sites as _sites
 from core.storage import PUBLIC_URL
-from api.deps import log, UI_DIR, FRONTEND, DEV_USER_ID
+from api.deps import log, DEV_USER_ID
 from config import Config
 from core.storage import save as store_save, load as store_load
 

@@ -8,23 +8,23 @@ import zipfile
 
 from fastapi import (APIRouter, Request, Form, File, UploadFile, HTTPException,
                      BackgroundTasks)
-from fastapi.responses import JSONResponse, HTMLResponse, Response
+from fastapi.responses import JSONResponse, HTMLResponse, Response, RedirectResponse
 
 from api import ROOT
 from core import sites as _sites
 from core import storage as _storage
 from core import jobs as _jobs
-from api.deps import log, UI_DIR, FRONTEND, DEV_USER_ID
+from api.deps import log, DEV_USER_ID
 from config import Config
 from core.storage import save as store_save, load as store_load
 
 router = APIRouter(tags=["System & Diagnostics"])
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/", response_class=RedirectResponse, include_in_schema=False)
 async def index():
-    with open(FRONTEND, "r", encoding="utf-8") as fh:
-        return HTMLResponse(fh.read())
+    """Root redirects to the interactive Swagger OpenAPI documentation."""
+    return RedirectResponse(url="/docs")
 
 
 @router.get("/packs-info")

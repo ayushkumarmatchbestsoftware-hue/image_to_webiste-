@@ -6,27 +6,6 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/": {
-      "get": {
-        "tags": [
-          "System & Diagnostics"
-        ],
-        "summary": "Index",
-        "operationId": "index__get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/packs-info": {
       "get": {
         "tags": [
@@ -72,16 +51,14 @@
           "Design Packs"
         ],
         "summary": "Templates Gallery",
-        "description": "Browse the designs before uploading anything.\n\nEach is rendered live rather than screenshotted, so the gallery can never\ndrift out of date the way a folder of images does.",
+        "description": "List all available design packs and their metadata.",
         "operationId": "templates_gallery_templates_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
+              "application/json": {
+                "schema": {}
               }
             }
           }
@@ -565,7 +542,7 @@
           "Commerce & Orders"
         ],
         "summary": "Shop Dashboard",
-        "description": "The merchant's order desk. Served as a plain page; it talks to the API.",
+        "description": "The merchant's order summary and catalog information.",
         "operationId": "shop_dashboard_shop__website_id__get",
         "parameters": [
           {
@@ -582,10 +559,8 @@
           "200": {
             "description": "Successful Response",
             "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
+              "application/json": {
+                "schema": {}
               }
             }
           },
