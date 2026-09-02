@@ -21,10 +21,10 @@ from core.storage import save as store_save, load as store_load
 router = APIRouter(tags=["System & Diagnostics"])
 
 
-@router.get("/", response_class=RedirectResponse, include_in_schema=False)
+@router.get("/")
 async def index():
-    """Root redirects to the interactive Swagger OpenAPI documentation."""
-    return RedirectResponse(url="/docs")
+    """Service root endpoint."""
+    return {"status": "ok", "service": "Image to Website API", "version": "1.0.0"}
 
 
 @router.get("/packs-info")

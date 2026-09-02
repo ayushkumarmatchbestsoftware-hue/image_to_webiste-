@@ -14,9 +14,14 @@ static/uploads/*
 static/generated/*
 !static/generated/.gitkeep
 
-# Local test UI — not for production; frontend team builds their own
-!/templates/**/*.html
+# Local test UI & Frontend (NEVER commit or push frontend)
+frontend/
+local_frontend/
+dev_frontend/
+test_ui/
+*.frontend.*
 templates/index_local_test.html
+
 # Test scripts and test directories
 tests/
 test_*.py

@@ -20,35 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from api import ROOT                      # runs the bootstrap — keep first
-from api.routes import (system, designs, generate, sites, shop, publish)
+from api.routes import (system, designs, generate, sites, shop, publish, images)
 from config import Config
-
-TAGS_METADATA = [
-    {
-        "name": "System & Diagnostics",
-        "description": "Health diagnostics, provider status, installed template packs, and system metrics.",
-    },
-    {
-        "name": "Generation",
-        "description": "Photo triage, quality analysis, product detection, and end-to-end async site generation.",
-    },
-    {
-        "name": "Sites & Content",
-        "description": "Site previews, live in-place page editing, media delivery, and zip bundle downloads.",
-    },
-    {
-        "name": "Design Packs",
-        "description": "Template pack gallery and live demo theme rendering.",
-    },
-    {
-        "name": "Commerce & Orders",
-        "description": "Product catalog, server-side cart pricing, order lifecycle, and merchant order desk.",
-    },
-    {
-        "name": "Publishing",
-        "description": "Slug assignment, public storefront hosting, and published site serving.",
-    },
-]
 
 app = FastAPI(
     title="Image to Website API",
@@ -58,10 +31,9 @@ app = FastAPI(
         "AI vision intelligence, and server-managed commerce."
     ),
     version="1.0.0",
-    openapi_tags=TAGS_METADATA,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 # The storefront on a published site calls this API from another origin, so the
@@ -95,5 +67,5 @@ except Exception:
 
 # Order matters for one pair only: publish declares /s/{slug}/{filename}, and
 # registering it after the rest keeps it from shadowing anything narrower.
-for _router in (system, designs, generate, sites, shop, publish):
+for _router in (system, designs, generate, sites, shop, images, publish):
     app.include_router(_router.router)

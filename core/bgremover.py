@@ -40,6 +40,7 @@ import os
 import urllib.error
 import urllib.request
 import uuid
+from typing import Optional, Tuple
 
 logger = logging.getLogger("bgremover")
 
@@ -428,3 +429,62 @@ def stage(photo: bytes, spec: dict) -> bytes:
         logger.info(f"staged by {name}/{model} ({len(out)//1024}KB)")
         return out
     raise Unavailable(last or f"no {name} image model succeeded")
+
+
+def remove_background(
+    photo_bytes: bytes,
+    transparent: bool = True,
+    bg_color: Optional[str] = None,
+    tolerance: int = 40
+) -> Tuple[bytes, str]:
+    """
+    Standalone background removal for product photographs.
+    Returns (output_bytes, mime_type).
+    """
+    import io
+    from PIL import Image
+    from core.imagedirector import _cutout_rembg, _cutout_flood, _clean_edges
+    from core.utils import hex_to_rgb
+
+    img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
+    cutout = None
+
+    # 1. Try local rembg segmentation
+    try:
+        raw_cut, _ = _cutout_rembg(img)
+        if raw_cut:
+            cutout = _clean_edges(raw_cut)
+    except Exception as e:
+        logger.debug(f"rembg background removal unavailable ({e})")
+
+    # 2. Try border flood-fill matting
+    if cutout is None:
+        try:
+            raw_cut, _ = _cutout_flood(img, tol=tolerance)
+            if raw_cut:
+                cutout = _clean_edges(raw_cut)
+        except Exception as e:
+            logger.debug(f"floodfill cutout failed ({e})")
+
+    # 3. Fallback: if cutout failed, use original image
+    if cutout is None:
+        cutout = img.convert("RGBA")
+
+    # If solid background color requested
+    if bg_color and not transparent:
+        rgb = hex_to_rgb(bg_color) or (245, 245, 245)
+        ground = Image.new("RGB", cutout.size, rgb)
+        # Paste with alpha mask
+        if cutout.mode == "RGBA":
+            ground.paste(cutout, mask=cutout.split()[-1])
+        else:
+            ground.paste(cutout, (0, 0))
+        buf = io.BytesIO()
+        ground.save(buf, format="JPEG", quality=95)
+        return buf.getvalue(), "image/jpeg"
+
+    # Transparent PNG
+    buf = io.BytesIO()
+    cutout.save(buf, format="PNG")
+    return buf.getvalue(), "image/png"
+
