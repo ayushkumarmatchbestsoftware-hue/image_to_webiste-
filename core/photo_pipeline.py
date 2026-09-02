@@ -27,7 +27,7 @@ import re
 from typing import Optional
 
 from core.llm import chat_json, MODEL_CONTENT
-from core.vision import intake, detect_product, analyze_quality, build_guidance
+from core.vision import intake, detect_product, analyze_quality, build_guidance, get_default_price
 from core.design import derive_design
 from core.packs import (select_pack, get_pack, pack_layout, score_packs,
                         NoPacksInstalled, packs_installed, PACKS)
@@ -332,6 +332,11 @@ async def run_photo_generation_job(
 
         logger.info(f"[{job_id[:8]}] spec: {spec.get('category')}/{spec.get('sub_type')} "
                     f"conf={spec.get('confidence')} verdict={verdict}")
+
+        # Ensure market-realistic retail price is assigned even if user didn't enter one
+        if not price or not str(price).strip():
+            price = get_default_price(spec, currency="INR")
+            logger.info(f"[{job_id[:8]}] auto-estimated retail price: {price}")
 
         # ── Design derivation (FR-7, FR-8, FR-9, FR-10) ──
         await report(job_id, "design")

@@ -37,8 +37,9 @@
       <a class="cta {{ tclass }}" href="{{ _cta_href }}">{{ home.cta or t('cta_enquire') }}</a>
     </div>
     {% if port_img %}
-    <figure class="file__plate">
+    <figure class="file__plate" style="position: relative;">
       <img style="{{ capstyle }}" src="{{ port_img }}" alt="{{ site_title }}">
+      {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
       <figcaption>{{ home.subtitle or tagline }}</figcaption>
     </figure>{% endif %}
   </div>

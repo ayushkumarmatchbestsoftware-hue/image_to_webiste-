@@ -186,56 +186,63 @@ async def build_image_set(photo_bytes, theme: dict, website_id: str,
             plan = await to_thread(plan_treatment, spec, quality or {}, theme, bg)
             cut_out = "cutout" in [st["op"] for st in plan]
 
-            # When the background is coming out anyway, try replacing it with
-            # an image model first (skills/bg-remover.md). It re-renders the
-            # photograph rather than segmenting it, so thin structures — a
-            # chair base, a wire handle, a chain — survive, and there is no
-            # mask to wrongly INCLUDE a patch of floor.
-            #
-            # Strictly an upgrade: no key, no quota, or a result that no longer
-            # matches the seller's product, and the local cut-out below runs
-            # exactly as before. A generation is never blocked on it.
-            # Three ways to deal with the background, best first. Each falls
-            # through to the next, and the last needs no key at all — so a
-            # generation is never blocked, only made better when it can be.
-            #
-            #   stage    put the product in a setting from its own world.
-            #            skills/product-staging.md. Best by a distance, and the
-            #            only one that also solves resolution: a staged
-            #            photograph is generated at its own size, where a
-            #            cut-out is limited to the few hundred pixels the
-            #            seller's product actually occupies.
-            #   replace  the product on the site's own ground colour. Clean,
-            #            but says "photographed against something we removed".
-            #   cut out  local rembg. No key, no network, weakest on thin
-            #            structures.
-            if cut_out:
-                from core import bgremover
-                staged = False
+            # Always attempt contextual staging for the hero and wide slots
+            staged = False
+            staged_lead = None
+            try:
+                from core import bgremover, image_generator
+                # 1. Try bgremover.stage with original photo
+                if bgremover.available():
+                    try:
+                        staged_lead = await to_thread(bgremover.stage, photos[0], spec)
+                    except Exception as e:
+                        logger.info(f"bgremover.stage unavailable ({e})")
+
+                # 2. Try prompt-driven realistic staging generation
+                if not staged_lead:
+                    scene_prompt = spec.get("staging_scene_prompt") or bgremover.describe_scene(spec)
+                    if not scene_prompt:
+                        sub = spec.get("sub_type") or spec.get("category") or "product"
+                        mood = spec.get("mood") or "premium"
+                        scene_prompt = f"A professional commercial showcase photograph of {sub}, in an authentic aesthetic setting ({mood}), soft natural lighting, 8k resolution"
+
+                    gen_bytes, mime, w, h = await to_thread(
+                        image_generator.generate_image,
+                        prompt=scene_prompt,
+                        aspect_ratio="hero",
+                        style="photorealistic",
+                        category=spec.get("category"),
+                        allow_fallback=True
+                    )
+                    if gen_bytes and len(gen_bytes) > 2000:
+                        staged_lead = gen_bytes
+                        logger.info("Generated contextual product staging image via prompt engine")
+
+                if staged_lead:
+                    photos = [staged_lead] + photos[1:]
+                    staged = True
+                    urls["_staged"] = True
+                    logger.info("product staged in a realistic commercial setting")
+            except Exception as e:
+                logger.warning(f"staging generation failed ({e})")
+
+            # If not staged and cutout was planned, attempt background replacement
+            if not staged and cut_out:
                 try:
                     if bgremover.available():
-                        photos = [await to_thread(bgremover.stage, photos[0], spec)]                                  + photos[1:]
+                        photos = [await to_thread(
+                            bgremover.replace, photos[0], theme)] + photos[1:]
+                        urls["_bg_replaced"] = True
+                        logger.info("background replaced by image model")
                         staged = True
-                        urls["_staged"] = True
-                        logger.info("product staged in a generated setting")
                 except Exception as e:
-                    logger.info(f"staging unavailable ({e})")
-                if not staged:
-                    try:
-                        if bgremover.available():
-                            photos = [await to_thread(
-                                bgremover.replace, photos[0], theme)] + photos[1:]
-                            urls["_bg_replaced"] = True
-                            logger.info("background replaced by image model")
-                            staged = True
-                    except Exception as e:
-                        logger.info(f"image-model background skipped ({e}); "
-                                    "using the local cut-out")
-                if staged:
-                    # Both return a photograph, not a transparent cut-out, so
-                    # the slots crop rather than composing a plate.
-                    plan = [st for st in plan if st["op"] != "cutout"]
-                    cut_out = False
+                    logger.info(f"image-model background skipped ({e}); using local cut-out")
+
+            if staged:
+                # Both return a photograph, not a transparent cut-out, so
+                # the slots crop rather than composing a plate.
+                plan = [st for st in plan if st["op"] != "cutout"]
+                cut_out = False
 
             if plan:
                 treated = []

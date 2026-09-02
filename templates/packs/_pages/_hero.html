@@ -85,13 +85,17 @@
   looks generated and one that looks photographed.
 #}
 {% if hv == 'bleed' and wide_img and (is_staged or _ww >= 1100) %}
-<section class="hero hero-bleed">
+<section class="hero hero-bleed" style="position: relative;">
   <img class="hero-bg" src="{{ wide_img }}" alt="{{ site_title }}">
+  {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
   <div class="wrap">{{ _eyebrow }}{{ _title }}{{ _sub }}{{ _buy }}</div>
 </section>
 
 {% elif hv == 'plate' and wide_img and _ww >= 900 %}
-<figure class="hero-plate{% if is_cutout %} plate-fit{% endif %}" style="{{ widecap }}"><img src="{{ wide_img }}" alt="{{ site_title }}"></figure>
+<figure class="hero-plate{% if is_cutout %} plate-fit{% endif %}" style="{{ widecap }}; position: relative;">
+  <img src="{{ wide_img }}" alt="{{ site_title }}">
+  {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
+</figure>
 <section class="hero hero-stack">
   <div class="wrap">{{ _eyebrow }}{{ _title }}{{ _sub }}{{ _buy }}</div>
 </section>
@@ -99,7 +103,10 @@
 {% elif hv == 'side-left' and port_img %}
 <section class="hero hero-split rev">
   <div class="wrap">
-    <figure class="shot" style="{{ capstyle }}"><img src="{{ port_img }}" alt="{{ site_title }}"></figure>
+    <figure class="shot" style="{{ capstyle }}; position: relative;">
+      <img src="{{ port_img }}" alt="{{ site_title }}">
+      {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
+    </figure>
     <div>{{ _eyebrow }}{{ _title }}{{ _sub }}{{ _buy }}</div>
   </div>
 </section>
@@ -109,14 +116,22 @@
   <div class="wrap">{{ _eyebrow }}{{ _title }}{{ _sub }}{{ _buy }}</div>
 </section>
 {% if wide_img %}
-<figure class="hero-under{% if is_cutout %} plate-fit{% endif %}" style="{{ widecap }}"><img src="{{ wide_img }}" alt="{{ site_title }}"></figure>
+<figure class="hero-under{% if is_cutout %} plate-fit{% endif %}" style="{{ widecap }}; position: relative;">
+  <img src="{{ wide_img }}" alt="{{ site_title }}">
+  {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
+</figure>
 {% endif %}
 
 {% elif hv == 'inset' %}
 <section class="hero hero-inset">
   <div class="wrap">
     <div>{{ _eyebrow }}{{ _title }}{{ _sub }}{{ _buy }}</div>
-    {% if port_img %}<figure class="shot sm" style="{{ capstyle }}"><img src="{{ port_img }}" alt="{{ site_title }}"></figure>{% endif %}
+    {% if port_img %}
+    <figure class="shot sm" style="{{ capstyle }}; position: relative;">
+      <img src="{{ port_img }}" alt="{{ site_title }}">
+      {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
+    </figure>
+    {% endif %}
   </div>
 </section>
 
@@ -124,7 +139,12 @@
 <section class="hero hero-split">
   <div class="wrap">
     <div>{{ _eyebrow }}{{ _title }}{{ _sub }}{{ _buy }}</div>
-    {% if port_img %}<figure class="shot" style="{{ capstyle }}"><img src="{{ port_img }}" alt="{{ site_title }}"></figure>{% endif %}
+    {% if port_img %}
+    <figure class="shot" style="{{ capstyle }}; position: relative;">
+      <img src="{{ port_img }}" alt="{{ site_title }}">
+      {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
+    </figure>
+    {% endif %}
   </div>
 </section>
 {% endif %}

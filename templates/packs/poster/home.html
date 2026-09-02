@@ -16,7 +16,10 @@
   <div class="wrap">
     <div class="sheet">
       {% if port_img %}
-      <figure class="sheet__shot"><img src="{{ port_img }}" alt="{{ site_title }}"></figure>
+      <figure class="sheet__shot" style="position: relative;">
+        <img src="{{ port_img }}" alt="{{ site_title }}">
+        {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
+      </figure>
       {% endif %}
       <div class="sheet__bill">
         <div>

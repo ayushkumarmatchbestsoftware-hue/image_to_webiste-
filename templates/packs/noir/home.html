@@ -23,8 +23,9 @@
                    else ('mailto:' ~ contact.email if contact.email else '#') %}
 <section class="hero hero-vitrine">
   {% if port_img %}
-  <figure class="vitrine">
+  <figure class="vitrine" style="position: relative;">
     <img style="{{ capstyle }}" src="{{ port_img }}" alt="{{ site_title }}">
+    {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
   </figure>
   {% endif %}
   <div class="wrap vitrine__say">

@@ -193,14 +193,18 @@ Return a JSON object with EXACTLY this shape:
   "background_separable": true|false,
   "separability_note": "why the product is or is not cleanly separable from its background",
   "visible_text": "any text legible on the product itself, else empty string",
-  "suggested_business": "one sentence describing the business that sells this, in the seller's likely words"
+  "suggested_business": "one sentence describing the business that sells this, in the seller's likely words",
+  "estimated_price_inr": 4999,
+  "estimated_price_usd": 60,
+  "staging_scene_prompt": "a vivid 1-sentence prompt describing the ideal photorealistic commercial setting for this product (e.g. 'A premium English willow cricket bat resting against an old wooden cricket pavilion fence on lush green turf with a cricket ball and batting pads softly blurred in the background, warm natural sunlight')"
 }
 
 RULES:
 - category MUST be "other" if it is not clearly apparel, food, or a toy. Never guess to force a fit.
 - confidence reflects how certain you are of category AND sub_type together.
 - dominant_colours are sampled from the PRODUCT itself, not the background or the lighting.
-- Describe only what is visible. Never invent a brand, origin, price, or material you cannot see.
+- estimated_price_inr and estimated_price_usd should be realistic market retail prices as integers.
+- staging_scene_prompt MUST describe a beautiful, highly contextual commercial environment where this product naturally belongs.
 - If the photo shows several products, describe the single most prominent one."""
 
 
@@ -306,3 +310,61 @@ async def intake(image_path: str) -> dict:
         "defects": defects,
         "guidance": build_guidance(defects, category),
     }
+
+
+def get_default_price(spec: Optional[dict], currency: str = "INR") -> str:
+    """
+    Derive a market-appropriate default retail price when the seller did not supply one.
+    """
+    if not spec:
+        return "₹4,999.00" if currency == "INR" else "$49.99"
+
+    # 1. Try estimated price from vision model
+    p_inr = spec.get("estimated_price_inr")
+    p_usd = spec.get("estimated_price_usd")
+    
+    if currency == "INR" and p_inr:
+        try:
+            val = float(p_inr)
+            return f"₹{val:,.2f}"
+        except (ValueError, TypeError):
+            pass
+    elif currency == "USD" and p_usd:
+        try:
+            val = float(p_usd)
+            return f"${val:,.2f}"
+        except (ValueError, TypeError):
+            pass
+
+    # 2. Smart category & band fallback
+    band = str(spec.get("implied_price_band", "")).lower()
+    cat = str(spec.get("category", "")).lower()
+    sub = str(spec.get("sub_type", "")).lower()
+
+    if "bat" in sub or "cricket" in sub:
+        base = 4999.0
+    elif "watch" in sub or "jewel" in sub:
+        base = 6999.0 if band in ("premium", "luxury") else 2999.0
+    elif "shoe" in sub or "boot" in sub:
+        base = 3499.0
+    elif "bag" in sub or "leather" in sub:
+        base = 3999.0
+    elif cat == "apparel":
+        base = 1999.0 if band in ("premium", "luxury") else 999.0
+    elif cat == "food":
+        base = 499.0
+    elif cat == "toys":
+        base = 799.0
+    else:
+        base = 2499.0 if band in ("premium", "luxury") else 1499.0
+
+    if currency == "INR":
+        return f"₹{base:,.2f}"
+    elif currency == "USD":
+        return f"${(base / 80):,.2f}"
+    elif currency == "EUR":
+        return f"€{(base / 88):,.2f}"
+    elif currency == "GBP":
+        return f"£{(base / 105):,.2f}"
+    return f"₹{base:,.2f}"
+

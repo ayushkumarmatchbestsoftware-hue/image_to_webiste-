@@ -346,3 +346,25 @@ figure.plate-fit img{
 .lines,
 .row__v,
 .rows b{overflow-wrap:anywhere}
+
+/* Floating Hero Price Badge */
+.hero-price-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: #0070f3;
+  color: #ffffff !important;
+  font-weight: 800;
+  font-size: 1.15rem;
+  padding: 8px 18px;
+  border-radius: 999px;
+  box-shadow: 0 4px 18px rgba(0, 112, 243, 0.45);
+  letter-spacing: -0.01em;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+

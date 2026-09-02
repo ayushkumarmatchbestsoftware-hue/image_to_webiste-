@@ -18,8 +18,9 @@
     <h1 class="{{ hclass }}">{{ site_title }}</h1>
   </div>
   {% if port_img %}
-  <figure class="tile tile--flush t-shot" style="margin:0">
+  <figure class="tile tile--flush t-shot" style="margin:0; position: relative;">
     <img src="{{ port_img }}" alt="{{ site_title }}">
+    {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
   </figure>
   {% endif %}
   <div class="tile t-seven">

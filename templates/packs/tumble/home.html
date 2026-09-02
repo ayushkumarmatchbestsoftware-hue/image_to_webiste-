@@ -50,8 +50,9 @@
   <div class="wrap sheet">
     <div class="sheet__tiles sheet__tiles--solo">
       {% if port_img %}
-      <div class="tile tile--0 tile--solo">
+      <div class="tile tile--0 tile--solo" style="position: relative;">
         <img src="{{ port_img }}" alt="{{ site_title }}">
+        {% if price %}<span class="hero-price-badge">{{ price }}</span>{% endif %}
       </div>
       {% endif %}
     </div>
