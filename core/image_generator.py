@@ -88,6 +88,18 @@ def _call_openai_dalle(prompt: str, size: str = "1024x1024", model: str = "dall-
                 "n": 1,
                 "size": "512x512" if m == "dall-e-2" else size
             }
+            # Ask for the image IN the response.
+            #
+            # dall-e-2 and dall-e-3 default to returning a URL on Azure blob
+            # storage, which means a second outbound request to a domain that
+            # is not api.openai.com. That works on a laptop with open internet
+            # and fails on a host whose egress is limited to the API itself -
+            # which is exactly how this behaved: fine locally, dead on staging.
+            #
+            # gpt-image-1 only ever returns b64_json and rejects the parameter,
+            # so it is sent only to the models that accept it.
+            if m.startswith("dall-e"):
+                payload["response_format"] = "b64_json"
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode("utf-8"),
@@ -159,13 +171,14 @@ def generate_image(
     Generate a high-resolution, website-ready image from a user prompt.
     Returns (image_bytes, mime_type, width, height).
     """
-    width, height = ASPECT_RATIOS.get(aspect_ratio, (1200, 800))
+    width, height = ASPECT_RATIOS.get(aspect_ratio, (1024, 1024))
     size_str = f"{width}x{height}"
     
     full_prompt = enrich_prompt(prompt, style_name=style, category=category)
     logger.info(f"Generating image for prompt: '{prompt[:60]}...' [Aspect: {aspect_ratio}, Style: {style}]")
 
     provider_name, key = _get_provider_and_key()
+    attempts = []
     
     # 1. Try OpenAI API if key available
     if key and provider_name == "openai":
@@ -174,6 +187,7 @@ def generate_image(
             if img_bytes and len(img_bytes) > 2000:
                 return img_bytes, "image/png", width, height
         except Exception as e:
+            attempts.append(f"openai: {e}")
             logger.warning(f"OpenAI image generation unavailable ({e})")
 
     # 2. Try Gemini API if key available
@@ -183,6 +197,7 @@ def generate_image(
             if img_bytes and len(img_bytes) > 2000:
                 return img_bytes, "image/jpeg", width, height
         except Exception as e:
+            attempts.append(f"gemini: {e}")
             logger.warning(f"Gemini image generation unavailable ({e})")
 
     # 3. High-fidelity FLUX commercial photography engine
@@ -193,6 +208,12 @@ def generate_image(
             if img_bytes and len(img_bytes) > 2000:
                 return img_bytes, "image/jpeg", width, height
         except Exception as e:
+            attempts.append(f"flux: {e}")
             logger.warning(f"FLUX generation failed: {e}")
 
-    raise RuntimeError("Image generation failed across all providers.")
+    # Name what actually happened. "failed across all providers" sent someone
+    # looking at the key when the real answer was that the last fallback is a
+    # third-party service the host could not reach.
+    raise RuntimeError(
+        "Image generation failed. Tried: "
+        + "; ".join(attempts or ["nothing - no provider configured"]))

@@ -239,8 +239,16 @@ async def build_image_set(photo_bytes, theme: dict, website_id: str,
                     logger.info(f"image-model background skipped ({e}); using local cut-out")
 
             if staged:
-                # Both return a photograph, not a transparent cut-out, so
-                # the slots crop rather than composing a plate.
+                # Background removal runs on the SELLER'S photograph and never
+                # on a generated one. Once staging or replacement has produced
+                # an image, its background is the thing that was just paid for
+                # — stripping it destroys the result. The seller's own snapshot
+                # is the one with a kitchen or a shop floor behind it, and that
+                # is what the cutout is for.
+                #
+                # Both paths return a photograph rather than a transparent
+                # cut-out anyway, so the slots crop instead of composing a
+                # plate. Do not re-introduce a cutout below this line.
                 plan = [st for st in plan if st["op"] != "cutout"]
                 cut_out = False
 
