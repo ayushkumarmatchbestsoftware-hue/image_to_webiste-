@@ -33,11 +33,16 @@ pillow-heif==1.5.0
 openai==2.46.0
 
 # ── Image treatment ──────────────────────────────────────────────────────────
-# rembg carries the background-removal model and runs it on onnxruntime,
-# entirely offline - no API call and no key. numpy backs the connected-component
-# despeckle in core/imagedirector.py.
-rembg==2.0.81
-onnxruntime==1.29.0
+# numpy backs the background measurement and the connected-component despeckle
+# in core/imagedirector.py.
+#
+# rembg and onnxruntime were here and are deliberately gone. They existed for
+# one function - a local background cutout - and charged the whole service for
+# it: onnxruntime, scipy, scikit-image, pymatting, pooch, jsonschema and tqdm
+# came with them, and an inference session sat in memory for the life of the
+# process whether a seller uploaded anything or not. Background removal is done
+# by the image model the key already pays for, and the local fallback is a PIL
+# flood fill that allocates nothing until it is called.
 numpy==2.5.1
 
 # ── Configuration ────────────────────────────────────────────────────────────

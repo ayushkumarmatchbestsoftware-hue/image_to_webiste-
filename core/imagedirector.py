@@ -126,13 +126,21 @@ def analyze_background(photo_bytes: bytes, theme: Optional[dict] = None) -> dict
 
 
 def _backend():
-    """The best cutout backend this machine actually has."""
-    try:
-        import rembg  # noqa: F401
-        return "rembg"
-    except Exception:
-        pass
-    return "flood"     # always available: PIL flood-fill from the borders
+    """
+    How a cutout is made locally.
+
+    There used to be a choice here between rembg's segmentation model and a
+    flood fill. rembg is gone: it carried onnxruntime, scipy, scikit-image and
+    pymatting for one function, held an inference session in memory for the
+    life of the process, and the model it ran produced a soft mask this module
+    then had to repair anyway. Background removal is done by the image model
+    now, which the seller's key already pays for.
+
+    The flood fill stays because it costs nothing — PIL only, no model, no
+    memory held between calls — and it is what answers when the image model
+    cannot be reached.
+    """
+    return "flood"
 
 
 def plan_treatment(spec: dict, quality: dict, theme: dict,
@@ -266,39 +274,6 @@ def _cutout_flood(img, tol=38):
     return out, frac
 
 
-_SESSION = None
-
-
-def _rembg_session():
-    """
-    One session for the process.
-
-    rembg builds a fresh ONNX session per call by default, which loads the
-    model from disk every time — that was the whole of the 50s, not inference.
-    Held here and reused; the first call still pays for the load.
-    """
-    global _SESSION
-    if _SESSION is None:
-        from rembg import new_session
-        import os
-        # u2netp by default. Measured against isnet-general-use on the same photo:
-        # isnet ran 3.6s to u2netp's 0.3s, needed a 179MB download, and produced
-        # 24.5% partial alpha against 26.5% — twelve times the cost for almost
-        # nothing. Both models return a SOFT mask; that is inherent, and it is
-        # what _clean_edges deals with. Override with REMBG_MODEL if a
-        # particular product defeats the small model.
-        _SESSION = new_session(os.getenv("REMBG_MODEL", "u2netp"))
-    return _SESSION
-
-
-def warm():
-    """Load the model up front so the first seller does not wait for it."""
-    try:
-        _rembg_session()
-        return True
-    except Exception as e:
-        logger.warning(f"rembg warm-up skipped: {e}")
-        return False
 
 
 def _despeckle(cut, min_frac=0.004):
@@ -400,16 +375,6 @@ def _clean_edges(cut):
     a = cut.split()[-1]
     cut.putalpha(a.point(lambda v: 0 if v < ALPHA_FLOOR else v))
     return cut
-
-
-def _cutout_rembg(img):
-    try:
-        from rembg import remove
-        cut = remove(img.convert("RGBA"), session=_rembg_session())
-        return _clean_edges(cut), None
-    except Exception as e:
-        logger.warning(f"rembg failed, falling back: {e}")
-        return None, None
 
 
 def _ground(cut, theme, pad=0.10, aspect=None, fill=0.76, target_w=None):
@@ -550,14 +515,10 @@ def apply(photo_bytes: bytes, plan: list, theme: dict,
             elif op == "contrast":
                 img = ImageEnhance.Contrast(img).enhance(step["factor"]); applied.append(op)
             elif op == "cutout":
-                res = None
-                if step.get("backend") == "rembg":
-                    res, _ = _cutout_rembg(img)
+                res, frac = _cutout_flood(img)
                 if res is None:
-                    res, frac = _cutout_flood(img)
-                    if res is None:
-                        logger.info(f"director: cutout skipped (would remove {frac:.0%})")
-                        continue
+                    logger.info(f"director: cutout skipped (would remove {frac:.0%})")
+                    continue
                 cut = _despeckle(res)
                 applied.append(f"cutout:{step.get('backend')}")
             elif op in ("ground", "shadow", "tighten") and return_cutout:

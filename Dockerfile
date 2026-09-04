@@ -7,7 +7,19 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    # glibc gives every thread its own malloc arena, up to eight per CPU core,
+    # and a Python process that has once peaked holds all of them. On a
+    # many-core host that is hundreds of megabytes of resident memory the
+    # service is not using and will not give back. Two arenas is the usual
+    # setting for a container and costs nothing here: the work is one request
+    # at a time, not a thread pool under contention.
+    MALLOC_ARENA_MAX=2 \
+    # Pillow decodes into a single buffer; this refuses an image whose declared
+    # dimensions would need more than it, before the allocation happens rather
+    # than after. A seller cannot upload a decompression bomb by accident, but
+    # a container with a memory limit dies either way.
+    PILLOW_MAX_IMAGE_PIXELS=80000000
 
 # chromium is a real dependency, not a convenience. The Art Director's second
 # pass screenshots the finished page and critiques what it sees; with no
@@ -15,10 +27,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # unreviewed. Installed headless-shell only — no X, no fonts beyond the
 # defaults the pages already load from Google Fonts.
 ENV CHROME_BIN=/usr/bin/chromium
+# build-essential is gone with rembg. It was here because rembg dragged in
+# scipy, scikit-image and pymatting, and a compiler was insurance against one
+# of them arriving as a source distribution. Every remaining requirement is
+# either pure Python or ships a manylinux wheel, so nothing compiles at build
+# time and a ~200MB toolchain does not need to sit in the running image.
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-      build-essential \
       curl \
       ca-certificates \
       chromium \

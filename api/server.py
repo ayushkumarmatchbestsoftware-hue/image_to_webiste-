@@ -57,13 +57,11 @@ _PACKS_DIR = os.path.join(ROOT, "templates", "packs")
 if os.path.isdir(_PACKS_DIR):
     app.mount("/packs", StaticFiles(directory=_PACKS_DIR), name="packs")
 
-# Load the cutout model at boot. Left lazy it costs the first seller several
-# seconds; here it costs the server a moment nobody is waiting on.
-try:
-    from core.imagedirector import warm as _warm_cutout
-    _warm_cutout()
-except Exception:
-    pass
+# There is no model to load at boot any more. This used to warm rembg's ONNX
+# session so the first seller did not wait for it — but that session then sat
+# in memory for the life of the process, which is most of what the container
+# was holding. Background removal is the image model's job now, and the local
+# fallback is a flood fill that allocates nothing until it is called.
 
 # Order matters for one pair only: publish declares /s/{slug}/{filename}, and
 # registering it after the rest keeps it from shadowing anything narrower.

@@ -86,9 +86,11 @@ unfunded key returns HTTP 429 for image models while text models keep working,
 which is easy to misread as the feature being broken.
 
 When it is unavailable, or when a check above fails, fall back to the local
-`rembg` cut-out in `core/imagedirector.py`. That path needs no key and no
-network. It is weaker on thin structures — a chair base, a wire handle — which
-is exactly the gap this skill closes when it can run.
+flood fill in `core/imagedirector.py`. That path needs no key, no network and
+no model — it reads the background in from the borders with PIL alone. It is
+weaker on thin structures — a chair base, a wire handle — and on any product
+whose colour meets its background, which is exactly the gap this skill closes
+when it can run.
 
 Never block a generation on this. A site with an untouched photo ships; a site
 that failed to generate does not.

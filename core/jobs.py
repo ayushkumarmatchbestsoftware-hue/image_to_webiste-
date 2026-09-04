@@ -12,12 +12,37 @@ or across instances is ever needed, this module is the seam to put a job queue
 behind.
 """
 import logging
+import os
 from datetime import datetime, timezone
 
 logger = logging.getLogger("jobs")
 
 JOBS: dict = {}            # job_id -> status
 WEBSITE_TO_JOB: dict = {}  # website_id -> job_id
+
+# How many finished jobs are kept. Nothing evicted from these dictionaries
+# before, so a container that had generated ten thousand sites was still
+# holding the status of all ten thousand — small records, but they only ever
+# grew, and a process that never gives memory back is a process that gets
+# killed eventually.
+#
+# A job's status is only read while the page is polling it, which stops the
+# moment the site is delivered. Keeping the last few hundred covers a reload
+# and a slow tab; older ones answer 404, which the page already handles as
+# "that job is gone".
+MAX_JOBS = int(os.getenv("MAX_JOBS_KEPT", "300"))
+
+
+def _evict() -> None:
+    """Drop the oldest records once the store is over its limit."""
+    if len(JOBS) <= MAX_JOBS:
+        return
+    # created_at is an ISO timestamp, so lexical order is chronological.
+    oldest = sorted(JOBS, key=lambda k: JOBS[k].get("created_at") or "")
+    for job_id in oldest[:len(JOBS) - MAX_JOBS]:
+        site = (JOBS.pop(job_id, {}) or {}).get("website_id")
+        if site and WEBSITE_TO_JOB.get(site) == job_id:
+            WEBSITE_TO_JOB.pop(site, None)
 
 
 def _now() -> str:
@@ -29,6 +54,7 @@ async def create_job_record(*, job_id: str, website_id: str) -> None:
                     "created_at": _now(), "error": None, "url": None,
                     "progress": 0, "stage": "Getting ready", "detail": ""}
     WEBSITE_TO_JOB[website_id] = job_id
+    _evict()
     logger.info(f"{job_id[:8]} queued (website {website_id[:8]})")
 
 

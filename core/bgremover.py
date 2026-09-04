@@ -443,30 +443,41 @@ def remove_background(
     """
     import io
     from PIL import Image
-    from core.imagedirector import _cutout_rembg, _cutout_flood, _clean_edges
+    from core.imagedirector import _cutout_flood, _clean_edges
     from core.utils import hex_to_rgb
 
     img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
     cutout = None
 
-    # 1. Try local rembg segmentation
+    # 1. The image model, when a flat ground is what was asked for.
+    #
+    # It re-renders the photograph rather than segmenting it, so thin
+    # structures — a wire handle, a chair base, a chain — survive, and there is
+    # no mask that can wrongly include a patch of floor. It cannot return
+    # transparency: an images/edits endpoint hands back a photograph, not an
+    # alpha channel. So it answers the solid-colour request and the flood fill
+    # answers the transparent one.
+    if bg_color and not transparent and available():
+        try:
+            out = replace(photo_bytes, {"bg": bg_color, "bg_alt": bg_color})
+            if _accepts(photo_bytes, out):
+                return out, "image/png"
+            logger.info("background replacement rejected: the product drifted")
+        except Unavailable as e:
+            logger.info(f"image model unavailable for background removal ({e})")
+        except Exception as e:
+            logger.warning(f"background replacement failed ({e})")
+
+    # 2. Border flood fill. PIL only — no model, nothing held in memory between
+    #    calls — which is why it is what remains after rembg was removed.
     try:
-        raw_cut, _ = _cutout_rembg(img)
+        raw_cut, _ = _cutout_flood(img, tol=tolerance)
         if raw_cut:
             cutout = _clean_edges(raw_cut)
     except Exception as e:
-        logger.debug(f"rembg background removal unavailable ({e})")
+        logger.debug(f"floodfill cutout failed ({e})")
 
-    # 2. Try border flood-fill matting
-    if cutout is None:
-        try:
-            raw_cut, _ = _cutout_flood(img, tol=tolerance)
-            if raw_cut:
-                cutout = _clean_edges(raw_cut)
-        except Exception as e:
-            logger.debug(f"floodfill cutout failed ({e})")
-
-    # 3. Fallback: if cutout failed, use original image
+    # 3. The photograph as it arrived. Worse than a cutout, never wrong.
     if cutout is None:
         cutout = img.convert("RGBA")
 
